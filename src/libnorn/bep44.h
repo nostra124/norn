@@ -42,6 +42,9 @@ typedef struct {
 /* target = SHA1(pubkey) — the DHT key to publish under (no salt). */
 void bep44_target(const unsigned char pubkey[32], unsigned char target[20]);
 
+/* Compute target for pubkey: target = SHA1("k" || pubkey) for mutable items. */
+void bep44_target_for_pubkey(unsigned char target[20], const unsigned char pubkey[32]);
+
 /* Salted target = SHA1(pubkey || salt) — BEP-44 with salt, for per-name signed
  * DHT keys (`spub`/`sget`, salt = the key name). salt clamped to 64 bytes. */
 void bep44_target_salted(const unsigned char pubkey[32],
@@ -72,5 +75,20 @@ int bep44_signbuf_salted(const unsigned char *salt, size_t saltlen, uint32_t seq
  * encode returns bytes written (or -1); decode returns 0 (or -1). */
 int bep44_record_encode(const bep44_record_t *r, unsigned char *out, size_t outcap);
 int bep44_record_decode(const unsigned char *in, size_t len, bep44_record_t *r);
+
+/* BEP-44 mutable item encode/decode with signature.
+ * encode: sign the value with sk and produce the wire format.
+ * decode: verify signature with pk and extract value.
+ * Returns bytes/0 on success, -1 on error. */
+int bep44_encode(unsigned char *out, size_t outcap,
+                 const unsigned char pk[32],
+                 const unsigned char *value, size_t vlen,
+                 uint32_t seq,
+                 const unsigned char sk[64]);
+int bep44_decode(const unsigned char *in, size_t len,
+                 unsigned char pk[32],
+                 unsigned char **value, size_t *vlen,
+                 uint32_t *seq,
+                 unsigned char sig[64]);
 
 #endif

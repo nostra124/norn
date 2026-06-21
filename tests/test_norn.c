@@ -1,9 +1,16 @@
 /* norn stub test */
 #include "norn.h"
+#include <sodium.h>
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 int main(void) {
+    if (sodium_init() < 0) {
+        fprintf(stderr, "Failed to initialize libsodium\n");
+        return 1;
+    }
+    
     unsigned char pubkey[NORN_PUBKEY_BYTES];
     unsigned char seckey[NORN_SECRETKEY_BYTES];
     
@@ -11,7 +18,8 @@ int main(void) {
     crypto_sign_keypair(pubkey, seckey);
     
     /* Create client with default config */
-    norn_config_t cfg = {0};
+    norn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
     cfg.version = "test";
     
     norn_client_t *client = norn_new(pubkey, seckey, &cfg);

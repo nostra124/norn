@@ -1,5 +1,6 @@
 #include "bep44.h"
 #include "sha1.h"
+#include <sodium.h>
 
 #include <string.h>
 #include <stdio.h>
@@ -7,6 +8,13 @@
 
 void bep44_target(const unsigned char pubkey[32], unsigned char target[20]) {
     sha1(pubkey, 32, target);
+}
+
+void bep44_target_for_pubkey(unsigned char target[20], const unsigned char pubkey[32]) {
+    /* BEP-44 mutable: target = SHA1("k" || pubkey) */
+    unsigned char buf[1 + 32] = {'k'};
+    memcpy(buf + 1, pubkey, 32);
+    sha1(buf, 33, target);
 }
 
 void bep44_target_salted(const unsigned char pubkey[32],
@@ -111,5 +119,71 @@ int bep44_record_decode(const unsigned char *in, size_t len, bep44_record_t *r) 
         if (remain > BEP44_REC_SVC_MAX) remain = BEP44_REC_SVC_MAX;
         memcpy(r->svc, in + o, remain); r->svc_len = (uint16_t)remain; o += remain;
     }
+    return 0;
+}
+
+int bep44_encode(unsigned char *out, size_t outcap,
+                 const unsigned char pk[32],
+                 const unsigned char *value, size_t vlen,
+                 uint32_t seq,
+                 const unsigned char sk[64]) {
+    if (!out || !pk || !value || !sk) return -1;
+    if (vlen > 1000) return -1;
+    
+    /* Build sign buffer */
+    unsigned char signbuf[2048];
+    int signlen = bep44_signbuf(seq, value, vlen, signbuf, sizeof(signbuf));
+    if (signlen < 0) return -1;
+    
+    /* Sign with ed25519 */
+    unsigned char sig[64];
+    if (crypto_sign_detached(sig, NULL, signbuf, (size_t)signlen, sk) != 0)
+        return -1;
+    
+    /* Output format: pk(32) || seq(4,BE) || vlen(2,BE) || value || sig(64) */
+    size_t need = 32 + 4 + 2 + vlen + 64;
+    if (outcap < need) return -1;
+    
+    size_t o = 0;
+    memcpy(out + o, pk, 32); o += 32;
+    uint32_t seq_be = htonl(seq);
+    memcpy(out + o, &seq_be, 4); o += 4;
+    uint16_t vlen_be = htons((uint16_t)vlen);
+    memcpy(out + o, &vlen_be, 2); o += 2;
+    memcpy(out + o, value, vlen); o += vlen;
+    memcpy(out + o, sig, 64); o += 64;
+    
+    return (int)o;
+}
+
+int bep44_decode(const unsigned char *in, size_t len,
+                 unsigned char pk[32],
+                 unsigned char **value, size_t *vlen,
+                 uint32_t *seq,
+                 unsigned char sig[64]) {
+    if (!in || len < 32 + 4 + 2 + 64) return -1;
+    
+    size_t o = 0;
+    if (pk) { memcpy(pk, in + o, 32); } o += 32;
+    uint32_t seq_be; memcpy(&seq_be, in + o, 4); o += 4;
+    if (seq) *seq = ntohl(seq_be);
+    uint16_t vlen_be; memcpy(&vlen_be, in + o, 2); o += 2;
+    size_t vl = ntohs(vlen_be);
+    if (o + vl + 64 > len) return -1;
+    if (value) *value = (unsigned char *)(in + o);
+    if (vlen) *vlen = vl;
+    o += vl;
+    if (sig) memcpy(sig, in + o, 64);
+    
+    /* Verify signature */
+    unsigned char signbuf[2048];
+    int signlen = bep44_signbuf(ntohl(seq_be), in + 32 + 4 + 2, vl, signbuf, sizeof(signbuf));
+    if (signlen < 0) return -1;
+    
+    unsigned char sig_copy[64];
+    memcpy(sig_copy, in + o, 64);
+    if (crypto_sign_detached_verify(sig_copy, signbuf, (size_t)signlen, pk ? pk : in) != 0)
+        return -1;
+    
     return 0;
 }
