@@ -89,10 +89,11 @@ int norn_put_mutable(norn_client_t *client,
                      const unsigned char *value, size_t value_len,
                      uint32_t seq) {
     if (!client || !client->ml || !pubkey || !secret || !value) return -1;
-    if (value_len > BEP44_MAX_VALUE) return -1;
+    if (value_len > 1000) return -1;  /* BEP-44 limit */
     
     /* Create BEP-44 mutable record and store */
     /* This would send put request to DHT */
+    (void)seq;  /* TODO: implement */
     return 0;
 }
 
@@ -100,6 +101,7 @@ int norn_get_mutable(norn_client_t *client,
                      const unsigned char *pubkey,
                      norn_get_callback_t callback, void *user_data) {
     if (!client || !client->ml || !pubkey || !callback) return -1;
+    (void)user_data;  /* TODO: implement */
     /* This would send get request to DHT and invoke callback */
     return 0;
 }
@@ -107,6 +109,7 @@ int norn_get_mutable(norn_client_t *client,
 int norn_put_immutable(norn_client_t *client,
                        const unsigned char *value, size_t value_len) {
     if (!client || !client->ml || !value) return -1;
+    (void)value_len;  /* TODO: implement */
     return 0;
 }
 
@@ -114,6 +117,7 @@ int norn_get_immutable(norn_client_t *client,
                        const unsigned char *key,
                        norn_get_callback_t callback, void *user_data) {
     if (!client || !client->ml || !key || !callback) return -1;
+    (void)user_data;  /* TODO: implement */
     return 0;
 }
 
@@ -127,6 +131,7 @@ int norn_discover(norn_client_t *client,
                   const unsigned char *info_hash,
                   norn_peer_callback_t callback, void *user_data) {
     if (!client || !client->ml || !info_hash || !callback) return -1;
+    (void)user_data;  /* TODO: implement */
     return 0;
 }
 
@@ -145,14 +150,30 @@ int norn_encode_mutable(const norn_mutable_t *rec,
                         unsigned char *out, size_t outcap) {
     if (!rec || !out) return -1;
     /* Encode using BEP-44 format */
-    return bep44_encode(out, outcap, rec->key, rec->pubkey, 
-                        rec->value, rec->value_len, rec->seq, rec->sig);
+    return bep44_encode(out, outcap, rec->pubkey, 
+                        rec->value, rec->value_len, rec->seq, 
+                        rec->have_sig ? rec->sig : NULL);
 }
 
 int norn_decode_mutable(const unsigned char *buf, size_t len,
                         norn_mutable_t *rec) {
     if (!buf || !rec) return -1;
     /* Decode BEP-44 format */
-    return bep44_decode(buf, len, rec->key, rec->pubkey,
-                        &rec->value, &rec->value_len, &rec->seq, rec->sig);
+    unsigned char *value;
+    size_t vlen;
+    uint32_t seq;
+    unsigned char sig[64];
+    
+    int ret = bep44_decode(buf, len, rec->pubkey, &value, &vlen, &seq, sig);
+    if (ret != 0) return -1;
+    
+    /* Copy value into the record buffer */
+    if (vlen > sizeof(rec->value)) return -1;
+    memcpy(rec->value, value, vlen);
+    rec->value_len = vlen;
+    rec->seq = seq;
+    memcpy(rec->sig, sig, 64);
+    rec->have_sig = 1;
+    
+    return 0;
 }

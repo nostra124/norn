@@ -182,7 +182,7 @@ int bep44_decode(const unsigned char *in, size_t len,
     
     unsigned char sig_copy[64];
     memcpy(sig_copy, in + o, 64);
-    if (crypto_sign_detached_verify(sig_copy, signbuf, (size_t)signlen, pk ? pk : in) != 0)
+    if (crypto_sign_verify_detached(sig_copy, signbuf, (size_t)signlen, pk ? pk : in) != 0)
         return -1;
     
     return 0;
