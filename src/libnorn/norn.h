@@ -35,7 +35,7 @@ typedef struct {
 typedef struct {
     unsigned char key[NORN_ID_BYTES];      /* target = sha1("k" || pubkey) */
     unsigned char pubkey[NORN_PUBKEY_BYTES];
-    unsigned char *value;
+    unsigned char value[1024];              /* BEP-44 max value size */
     size_t value_len;
     uint32_t seq;
     unsigned char sig[64];

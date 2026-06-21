@@ -9,9 +9,11 @@ libnorn_la_SOURCES = \
 	src/libnorn/bep44.c \
 	src/libnorn/sha1.c \
 	src/libnorn/dhtstore.c \
+	src/libnorn/recstore.c \
 	src/libnorn/bencode.c \
 	src/libnorn/crypto.c \
-	src/libnorn/net.c
+	src/libnorn/net.c \
+	src/libnorn/log.c
 
 libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -O2 -I$(top_srcdir)/src/libnorn
 
