@@ -4,11 +4,14 @@ lib_LTLIBRARIES = libnorn.la
 
 libnorn_la_SOURCES = \
 	src/libnorn/norn.c \
+	src/libnorn/norn_impl.c \
 	src/libnorn/kademlia.c \
 	src/libnorn/bep44.c \
 	src/libnorn/sha1.c \
 	src/libnorn/dhtstore.c \
-	src/libnorn/bencode.c
+	src/libnorn/bencode.c \
+	src/libnorn/crypto.c \
+	src/libnorn/net.c
 
 libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -O2 -I$(top_srcdir)/src/libnorn
 
