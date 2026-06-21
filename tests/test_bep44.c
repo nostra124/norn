@@ -1,4 +1,4 @@
-/* Test BEP-44 encoding/decoding (copied from bifrost test_bep44.c) */
+/* Test BEP-44 encoding/decoding */
 #include "bep44.h"
 #include "sha1.h"
 #include <stdio.h>
@@ -11,10 +11,12 @@ int main(void) {
     unsigned char target[20];
     unsigned char value[] = "hello world";
     unsigned char out[1024];
-    unsigned char vout[1024];
     uint32_t seq = 1;
     
-    assert(sodium_init() >= 0);
+    if (sodium_init() < 0) {
+        fprintf(stderr, "Failed to initialize libsodium\n");
+        return 1;
+    }
     
     /* Generate keypair */
     crypto_sign_keypair(pk, sk);
@@ -22,18 +24,27 @@ int main(void) {
     /* Compute target = sha1("k" || pk) */
     bep44_target_for_pubkey(target, pk);
     
-    /* Encode mutable */
+    /* Verify target is computed correctly */
+    printf("Target: ");
+    for (int i = 0; i < 20; i++) printf("%02x", target[i]);
+    printf("\n");
+    
+    /* Test encode */
     int len = bep44_encode(out, sizeof(out), pk, value, sizeof(value) - 1, seq, sk);
     assert(len > 0);
+    printf("Encoded length: %d\n", len);
     
-    /* Decode */
-    unsigned char pk2[32], vout2[1024];
+    /* Test decode */
+    unsigned char pk2[32], sig[64];
+    unsigned char *vout;
     size_t vlen;
     uint32_t seq2;
-    assert(bep44_decode(out, len, pk2, vout2, &vlen, &seq2) == 0);
+    
+    int ret = bep44_decode(out, (size_t)len, pk2, &vout, &vlen, &seq2, sig);
+    assert(ret == 0);
     assert(memcmp(pk2, pk, 32) == 0);
     assert(vlen == sizeof(value) - 1);
-    assert(memcmp(vout2, value, vlen) == 0);
+    assert(memcmp(vout, value, vlen) == 0);
     assert(seq2 == seq);
     
     printf("test_bep44: OK\n");

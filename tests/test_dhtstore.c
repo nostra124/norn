@@ -1,26 +1,30 @@
-/* Test DHT storage (copied from bifrost test_dhtstore.c) */
+/* Test DHT storage */
 #include "dhtstore.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 
 int main(void) {
-    dhtstore_t store;
-    assert(dhtstore_init(&store, "/tmp/test_dhtstore.db") == 0);
-    
     unsigned char key[20] = {0};
     unsigned char value[] = "test value";
-    
-    /* Put and get */
-    assert(dhtstore_put(&store, key, value, sizeof(value) - 1) == 0);
-    
     unsigned char out[1024];
+    unsigned char k_out[32];
+    uint32_t seq_out;
     size_t outlen;
-    assert(dhtstore_get(&store, key, out, sizeof(out), &outlen) == 0);
+    
+    /* Initialize with 2MB budget */
+    size_t budget = dhtstore_init(2, 0);
+    printf("DHT store initialized with %zu bytes\n", budget);
+    assert(budget > 0);
+    
+    /* Put immutable value */
+    unsigned char target[20];
+    assert(dhtstore_put_immutable(value, sizeof(value) - 1, 0, target) == 1);
+    
+    /* Get it back */
+    assert(dhtstore_get(target, k_out, &seq_out, out, sizeof(out), &outlen, NULL, NULL) == 1);
     assert(outlen == sizeof(value) - 1);
     assert(memcmp(out, value, outlen) == 0);
-    
-    dhtstore_close(&store);
     
     printf("test_dhtstore: OK\n");
     return 0;
