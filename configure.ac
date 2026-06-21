@@ -24,6 +24,17 @@ AC_TYPE_SIZE_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT8_T
 
+# Coverage support
+AC_ARG_ENABLE([coverage],
+              [AS_HELP_STRING([--enable-coverage],
+                              [Enable code coverage testing @<:@default=no@:>@])],
+              [enable_coverage=$enableval],
+              [enable_coverage=no])
+AM_CONDITIONAL([ENABLE_COVERAGE], [test "x$enable_coverage" = "xyes"])
+
+AS_IF([test "x$enable_coverage" = "xyes"],
+      [CFLAGS="$CFLAGS --coverage -O0"])
+
 AC_CONFIG_FILES([Makefile norn.pc])
 AC_OUTPUT
 

@@ -39,5 +39,17 @@ test_dhtstore_LDADD = libnorn.la $(SODIUM_LIBS)
 
 TESTS = $(check_PROGRAMS)
 
+# Coverage support
+if ENABLE_COVERAGE
+COV_FLAGS = -fprofile-arcs -ftest-coverage
+libnorn_la_CFLAGS += $(COV_FLAGS)
+norn_CFLAGS += $(COV_FLAGS)
+endif
+
+coverage:
+	$(top_srcdir)/contrib/coverage.sh
+
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = norn.pc
+
+EXTRA_DIST = README.md LICENSE docs AGENTS.md
