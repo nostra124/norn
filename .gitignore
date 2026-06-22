@@ -26,8 +26,8 @@ libtool
 stamp-h1
 *.pc
 
-# Test artifacts
-test_*
+# Test artifacts (executables, not source files)
+/test_*
 *.log
 *.trs
 test-suite.log
