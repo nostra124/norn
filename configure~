@@ -5024,7 +5024,6 @@ fi
 
 
 
-
   if test -n "$ac_tool_prefix"; then
   for ac_prog in ar lib "link -lib"
   do

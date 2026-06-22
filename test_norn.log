@@ -1,3 +1,25 @@
-Client created, node ID: 0000000000000000000000000000000000000000
+test_norn:
+  test_new_free: OK
+  test_new_null: OK
+  test_free_null: OK
+  test_get_id: OK
+  test_get_id_null: OK
+  test_bootstrap: OK
+  test_bootstrap_null: OK
+  test_tick: OK
+  test_tick_null: OK
+  test_get_fd: OK
+  test_get_fd_null: OK
+  test_encode_decode_mutable: OK
+  test_encode_mutable_null: OK
+  test_decode_mutable_null: OK
+  test_put_mutable: OK
+  test_put_mutable_null: OK
+  test_get_mutable: OK
+  test_get_mutable_null: OK
+  test_put_immutable: OK
+  test_get_immutable: OK
+  test_announce: OK
+  test_discover: OK
 test_norn: OK
 PASS test_norn (exit status: 0)

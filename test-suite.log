@@ -2,8 +2,8 @@
    norn 0.1.0: ./test-suite.log
 ==================================
 
-# TOTAL: 3
-# PASS:  3
+# TOTAL: 25
+# PASS:  25
 # SKIP:  0
 # XFAIL: 0
 # FAIL:  0
