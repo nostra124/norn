@@ -14,7 +14,9 @@ libnorn_la_SOURCES = \
 	src/libnorn/bencode.c \
 	src/libnorn/crypto.c \
 	src/libnorn/net.c \
-	src/libnorn/log.c
+	src/libnorn/log.c \
+	src/libnorn/channel.c \
+	src/libnorn/replaycache.c
 
 libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -O2 -I$(top_srcdir)/src/libnorn
 
@@ -26,7 +28,7 @@ norn_SOURCES = src/norn.c
 norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -O2 -I$(top_srcdir)/src/libnorn
 norn_LDADD = libnorn.la $(SODIUM_LIBS)
 
-check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline
+check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache
 
 test_norn_SOURCES = tests/test_norn.c
 test_norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
@@ -67,6 +69,18 @@ test_norn_async_LDADD = libnorn.la $(SODIUM_LIBS)
 test_mainline_SOURCES = tests/test_mainline.c
 test_mainline_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
 test_mainline_LDADD = libnorn.la $(SODIUM_LIBS)
+
+test_channel_SOURCES = tests/test_channel.c
+test_channel_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_channel_LDADD = libnorn.la $(SODIUM_LIBS)
+
+test_channel_edges_SOURCES = tests/test_channel_edges.c
+test_channel_edges_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_channel_edges_LDADD = libnorn.la $(SODIUM_LIBS)
+
+test_replaycache_SOURCES = tests/test_replaycache.c
+test_replaycache_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_replaycache_LDADD = libnorn.la $(SODIUM_LIBS)
 
 TESTS = $(check_PROGRAMS)
 
