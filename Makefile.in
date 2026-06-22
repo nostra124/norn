@@ -95,7 +95,17 @@ build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = norn$(EXEEXT)
 check_PROGRAMS = test_norn$(EXEEXT) test_bep44$(EXEEXT) \
-	test_dhtstore$(EXEEXT)
+	test_dhtstore$(EXEEXT) test_bencode$(EXEEXT) \
+	test_crypto$(EXEEXT) test_log$(EXEEXT) test_kademlia$(EXEEXT) \
+	test_recstore$(EXEEXT) test_norn_async$(EXEEXT) \
+	test_mainline$(EXEEXT) test_channel$(EXEEXT) \
+	test_channel_edges$(EXEEXT) test_replaycache$(EXEEXT) \
+	test_stream$(EXEEXT) test_stream_edges$(EXEEXT) \
+	test_stream_recovery$(EXEEXT) test_stream_cc$(EXEEXT) \
+	test_stream_random$(EXEEXT) test_streammux$(EXEEXT) \
+	test_streammux_random$(EXEEXT) test_transport$(EXEEXT) \
+	test_transport_udp$(EXEEXT) test_transport_tcp$(EXEEXT) \
+	test_idexch$(EXEEXT) test_attr$(EXEEXT)
 @ENABLE_COVERAGE_TRUE@am__append_1 = $(COV_FLAGS)
 @ENABLE_COVERAGE_TRUE@am__append_2 = $(COV_FLAGS)
 subdir = .
@@ -148,13 +158,23 @@ libnorn_la_LIBADD =
 am__dirstamp = $(am__leading_dot)dirstamp
 am_libnorn_la_OBJECTS = src/libnorn/libnorn_la-norn.lo \
 	src/libnorn/libnorn_la-norn_impl.lo \
+	src/libnorn/libnorn_la-norn_transaction.lo \
 	src/libnorn/libnorn_la-kademlia.lo \
 	src/libnorn/libnorn_la-bep44.lo src/libnorn/libnorn_la-sha1.lo \
 	src/libnorn/libnorn_la-dhtstore.lo \
 	src/libnorn/libnorn_la-recstore.lo \
 	src/libnorn/libnorn_la-bencode.lo \
 	src/libnorn/libnorn_la-crypto.lo src/libnorn/libnorn_la-net.lo \
-	src/libnorn/libnorn_la-log.lo
+	src/libnorn/libnorn_la-log.lo \
+	src/libnorn/libnorn_la-channel.lo \
+	src/libnorn/libnorn_la-replaycache.lo \
+	src/libnorn/libnorn_la-stream.lo \
+	src/libnorn/libnorn_la-streammux.lo \
+	src/libnorn/libnorn_la-transport.lo \
+	src/libnorn/libnorn_la-transport_udp.lo \
+	src/libnorn/libnorn_la-transport_tcp.lo \
+	src/libnorn/libnorn_la-idexch.lo \
+	src/libnorn/libnorn_la-attr.lo
 libnorn_la_OBJECTS = $(am_libnorn_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -170,11 +190,43 @@ norn_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
 norn_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(norn_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_test_attr_OBJECTS = tests/test_attr-test_attr.$(OBJEXT)
+test_attr_OBJECTS = $(am_test_attr_OBJECTS)
+test_attr_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_attr_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_attr_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_test_bencode_OBJECTS = tests/test_bencode-test_bencode.$(OBJEXT)
+test_bencode_OBJECTS = $(am_test_bencode_OBJECTS)
+test_bencode_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_bencode_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_bencode_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_test_bep44_OBJECTS = tests/test_bep44-test_bep44.$(OBJEXT)
 test_bep44_OBJECTS = $(am_test_bep44_OBJECTS)
 test_bep44_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
 test_bep44_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_bep44_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_test_channel_OBJECTS = tests/test_channel-test_channel.$(OBJEXT)
+test_channel_OBJECTS = $(am_test_channel_OBJECTS)
+test_channel_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_channel_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_channel_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_test_channel_edges_OBJECTS =  \
+	tests/test_channel_edges-test_channel_edges.$(OBJEXT)
+test_channel_edges_OBJECTS = $(am_test_channel_edges_OBJECTS)
+test_channel_edges_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_channel_edges_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_channel_edges_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
+	$(LDFLAGS) -o $@
+am_test_crypto_OBJECTS = tests/test_crypto-test_crypto.$(OBJEXT)
+test_crypto_OBJECTS = $(am_test_crypto_OBJECTS)
+test_crypto_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_crypto_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_crypto_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_test_dhtstore_OBJECTS =  \
 	tests/test_dhtstore-test_dhtstore.$(OBJEXT)
@@ -183,12 +235,139 @@ test_dhtstore_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
 test_dhtstore_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_dhtstore_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_test_idexch_OBJECTS = tests/test_idexch-test_idexch.$(OBJEXT)
+test_idexch_OBJECTS = $(am_test_idexch_OBJECTS)
+test_idexch_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_idexch_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_idexch_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_test_kademlia_OBJECTS =  \
+	tests/test_kademlia-test_kademlia.$(OBJEXT)
+test_kademlia_OBJECTS = $(am_test_kademlia_OBJECTS)
+test_kademlia_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_kademlia_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_kademlia_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_test_log_OBJECTS = tests/test_log-test_log.$(OBJEXT)
+test_log_OBJECTS = $(am_test_log_OBJECTS)
+test_log_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_log_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_log_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_test_mainline_OBJECTS =  \
+	tests/test_mainline-test_mainline.$(OBJEXT)
+test_mainline_OBJECTS = $(am_test_mainline_OBJECTS)
+test_mainline_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_mainline_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_mainline_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_test_norn_OBJECTS = tests/test_norn-test_norn.$(OBJEXT)
 test_norn_OBJECTS = $(am_test_norn_OBJECTS)
 test_norn_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
 test_norn_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_norn_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_test_norn_async_OBJECTS =  \
+	tests/test_norn_async-test_norn_async.$(OBJEXT)
+test_norn_async_OBJECTS = $(am_test_norn_async_OBJECTS)
+test_norn_async_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_norn_async_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_norn_async_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
+	-o $@
+am_test_recstore_OBJECTS =  \
+	tests/test_recstore-test_recstore.$(OBJEXT)
+test_recstore_OBJECTS = $(am_test_recstore_OBJECTS)
+test_recstore_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_recstore_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_recstore_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_test_replaycache_OBJECTS =  \
+	tests/test_replaycache-test_replaycache.$(OBJEXT)
+test_replaycache_OBJECTS = $(am_test_replaycache_OBJECTS)
+test_replaycache_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_replaycache_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_replaycache_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
+	-o $@
+am_test_stream_OBJECTS = tests/test_stream-test_stream.$(OBJEXT)
+test_stream_OBJECTS = $(am_test_stream_OBJECTS)
+test_stream_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_stream_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_stream_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_test_stream_cc_OBJECTS =  \
+	tests/test_stream_cc-test_stream_cc.$(OBJEXT)
+test_stream_cc_OBJECTS = $(am_test_stream_cc_OBJECTS)
+test_stream_cc_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_stream_cc_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_stream_cc_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o \
+	$@
+am_test_stream_edges_OBJECTS =  \
+	tests/test_stream_edges-test_stream_edges.$(OBJEXT)
+test_stream_edges_OBJECTS = $(am_test_stream_edges_OBJECTS)
+test_stream_edges_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_stream_edges_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_stream_edges_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
+	-o $@
+am_test_stream_random_OBJECTS =  \
+	tests/test_stream_random-test_stream_random.$(OBJEXT)
+test_stream_random_OBJECTS = $(am_test_stream_random_OBJECTS)
+test_stream_random_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_stream_random_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_stream_random_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
+	$(LDFLAGS) -o $@
+am_test_stream_recovery_OBJECTS =  \
+	tests/test_stream_recovery-test_stream_recovery.$(OBJEXT)
+test_stream_recovery_OBJECTS = $(am_test_stream_recovery_OBJECTS)
+test_stream_recovery_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_stream_recovery_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_stream_recovery_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
+	$(LDFLAGS) -o $@
+am_test_streammux_OBJECTS =  \
+	tests/test_streammux-test_streammux.$(OBJEXT)
+test_streammux_OBJECTS = $(am_test_streammux_OBJECTS)
+test_streammux_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_streammux_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_streammux_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o \
+	$@
+am_test_streammux_random_OBJECTS =  \
+	tests/test_streammux_random-test_streammux_random.$(OBJEXT)
+test_streammux_random_OBJECTS = $(am_test_streammux_random_OBJECTS)
+test_streammux_random_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_streammux_random_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_streammux_random_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
+	$(LDFLAGS) -o $@
+am_test_transport_OBJECTS =  \
+	tests/test_transport-test_transport.$(OBJEXT)
+test_transport_OBJECTS = $(am_test_transport_OBJECTS)
+test_transport_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_transport_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_transport_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o \
+	$@
+am_test_transport_tcp_OBJECTS =  \
+	tests/test_transport_tcp-test_transport_tcp.$(OBJEXT)
+test_transport_tcp_OBJECTS = $(am_test_transport_tcp_OBJECTS)
+test_transport_tcp_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_transport_tcp_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_transport_tcp_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
+	$(LDFLAGS) -o $@
+am_test_transport_udp_OBJECTS =  \
+	tests/test_transport_udp-test_transport_udp.$(OBJEXT)
+test_transport_udp_OBJECTS = $(am_test_transport_udp_OBJECTS)
+test_transport_udp_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_transport_udp_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_transport_udp_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
+	$(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -205,20 +384,52 @@ DEFAULT_INCLUDES = -I.@am__isrc@
 depcomp = $(SHELL) $(top_srcdir)/build-aux/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = src/$(DEPDIR)/norn-norn.Po \
+	src/libnorn/$(DEPDIR)/libnorn_la-attr.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-bencode.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-bep44.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-channel.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-crypto.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-dhtstore.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-idexch.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-kademlia.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-log.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-net.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-recstore.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-replaycache.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-sha1.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-stream.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-streammux.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-transport.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-transport_tcp.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-transport_udp.Plo \
+	tests/$(DEPDIR)/test_attr-test_attr.Po \
+	tests/$(DEPDIR)/test_bencode-test_bencode.Po \
 	tests/$(DEPDIR)/test_bep44-test_bep44.Po \
+	tests/$(DEPDIR)/test_channel-test_channel.Po \
+	tests/$(DEPDIR)/test_channel_edges-test_channel_edges.Po \
+	tests/$(DEPDIR)/test_crypto-test_crypto.Po \
 	tests/$(DEPDIR)/test_dhtstore-test_dhtstore.Po \
-	tests/$(DEPDIR)/test_norn-test_norn.Po
+	tests/$(DEPDIR)/test_idexch-test_idexch.Po \
+	tests/$(DEPDIR)/test_kademlia-test_kademlia.Po \
+	tests/$(DEPDIR)/test_log-test_log.Po \
+	tests/$(DEPDIR)/test_mainline-test_mainline.Po \
+	tests/$(DEPDIR)/test_norn-test_norn.Po \
+	tests/$(DEPDIR)/test_norn_async-test_norn_async.Po \
+	tests/$(DEPDIR)/test_recstore-test_recstore.Po \
+	tests/$(DEPDIR)/test_replaycache-test_replaycache.Po \
+	tests/$(DEPDIR)/test_stream-test_stream.Po \
+	tests/$(DEPDIR)/test_stream_cc-test_stream_cc.Po \
+	tests/$(DEPDIR)/test_stream_edges-test_stream_edges.Po \
+	tests/$(DEPDIR)/test_stream_random-test_stream_random.Po \
+	tests/$(DEPDIR)/test_stream_recovery-test_stream_recovery.Po \
+	tests/$(DEPDIR)/test_streammux-test_streammux.Po \
+	tests/$(DEPDIR)/test_streammux_random-test_streammux_random.Po \
+	tests/$(DEPDIR)/test_transport-test_transport.Po \
+	tests/$(DEPDIR)/test_transport_tcp-test_transport_tcp.Po \
+	tests/$(DEPDIR)/test_transport_udp-test_transport_udp.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -238,11 +449,33 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libnorn_la_SOURCES) $(norn_SOURCES) $(test_bep44_SOURCES) \
-	$(test_dhtstore_SOURCES) $(test_norn_SOURCES)
+SOURCES = $(libnorn_la_SOURCES) $(norn_SOURCES) $(test_attr_SOURCES) \
+	$(test_bencode_SOURCES) $(test_bep44_SOURCES) \
+	$(test_channel_SOURCES) $(test_channel_edges_SOURCES) \
+	$(test_crypto_SOURCES) $(test_dhtstore_SOURCES) \
+	$(test_idexch_SOURCES) $(test_kademlia_SOURCES) \
+	$(test_log_SOURCES) $(test_mainline_SOURCES) \
+	$(test_norn_SOURCES) $(test_norn_async_SOURCES) \
+	$(test_recstore_SOURCES) $(test_replaycache_SOURCES) \
+	$(test_stream_SOURCES) $(test_stream_cc_SOURCES) \
+	$(test_stream_edges_SOURCES) $(test_stream_random_SOURCES) \
+	$(test_stream_recovery_SOURCES) $(test_streammux_SOURCES) \
+	$(test_streammux_random_SOURCES) $(test_transport_SOURCES) \
+	$(test_transport_tcp_SOURCES) $(test_transport_udp_SOURCES)
 DIST_SOURCES = $(libnorn_la_SOURCES) $(norn_SOURCES) \
-	$(test_bep44_SOURCES) $(test_dhtstore_SOURCES) \
-	$(test_norn_SOURCES)
+	$(test_attr_SOURCES) $(test_bencode_SOURCES) \
+	$(test_bep44_SOURCES) $(test_channel_SOURCES) \
+	$(test_channel_edges_SOURCES) $(test_crypto_SOURCES) \
+	$(test_dhtstore_SOURCES) $(test_idexch_SOURCES) \
+	$(test_kademlia_SOURCES) $(test_log_SOURCES) \
+	$(test_mainline_SOURCES) $(test_norn_SOURCES) \
+	$(test_norn_async_SOURCES) $(test_recstore_SOURCES) \
+	$(test_replaycache_SOURCES) $(test_stream_SOURCES) \
+	$(test_stream_cc_SOURCES) $(test_stream_edges_SOURCES) \
+	$(test_stream_random_SOURCES) $(test_stream_recovery_SOURCES) \
+	$(test_streammux_SOURCES) $(test_streammux_random_SOURCES) \
+	$(test_transport_SOURCES) $(test_transport_tcp_SOURCES) \
+	$(test_transport_udp_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -617,6 +850,7 @@ lib_LTLIBRARIES = libnorn.la
 libnorn_la_SOURCES = \
 	src/libnorn/norn.c \
 	src/libnorn/norn_impl.c \
+	src/libnorn/norn_transaction.c \
 	src/libnorn/kademlia.c \
 	src/libnorn/bep44.c \
 	src/libnorn/sha1.c \
@@ -625,7 +859,16 @@ libnorn_la_SOURCES = \
 	src/libnorn/bencode.c \
 	src/libnorn/crypto.c \
 	src/libnorn/net.c \
-	src/libnorn/log.c
+	src/libnorn/log.c \
+	src/libnorn/channel.c \
+	src/libnorn/replaycache.c \
+	src/libnorn/stream.c \
+	src/libnorn/streammux.c \
+	src/libnorn/transport.c \
+	src/libnorn/transport_udp.c \
+	src/libnorn/transport_tcp.c \
+	src/libnorn/idexch.c \
+	src/libnorn/attr.c
 
 libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -O2 \
 	-I$(top_srcdir)/src/libnorn $(am__append_1)
@@ -643,13 +886,79 @@ test_bep44_LDADD = libnorn.la $(SODIUM_LIBS)
 test_dhtstore_SOURCES = tests/test_dhtstore.c
 test_dhtstore_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
 test_dhtstore_LDADD = libnorn.la $(SODIUM_LIBS)
+test_bencode_SOURCES = tests/test_bencode.c
+test_bencode_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_bencode_LDADD = libnorn.la $(SODIUM_LIBS)
+test_crypto_SOURCES = tests/test_crypto.c
+test_crypto_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_crypto_LDADD = libnorn.la $(SODIUM_LIBS)
+test_log_SOURCES = tests/test_log.c
+test_log_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_log_LDADD = libnorn.la $(SODIUM_LIBS)
+test_kademlia_SOURCES = tests/test_kademlia.c
+test_kademlia_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_kademlia_LDADD = libnorn.la $(SODIUM_LIBS)
+test_recstore_SOURCES = tests/test_recstore.c
+test_recstore_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_recstore_LDADD = libnorn.la $(SODIUM_LIBS)
+test_norn_async_SOURCES = tests/test_norn_async.c
+test_norn_async_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_norn_async_LDADD = libnorn.la $(SODIUM_LIBS)
+test_mainline_SOURCES = tests/test_mainline.c
+test_mainline_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_mainline_LDADD = libnorn.la $(SODIUM_LIBS)
+test_channel_SOURCES = tests/test_channel.c
+test_channel_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_channel_LDADD = libnorn.la $(SODIUM_LIBS)
+test_channel_edges_SOURCES = tests/test_channel_edges.c
+test_channel_edges_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_channel_edges_LDADD = libnorn.la $(SODIUM_LIBS)
+test_replaycache_SOURCES = tests/test_replaycache.c
+test_replaycache_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_replaycache_LDADD = libnorn.la $(SODIUM_LIBS)
+test_stream_SOURCES = tests/test_stream.c
+test_stream_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_stream_LDADD = libnorn.la $(SODIUM_LIBS)
+test_stream_edges_SOURCES = tests/test_stream_edges.c
+test_stream_edges_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_stream_edges_LDADD = libnorn.la $(SODIUM_LIBS)
+test_stream_recovery_SOURCES = tests/test_stream_recovery.c
+test_stream_recovery_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_stream_recovery_LDADD = libnorn.la $(SODIUM_LIBS)
+test_stream_cc_SOURCES = tests/test_stream_cc.c
+test_stream_cc_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_stream_cc_LDADD = libnorn.la $(SODIUM_LIBS)
+test_stream_random_SOURCES = tests/test_stream_random.c
+test_stream_random_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_stream_random_LDADD = libnorn.la $(SODIUM_LIBS)
+test_streammux_SOURCES = tests/test_streammux.c
+test_streammux_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_streammux_LDADD = libnorn.la $(SODIUM_LIBS)
+test_streammux_random_SOURCES = tests/test_streammux_random.c
+test_streammux_random_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_streammux_random_LDADD = libnorn.la $(SODIUM_LIBS)
+test_transport_SOURCES = tests/test_transport.c
+test_transport_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_transport_LDADD = libnorn.la $(SODIUM_LIBS)
+test_transport_udp_SOURCES = tests/test_transport_udp.c
+test_transport_udp_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_transport_udp_LDADD = libnorn.la $(SODIUM_LIBS)
+test_transport_tcp_SOURCES = tests/test_transport_tcp.c
+test_transport_tcp_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_transport_tcp_LDADD = libnorn.la $(SODIUM_LIBS)
+test_idexch_SOURCES = tests/test_idexch.c
+test_idexch_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_idexch_LDADD = libnorn.la $(SODIUM_LIBS)
+test_attr_SOURCES = tests/test_attr.c
+test_attr_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_attr_LDADD = libnorn.la $(SODIUM_LIBS)
 TESTS = $(check_PROGRAMS)
 
 # Coverage support
 @ENABLE_COVERAGE_TRUE@COV_FLAGS = -fprofile-arcs -ftest-coverage
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = norn.pc
-EXTRA_DIST = README.md LICENSE docs AGENTS.md
+EXTRA_DIST = README.md LICENSE docs AGENTS.md tests/sit tests/pit
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -796,6 +1105,9 @@ src/libnorn/libnorn_la-norn.lo: src/libnorn/$(am__dirstamp) \
 	src/libnorn/$(DEPDIR)/$(am__dirstamp)
 src/libnorn/libnorn_la-norn_impl.lo: src/libnorn/$(am__dirstamp) \
 	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-norn_transaction.lo:  \
+	src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
 src/libnorn/libnorn_la-kademlia.lo: src/libnorn/$(am__dirstamp) \
 	src/libnorn/$(DEPDIR)/$(am__dirstamp)
 src/libnorn/libnorn_la-bep44.lo: src/libnorn/$(am__dirstamp) \
@@ -813,6 +1125,24 @@ src/libnorn/libnorn_la-crypto.lo: src/libnorn/$(am__dirstamp) \
 src/libnorn/libnorn_la-net.lo: src/libnorn/$(am__dirstamp) \
 	src/libnorn/$(DEPDIR)/$(am__dirstamp)
 src/libnorn/libnorn_la-log.lo: src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-channel.lo: src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-replaycache.lo: src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-stream.lo: src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-streammux.lo: src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-transport.lo: src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-transport_udp.lo: src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-transport_tcp.lo: src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-idexch.lo: src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-attr.lo: src/libnorn/$(am__dirstamp) \
 	src/libnorn/$(DEPDIR)/$(am__dirstamp)
 
 libnorn.la: $(libnorn_la_OBJECTS) $(libnorn_la_DEPENDENCIES) $(EXTRA_libnorn_la_DEPENDENCIES) 
@@ -835,24 +1165,156 @@ tests/$(am__dirstamp):
 tests/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) tests/$(DEPDIR)
 	@: >>tests/$(DEPDIR)/$(am__dirstamp)
+tests/test_attr-test_attr.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_attr$(EXEEXT): $(test_attr_OBJECTS) $(test_attr_DEPENDENCIES) $(EXTRA_test_attr_DEPENDENCIES) 
+	@rm -f test_attr$(EXEEXT)
+	$(AM_V_CCLD)$(test_attr_LINK) $(test_attr_OBJECTS) $(test_attr_LDADD) $(LIBS)
+tests/test_bencode-test_bencode.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_bencode$(EXEEXT): $(test_bencode_OBJECTS) $(test_bencode_DEPENDENCIES) $(EXTRA_test_bencode_DEPENDENCIES) 
+	@rm -f test_bencode$(EXEEXT)
+	$(AM_V_CCLD)$(test_bencode_LINK) $(test_bencode_OBJECTS) $(test_bencode_LDADD) $(LIBS)
 tests/test_bep44-test_bep44.$(OBJEXT): tests/$(am__dirstamp) \
 	tests/$(DEPDIR)/$(am__dirstamp)
 
 test_bep44$(EXEEXT): $(test_bep44_OBJECTS) $(test_bep44_DEPENDENCIES) $(EXTRA_test_bep44_DEPENDENCIES) 
 	@rm -f test_bep44$(EXEEXT)
 	$(AM_V_CCLD)$(test_bep44_LINK) $(test_bep44_OBJECTS) $(test_bep44_LDADD) $(LIBS)
+tests/test_channel-test_channel.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_channel$(EXEEXT): $(test_channel_OBJECTS) $(test_channel_DEPENDENCIES) $(EXTRA_test_channel_DEPENDENCIES) 
+	@rm -f test_channel$(EXEEXT)
+	$(AM_V_CCLD)$(test_channel_LINK) $(test_channel_OBJECTS) $(test_channel_LDADD) $(LIBS)
+tests/test_channel_edges-test_channel_edges.$(OBJEXT):  \
+	tests/$(am__dirstamp) tests/$(DEPDIR)/$(am__dirstamp)
+
+test_channel_edges$(EXEEXT): $(test_channel_edges_OBJECTS) $(test_channel_edges_DEPENDENCIES) $(EXTRA_test_channel_edges_DEPENDENCIES) 
+	@rm -f test_channel_edges$(EXEEXT)
+	$(AM_V_CCLD)$(test_channel_edges_LINK) $(test_channel_edges_OBJECTS) $(test_channel_edges_LDADD) $(LIBS)
+tests/test_crypto-test_crypto.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_crypto$(EXEEXT): $(test_crypto_OBJECTS) $(test_crypto_DEPENDENCIES) $(EXTRA_test_crypto_DEPENDENCIES) 
+	@rm -f test_crypto$(EXEEXT)
+	$(AM_V_CCLD)$(test_crypto_LINK) $(test_crypto_OBJECTS) $(test_crypto_LDADD) $(LIBS)
 tests/test_dhtstore-test_dhtstore.$(OBJEXT): tests/$(am__dirstamp) \
 	tests/$(DEPDIR)/$(am__dirstamp)
 
 test_dhtstore$(EXEEXT): $(test_dhtstore_OBJECTS) $(test_dhtstore_DEPENDENCIES) $(EXTRA_test_dhtstore_DEPENDENCIES) 
 	@rm -f test_dhtstore$(EXEEXT)
 	$(AM_V_CCLD)$(test_dhtstore_LINK) $(test_dhtstore_OBJECTS) $(test_dhtstore_LDADD) $(LIBS)
+tests/test_idexch-test_idexch.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_idexch$(EXEEXT): $(test_idexch_OBJECTS) $(test_idexch_DEPENDENCIES) $(EXTRA_test_idexch_DEPENDENCIES) 
+	@rm -f test_idexch$(EXEEXT)
+	$(AM_V_CCLD)$(test_idexch_LINK) $(test_idexch_OBJECTS) $(test_idexch_LDADD) $(LIBS)
+tests/test_kademlia-test_kademlia.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_kademlia$(EXEEXT): $(test_kademlia_OBJECTS) $(test_kademlia_DEPENDENCIES) $(EXTRA_test_kademlia_DEPENDENCIES) 
+	@rm -f test_kademlia$(EXEEXT)
+	$(AM_V_CCLD)$(test_kademlia_LINK) $(test_kademlia_OBJECTS) $(test_kademlia_LDADD) $(LIBS)
+tests/test_log-test_log.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_log$(EXEEXT): $(test_log_OBJECTS) $(test_log_DEPENDENCIES) $(EXTRA_test_log_DEPENDENCIES) 
+	@rm -f test_log$(EXEEXT)
+	$(AM_V_CCLD)$(test_log_LINK) $(test_log_OBJECTS) $(test_log_LDADD) $(LIBS)
+tests/test_mainline-test_mainline.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_mainline$(EXEEXT): $(test_mainline_OBJECTS) $(test_mainline_DEPENDENCIES) $(EXTRA_test_mainline_DEPENDENCIES) 
+	@rm -f test_mainline$(EXEEXT)
+	$(AM_V_CCLD)$(test_mainline_LINK) $(test_mainline_OBJECTS) $(test_mainline_LDADD) $(LIBS)
 tests/test_norn-test_norn.$(OBJEXT): tests/$(am__dirstamp) \
 	tests/$(DEPDIR)/$(am__dirstamp)
 
 test_norn$(EXEEXT): $(test_norn_OBJECTS) $(test_norn_DEPENDENCIES) $(EXTRA_test_norn_DEPENDENCIES) 
 	@rm -f test_norn$(EXEEXT)
 	$(AM_V_CCLD)$(test_norn_LINK) $(test_norn_OBJECTS) $(test_norn_LDADD) $(LIBS)
+tests/test_norn_async-test_norn_async.$(OBJEXT):  \
+	tests/$(am__dirstamp) tests/$(DEPDIR)/$(am__dirstamp)
+
+test_norn_async$(EXEEXT): $(test_norn_async_OBJECTS) $(test_norn_async_DEPENDENCIES) $(EXTRA_test_norn_async_DEPENDENCIES) 
+	@rm -f test_norn_async$(EXEEXT)
+	$(AM_V_CCLD)$(test_norn_async_LINK) $(test_norn_async_OBJECTS) $(test_norn_async_LDADD) $(LIBS)
+tests/test_recstore-test_recstore.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_recstore$(EXEEXT): $(test_recstore_OBJECTS) $(test_recstore_DEPENDENCIES) $(EXTRA_test_recstore_DEPENDENCIES) 
+	@rm -f test_recstore$(EXEEXT)
+	$(AM_V_CCLD)$(test_recstore_LINK) $(test_recstore_OBJECTS) $(test_recstore_LDADD) $(LIBS)
+tests/test_replaycache-test_replaycache.$(OBJEXT):  \
+	tests/$(am__dirstamp) tests/$(DEPDIR)/$(am__dirstamp)
+
+test_replaycache$(EXEEXT): $(test_replaycache_OBJECTS) $(test_replaycache_DEPENDENCIES) $(EXTRA_test_replaycache_DEPENDENCIES) 
+	@rm -f test_replaycache$(EXEEXT)
+	$(AM_V_CCLD)$(test_replaycache_LINK) $(test_replaycache_OBJECTS) $(test_replaycache_LDADD) $(LIBS)
+tests/test_stream-test_stream.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_stream$(EXEEXT): $(test_stream_OBJECTS) $(test_stream_DEPENDENCIES) $(EXTRA_test_stream_DEPENDENCIES) 
+	@rm -f test_stream$(EXEEXT)
+	$(AM_V_CCLD)$(test_stream_LINK) $(test_stream_OBJECTS) $(test_stream_LDADD) $(LIBS)
+tests/test_stream_cc-test_stream_cc.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_stream_cc$(EXEEXT): $(test_stream_cc_OBJECTS) $(test_stream_cc_DEPENDENCIES) $(EXTRA_test_stream_cc_DEPENDENCIES) 
+	@rm -f test_stream_cc$(EXEEXT)
+	$(AM_V_CCLD)$(test_stream_cc_LINK) $(test_stream_cc_OBJECTS) $(test_stream_cc_LDADD) $(LIBS)
+tests/test_stream_edges-test_stream_edges.$(OBJEXT):  \
+	tests/$(am__dirstamp) tests/$(DEPDIR)/$(am__dirstamp)
+
+test_stream_edges$(EXEEXT): $(test_stream_edges_OBJECTS) $(test_stream_edges_DEPENDENCIES) $(EXTRA_test_stream_edges_DEPENDENCIES) 
+	@rm -f test_stream_edges$(EXEEXT)
+	$(AM_V_CCLD)$(test_stream_edges_LINK) $(test_stream_edges_OBJECTS) $(test_stream_edges_LDADD) $(LIBS)
+tests/test_stream_random-test_stream_random.$(OBJEXT):  \
+	tests/$(am__dirstamp) tests/$(DEPDIR)/$(am__dirstamp)
+
+test_stream_random$(EXEEXT): $(test_stream_random_OBJECTS) $(test_stream_random_DEPENDENCIES) $(EXTRA_test_stream_random_DEPENDENCIES) 
+	@rm -f test_stream_random$(EXEEXT)
+	$(AM_V_CCLD)$(test_stream_random_LINK) $(test_stream_random_OBJECTS) $(test_stream_random_LDADD) $(LIBS)
+tests/test_stream_recovery-test_stream_recovery.$(OBJEXT):  \
+	tests/$(am__dirstamp) tests/$(DEPDIR)/$(am__dirstamp)
+
+test_stream_recovery$(EXEEXT): $(test_stream_recovery_OBJECTS) $(test_stream_recovery_DEPENDENCIES) $(EXTRA_test_stream_recovery_DEPENDENCIES) 
+	@rm -f test_stream_recovery$(EXEEXT)
+	$(AM_V_CCLD)$(test_stream_recovery_LINK) $(test_stream_recovery_OBJECTS) $(test_stream_recovery_LDADD) $(LIBS)
+tests/test_streammux-test_streammux.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_streammux$(EXEEXT): $(test_streammux_OBJECTS) $(test_streammux_DEPENDENCIES) $(EXTRA_test_streammux_DEPENDENCIES) 
+	@rm -f test_streammux$(EXEEXT)
+	$(AM_V_CCLD)$(test_streammux_LINK) $(test_streammux_OBJECTS) $(test_streammux_LDADD) $(LIBS)
+tests/test_streammux_random-test_streammux_random.$(OBJEXT):  \
+	tests/$(am__dirstamp) tests/$(DEPDIR)/$(am__dirstamp)
+
+test_streammux_random$(EXEEXT): $(test_streammux_random_OBJECTS) $(test_streammux_random_DEPENDENCIES) $(EXTRA_test_streammux_random_DEPENDENCIES) 
+	@rm -f test_streammux_random$(EXEEXT)
+	$(AM_V_CCLD)$(test_streammux_random_LINK) $(test_streammux_random_OBJECTS) $(test_streammux_random_LDADD) $(LIBS)
+tests/test_transport-test_transport.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_transport$(EXEEXT): $(test_transport_OBJECTS) $(test_transport_DEPENDENCIES) $(EXTRA_test_transport_DEPENDENCIES) 
+	@rm -f test_transport$(EXEEXT)
+	$(AM_V_CCLD)$(test_transport_LINK) $(test_transport_OBJECTS) $(test_transport_LDADD) $(LIBS)
+tests/test_transport_tcp-test_transport_tcp.$(OBJEXT):  \
+	tests/$(am__dirstamp) tests/$(DEPDIR)/$(am__dirstamp)
+
+test_transport_tcp$(EXEEXT): $(test_transport_tcp_OBJECTS) $(test_transport_tcp_DEPENDENCIES) $(EXTRA_test_transport_tcp_DEPENDENCIES) 
+	@rm -f test_transport_tcp$(EXEEXT)
+	$(AM_V_CCLD)$(test_transport_tcp_LINK) $(test_transport_tcp_OBJECTS) $(test_transport_tcp_LDADD) $(LIBS)
+tests/test_transport_udp-test_transport_udp.$(OBJEXT):  \
+	tests/$(am__dirstamp) tests/$(DEPDIR)/$(am__dirstamp)
+
+test_transport_udp$(EXEEXT): $(test_transport_udp_OBJECTS) $(test_transport_udp_DEPENDENCIES) $(EXTRA_test_transport_udp_DEPENDENCIES) 
+	@rm -f test_transport_udp$(EXEEXT)
+	$(AM_V_CCLD)$(test_transport_udp_LINK) $(test_transport_udp_OBJECTS) $(test_transport_udp_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -865,20 +1327,52 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@src/$(DEPDIR)/norn-norn.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-attr.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-bencode.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-bep44.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-channel.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-crypto.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-dhtstore.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-idexch.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-kademlia.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-log.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-net.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-norn.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-recstore.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-replaycache.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-sha1.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-stream.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-streammux.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-transport.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-transport_tcp.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-transport_udp.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_attr-test_attr.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_bencode-test_bencode.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_bep44-test_bep44.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_channel-test_channel.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_channel_edges-test_channel_edges.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_crypto-test_crypto.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_dhtstore-test_dhtstore.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_idexch-test_idexch.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_kademlia-test_kademlia.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_log-test_log.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_mainline-test_mainline.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_norn-test_norn.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_norn_async-test_norn_async.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_recstore-test_recstore.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_replaycache-test_replaycache.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_stream-test_stream.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_stream_cc-test_stream_cc.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_stream_edges-test_stream_edges.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_stream_random-test_stream_random.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_stream_recovery-test_stream_recovery.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_streammux-test_streammux.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_streammux_random-test_streammux_random.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_transport-test_transport.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_transport_tcp-test_transport_tcp.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_transport_udp-test_transport_udp.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -923,6 +1417,13 @@ src/libnorn/libnorn_la-norn_impl.lo: src/libnorn/norn_impl.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='src/libnorn/norn_impl.c' object='src/libnorn/libnorn_la-norn_impl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-norn_impl.lo `test -f 'src/libnorn/norn_impl.c' || echo '$(srcdir)/'`src/libnorn/norn_impl.c
+
+src/libnorn/libnorn_la-norn_transaction.lo: src/libnorn/norn_transaction.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-norn_transaction.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Tpo -c -o src/libnorn/libnorn_la-norn_transaction.lo `test -f 'src/libnorn/norn_transaction.c' || echo '$(srcdir)/'`src/libnorn/norn_transaction.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Tpo src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='src/libnorn/norn_transaction.c' object='src/libnorn/libnorn_la-norn_transaction.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-norn_transaction.lo `test -f 'src/libnorn/norn_transaction.c' || echo '$(srcdir)/'`src/libnorn/norn_transaction.c
 
 src/libnorn/libnorn_la-kademlia.lo: src/libnorn/kademlia.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-kademlia.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-kademlia.Tpo -c -o src/libnorn/libnorn_la-kademlia.lo `test -f 'src/libnorn/kademlia.c' || echo '$(srcdir)/'`src/libnorn/kademlia.c
@@ -987,6 +1488,69 @@ src/libnorn/libnorn_la-log.lo: src/libnorn/log.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-log.lo `test -f 'src/libnorn/log.c' || echo '$(srcdir)/'`src/libnorn/log.c
 
+src/libnorn/libnorn_la-channel.lo: src/libnorn/channel.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-channel.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-channel.Tpo -c -o src/libnorn/libnorn_la-channel.lo `test -f 'src/libnorn/channel.c' || echo '$(srcdir)/'`src/libnorn/channel.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-channel.Tpo src/libnorn/$(DEPDIR)/libnorn_la-channel.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='src/libnorn/channel.c' object='src/libnorn/libnorn_la-channel.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-channel.lo `test -f 'src/libnorn/channel.c' || echo '$(srcdir)/'`src/libnorn/channel.c
+
+src/libnorn/libnorn_la-replaycache.lo: src/libnorn/replaycache.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-replaycache.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-replaycache.Tpo -c -o src/libnorn/libnorn_la-replaycache.lo `test -f 'src/libnorn/replaycache.c' || echo '$(srcdir)/'`src/libnorn/replaycache.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-replaycache.Tpo src/libnorn/$(DEPDIR)/libnorn_la-replaycache.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='src/libnorn/replaycache.c' object='src/libnorn/libnorn_la-replaycache.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-replaycache.lo `test -f 'src/libnorn/replaycache.c' || echo '$(srcdir)/'`src/libnorn/replaycache.c
+
+src/libnorn/libnorn_la-stream.lo: src/libnorn/stream.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-stream.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-stream.Tpo -c -o src/libnorn/libnorn_la-stream.lo `test -f 'src/libnorn/stream.c' || echo '$(srcdir)/'`src/libnorn/stream.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-stream.Tpo src/libnorn/$(DEPDIR)/libnorn_la-stream.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='src/libnorn/stream.c' object='src/libnorn/libnorn_la-stream.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-stream.lo `test -f 'src/libnorn/stream.c' || echo '$(srcdir)/'`src/libnorn/stream.c
+
+src/libnorn/libnorn_la-streammux.lo: src/libnorn/streammux.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-streammux.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-streammux.Tpo -c -o src/libnorn/libnorn_la-streammux.lo `test -f 'src/libnorn/streammux.c' || echo '$(srcdir)/'`src/libnorn/streammux.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-streammux.Tpo src/libnorn/$(DEPDIR)/libnorn_la-streammux.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='src/libnorn/streammux.c' object='src/libnorn/libnorn_la-streammux.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-streammux.lo `test -f 'src/libnorn/streammux.c' || echo '$(srcdir)/'`src/libnorn/streammux.c
+
+src/libnorn/libnorn_la-transport.lo: src/libnorn/transport.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-transport.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-transport.Tpo -c -o src/libnorn/libnorn_la-transport.lo `test -f 'src/libnorn/transport.c' || echo '$(srcdir)/'`src/libnorn/transport.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-transport.Tpo src/libnorn/$(DEPDIR)/libnorn_la-transport.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='src/libnorn/transport.c' object='src/libnorn/libnorn_la-transport.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-transport.lo `test -f 'src/libnorn/transport.c' || echo '$(srcdir)/'`src/libnorn/transport.c
+
+src/libnorn/libnorn_la-transport_udp.lo: src/libnorn/transport_udp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-transport_udp.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-transport_udp.Tpo -c -o src/libnorn/libnorn_la-transport_udp.lo `test -f 'src/libnorn/transport_udp.c' || echo '$(srcdir)/'`src/libnorn/transport_udp.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-transport_udp.Tpo src/libnorn/$(DEPDIR)/libnorn_la-transport_udp.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='src/libnorn/transport_udp.c' object='src/libnorn/libnorn_la-transport_udp.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-transport_udp.lo `test -f 'src/libnorn/transport_udp.c' || echo '$(srcdir)/'`src/libnorn/transport_udp.c
+
+src/libnorn/libnorn_la-transport_tcp.lo: src/libnorn/transport_tcp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-transport_tcp.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-transport_tcp.Tpo -c -o src/libnorn/libnorn_la-transport_tcp.lo `test -f 'src/libnorn/transport_tcp.c' || echo '$(srcdir)/'`src/libnorn/transport_tcp.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-transport_tcp.Tpo src/libnorn/$(DEPDIR)/libnorn_la-transport_tcp.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='src/libnorn/transport_tcp.c' object='src/libnorn/libnorn_la-transport_tcp.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-transport_tcp.lo `test -f 'src/libnorn/transport_tcp.c' || echo '$(srcdir)/'`src/libnorn/transport_tcp.c
+
+src/libnorn/libnorn_la-idexch.lo: src/libnorn/idexch.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-idexch.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-idexch.Tpo -c -o src/libnorn/libnorn_la-idexch.lo `test -f 'src/libnorn/idexch.c' || echo '$(srcdir)/'`src/libnorn/idexch.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-idexch.Tpo src/libnorn/$(DEPDIR)/libnorn_la-idexch.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='src/libnorn/idexch.c' object='src/libnorn/libnorn_la-idexch.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-idexch.lo `test -f 'src/libnorn/idexch.c' || echo '$(srcdir)/'`src/libnorn/idexch.c
+
+src/libnorn/libnorn_la-attr.lo: src/libnorn/attr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-attr.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-attr.Tpo -c -o src/libnorn/libnorn_la-attr.lo `test -f 'src/libnorn/attr.c' || echo '$(srcdir)/'`src/libnorn/attr.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-attr.Tpo src/libnorn/$(DEPDIR)/libnorn_la-attr.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='src/libnorn/attr.c' object='src/libnorn/libnorn_la-attr.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-attr.lo `test -f 'src/libnorn/attr.c' || echo '$(srcdir)/'`src/libnorn/attr.c
+
 src/norn-norn.o: src/norn.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(norn_CFLAGS) $(CFLAGS) -MT src/norn-norn.o -MD -MP -MF src/$(DEPDIR)/norn-norn.Tpo -c -o src/norn-norn.o `test -f 'src/norn.c' || echo '$(srcdir)/'`src/norn.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) src/$(DEPDIR)/norn-norn.Tpo src/$(DEPDIR)/norn-norn.Po
@@ -1000,6 +1564,34 @@ src/norn-norn.obj: src/norn.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='src/norn.c' object='src/norn-norn.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(norn_CFLAGS) $(CFLAGS) -c -o src/norn-norn.obj `if test -f 'src/norn.c'; then $(CYGPATH_W) 'src/norn.c'; else $(CYGPATH_W) '$(srcdir)/src/norn.c'; fi`
+
+tests/test_attr-test_attr.o: tests/test_attr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_attr_CFLAGS) $(CFLAGS) -MT tests/test_attr-test_attr.o -MD -MP -MF tests/$(DEPDIR)/test_attr-test_attr.Tpo -c -o tests/test_attr-test_attr.o `test -f 'tests/test_attr.c' || echo '$(srcdir)/'`tests/test_attr.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_attr-test_attr.Tpo tests/$(DEPDIR)/test_attr-test_attr.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_attr.c' object='tests/test_attr-test_attr.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_attr_CFLAGS) $(CFLAGS) -c -o tests/test_attr-test_attr.o `test -f 'tests/test_attr.c' || echo '$(srcdir)/'`tests/test_attr.c
+
+tests/test_attr-test_attr.obj: tests/test_attr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_attr_CFLAGS) $(CFLAGS) -MT tests/test_attr-test_attr.obj -MD -MP -MF tests/$(DEPDIR)/test_attr-test_attr.Tpo -c -o tests/test_attr-test_attr.obj `if test -f 'tests/test_attr.c'; then $(CYGPATH_W) 'tests/test_attr.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_attr.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_attr-test_attr.Tpo tests/$(DEPDIR)/test_attr-test_attr.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_attr.c' object='tests/test_attr-test_attr.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_attr_CFLAGS) $(CFLAGS) -c -o tests/test_attr-test_attr.obj `if test -f 'tests/test_attr.c'; then $(CYGPATH_W) 'tests/test_attr.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_attr.c'; fi`
+
+tests/test_bencode-test_bencode.o: tests/test_bencode.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_bencode_CFLAGS) $(CFLAGS) -MT tests/test_bencode-test_bencode.o -MD -MP -MF tests/$(DEPDIR)/test_bencode-test_bencode.Tpo -c -o tests/test_bencode-test_bencode.o `test -f 'tests/test_bencode.c' || echo '$(srcdir)/'`tests/test_bencode.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_bencode-test_bencode.Tpo tests/$(DEPDIR)/test_bencode-test_bencode.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_bencode.c' object='tests/test_bencode-test_bencode.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_bencode_CFLAGS) $(CFLAGS) -c -o tests/test_bencode-test_bencode.o `test -f 'tests/test_bencode.c' || echo '$(srcdir)/'`tests/test_bencode.c
+
+tests/test_bencode-test_bencode.obj: tests/test_bencode.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_bencode_CFLAGS) $(CFLAGS) -MT tests/test_bencode-test_bencode.obj -MD -MP -MF tests/$(DEPDIR)/test_bencode-test_bencode.Tpo -c -o tests/test_bencode-test_bencode.obj `if test -f 'tests/test_bencode.c'; then $(CYGPATH_W) 'tests/test_bencode.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_bencode.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_bencode-test_bencode.Tpo tests/$(DEPDIR)/test_bencode-test_bencode.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_bencode.c' object='tests/test_bencode-test_bencode.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_bencode_CFLAGS) $(CFLAGS) -c -o tests/test_bencode-test_bencode.obj `if test -f 'tests/test_bencode.c'; then $(CYGPATH_W) 'tests/test_bencode.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_bencode.c'; fi`
 
 tests/test_bep44-test_bep44.o: tests/test_bep44.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_bep44_CFLAGS) $(CFLAGS) -MT tests/test_bep44-test_bep44.o -MD -MP -MF tests/$(DEPDIR)/test_bep44-test_bep44.Tpo -c -o tests/test_bep44-test_bep44.o `test -f 'tests/test_bep44.c' || echo '$(srcdir)/'`tests/test_bep44.c
@@ -1015,6 +1607,48 @@ tests/test_bep44-test_bep44.obj: tests/test_bep44.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_bep44_CFLAGS) $(CFLAGS) -c -o tests/test_bep44-test_bep44.obj `if test -f 'tests/test_bep44.c'; then $(CYGPATH_W) 'tests/test_bep44.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_bep44.c'; fi`
 
+tests/test_channel-test_channel.o: tests/test_channel.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_channel_CFLAGS) $(CFLAGS) -MT tests/test_channel-test_channel.o -MD -MP -MF tests/$(DEPDIR)/test_channel-test_channel.Tpo -c -o tests/test_channel-test_channel.o `test -f 'tests/test_channel.c' || echo '$(srcdir)/'`tests/test_channel.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_channel-test_channel.Tpo tests/$(DEPDIR)/test_channel-test_channel.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_channel.c' object='tests/test_channel-test_channel.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_channel_CFLAGS) $(CFLAGS) -c -o tests/test_channel-test_channel.o `test -f 'tests/test_channel.c' || echo '$(srcdir)/'`tests/test_channel.c
+
+tests/test_channel-test_channel.obj: tests/test_channel.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_channel_CFLAGS) $(CFLAGS) -MT tests/test_channel-test_channel.obj -MD -MP -MF tests/$(DEPDIR)/test_channel-test_channel.Tpo -c -o tests/test_channel-test_channel.obj `if test -f 'tests/test_channel.c'; then $(CYGPATH_W) 'tests/test_channel.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_channel.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_channel-test_channel.Tpo tests/$(DEPDIR)/test_channel-test_channel.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_channel.c' object='tests/test_channel-test_channel.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_channel_CFLAGS) $(CFLAGS) -c -o tests/test_channel-test_channel.obj `if test -f 'tests/test_channel.c'; then $(CYGPATH_W) 'tests/test_channel.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_channel.c'; fi`
+
+tests/test_channel_edges-test_channel_edges.o: tests/test_channel_edges.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_channel_edges_CFLAGS) $(CFLAGS) -MT tests/test_channel_edges-test_channel_edges.o -MD -MP -MF tests/$(DEPDIR)/test_channel_edges-test_channel_edges.Tpo -c -o tests/test_channel_edges-test_channel_edges.o `test -f 'tests/test_channel_edges.c' || echo '$(srcdir)/'`tests/test_channel_edges.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_channel_edges-test_channel_edges.Tpo tests/$(DEPDIR)/test_channel_edges-test_channel_edges.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_channel_edges.c' object='tests/test_channel_edges-test_channel_edges.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_channel_edges_CFLAGS) $(CFLAGS) -c -o tests/test_channel_edges-test_channel_edges.o `test -f 'tests/test_channel_edges.c' || echo '$(srcdir)/'`tests/test_channel_edges.c
+
+tests/test_channel_edges-test_channel_edges.obj: tests/test_channel_edges.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_channel_edges_CFLAGS) $(CFLAGS) -MT tests/test_channel_edges-test_channel_edges.obj -MD -MP -MF tests/$(DEPDIR)/test_channel_edges-test_channel_edges.Tpo -c -o tests/test_channel_edges-test_channel_edges.obj `if test -f 'tests/test_channel_edges.c'; then $(CYGPATH_W) 'tests/test_channel_edges.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_channel_edges.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_channel_edges-test_channel_edges.Tpo tests/$(DEPDIR)/test_channel_edges-test_channel_edges.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_channel_edges.c' object='tests/test_channel_edges-test_channel_edges.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_channel_edges_CFLAGS) $(CFLAGS) -c -o tests/test_channel_edges-test_channel_edges.obj `if test -f 'tests/test_channel_edges.c'; then $(CYGPATH_W) 'tests/test_channel_edges.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_channel_edges.c'; fi`
+
+tests/test_crypto-test_crypto.o: tests/test_crypto.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_crypto_CFLAGS) $(CFLAGS) -MT tests/test_crypto-test_crypto.o -MD -MP -MF tests/$(DEPDIR)/test_crypto-test_crypto.Tpo -c -o tests/test_crypto-test_crypto.o `test -f 'tests/test_crypto.c' || echo '$(srcdir)/'`tests/test_crypto.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_crypto-test_crypto.Tpo tests/$(DEPDIR)/test_crypto-test_crypto.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_crypto.c' object='tests/test_crypto-test_crypto.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_crypto_CFLAGS) $(CFLAGS) -c -o tests/test_crypto-test_crypto.o `test -f 'tests/test_crypto.c' || echo '$(srcdir)/'`tests/test_crypto.c
+
+tests/test_crypto-test_crypto.obj: tests/test_crypto.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_crypto_CFLAGS) $(CFLAGS) -MT tests/test_crypto-test_crypto.obj -MD -MP -MF tests/$(DEPDIR)/test_crypto-test_crypto.Tpo -c -o tests/test_crypto-test_crypto.obj `if test -f 'tests/test_crypto.c'; then $(CYGPATH_W) 'tests/test_crypto.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_crypto.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_crypto-test_crypto.Tpo tests/$(DEPDIR)/test_crypto-test_crypto.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_crypto.c' object='tests/test_crypto-test_crypto.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_crypto_CFLAGS) $(CFLAGS) -c -o tests/test_crypto-test_crypto.obj `if test -f 'tests/test_crypto.c'; then $(CYGPATH_W) 'tests/test_crypto.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_crypto.c'; fi`
+
 tests/test_dhtstore-test_dhtstore.o: tests/test_dhtstore.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_dhtstore_CFLAGS) $(CFLAGS) -MT tests/test_dhtstore-test_dhtstore.o -MD -MP -MF tests/$(DEPDIR)/test_dhtstore-test_dhtstore.Tpo -c -o tests/test_dhtstore-test_dhtstore.o `test -f 'tests/test_dhtstore.c' || echo '$(srcdir)/'`tests/test_dhtstore.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_dhtstore-test_dhtstore.Tpo tests/$(DEPDIR)/test_dhtstore-test_dhtstore.Po
@@ -1029,6 +1663,62 @@ tests/test_dhtstore-test_dhtstore.obj: tests/test_dhtstore.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_dhtstore_CFLAGS) $(CFLAGS) -c -o tests/test_dhtstore-test_dhtstore.obj `if test -f 'tests/test_dhtstore.c'; then $(CYGPATH_W) 'tests/test_dhtstore.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_dhtstore.c'; fi`
 
+tests/test_idexch-test_idexch.o: tests/test_idexch.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_idexch_CFLAGS) $(CFLAGS) -MT tests/test_idexch-test_idexch.o -MD -MP -MF tests/$(DEPDIR)/test_idexch-test_idexch.Tpo -c -o tests/test_idexch-test_idexch.o `test -f 'tests/test_idexch.c' || echo '$(srcdir)/'`tests/test_idexch.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_idexch-test_idexch.Tpo tests/$(DEPDIR)/test_idexch-test_idexch.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_idexch.c' object='tests/test_idexch-test_idexch.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_idexch_CFLAGS) $(CFLAGS) -c -o tests/test_idexch-test_idexch.o `test -f 'tests/test_idexch.c' || echo '$(srcdir)/'`tests/test_idexch.c
+
+tests/test_idexch-test_idexch.obj: tests/test_idexch.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_idexch_CFLAGS) $(CFLAGS) -MT tests/test_idexch-test_idexch.obj -MD -MP -MF tests/$(DEPDIR)/test_idexch-test_idexch.Tpo -c -o tests/test_idexch-test_idexch.obj `if test -f 'tests/test_idexch.c'; then $(CYGPATH_W) 'tests/test_idexch.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_idexch.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_idexch-test_idexch.Tpo tests/$(DEPDIR)/test_idexch-test_idexch.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_idexch.c' object='tests/test_idexch-test_idexch.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_idexch_CFLAGS) $(CFLAGS) -c -o tests/test_idexch-test_idexch.obj `if test -f 'tests/test_idexch.c'; then $(CYGPATH_W) 'tests/test_idexch.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_idexch.c'; fi`
+
+tests/test_kademlia-test_kademlia.o: tests/test_kademlia.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_kademlia_CFLAGS) $(CFLAGS) -MT tests/test_kademlia-test_kademlia.o -MD -MP -MF tests/$(DEPDIR)/test_kademlia-test_kademlia.Tpo -c -o tests/test_kademlia-test_kademlia.o `test -f 'tests/test_kademlia.c' || echo '$(srcdir)/'`tests/test_kademlia.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_kademlia-test_kademlia.Tpo tests/$(DEPDIR)/test_kademlia-test_kademlia.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_kademlia.c' object='tests/test_kademlia-test_kademlia.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_kademlia_CFLAGS) $(CFLAGS) -c -o tests/test_kademlia-test_kademlia.o `test -f 'tests/test_kademlia.c' || echo '$(srcdir)/'`tests/test_kademlia.c
+
+tests/test_kademlia-test_kademlia.obj: tests/test_kademlia.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_kademlia_CFLAGS) $(CFLAGS) -MT tests/test_kademlia-test_kademlia.obj -MD -MP -MF tests/$(DEPDIR)/test_kademlia-test_kademlia.Tpo -c -o tests/test_kademlia-test_kademlia.obj `if test -f 'tests/test_kademlia.c'; then $(CYGPATH_W) 'tests/test_kademlia.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_kademlia.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_kademlia-test_kademlia.Tpo tests/$(DEPDIR)/test_kademlia-test_kademlia.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_kademlia.c' object='tests/test_kademlia-test_kademlia.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_kademlia_CFLAGS) $(CFLAGS) -c -o tests/test_kademlia-test_kademlia.obj `if test -f 'tests/test_kademlia.c'; then $(CYGPATH_W) 'tests/test_kademlia.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_kademlia.c'; fi`
+
+tests/test_log-test_log.o: tests/test_log.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_log_CFLAGS) $(CFLAGS) -MT tests/test_log-test_log.o -MD -MP -MF tests/$(DEPDIR)/test_log-test_log.Tpo -c -o tests/test_log-test_log.o `test -f 'tests/test_log.c' || echo '$(srcdir)/'`tests/test_log.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_log-test_log.Tpo tests/$(DEPDIR)/test_log-test_log.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_log.c' object='tests/test_log-test_log.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_log_CFLAGS) $(CFLAGS) -c -o tests/test_log-test_log.o `test -f 'tests/test_log.c' || echo '$(srcdir)/'`tests/test_log.c
+
+tests/test_log-test_log.obj: tests/test_log.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_log_CFLAGS) $(CFLAGS) -MT tests/test_log-test_log.obj -MD -MP -MF tests/$(DEPDIR)/test_log-test_log.Tpo -c -o tests/test_log-test_log.obj `if test -f 'tests/test_log.c'; then $(CYGPATH_W) 'tests/test_log.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_log.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_log-test_log.Tpo tests/$(DEPDIR)/test_log-test_log.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_log.c' object='tests/test_log-test_log.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_log_CFLAGS) $(CFLAGS) -c -o tests/test_log-test_log.obj `if test -f 'tests/test_log.c'; then $(CYGPATH_W) 'tests/test_log.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_log.c'; fi`
+
+tests/test_mainline-test_mainline.o: tests/test_mainline.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_mainline_CFLAGS) $(CFLAGS) -MT tests/test_mainline-test_mainline.o -MD -MP -MF tests/$(DEPDIR)/test_mainline-test_mainline.Tpo -c -o tests/test_mainline-test_mainline.o `test -f 'tests/test_mainline.c' || echo '$(srcdir)/'`tests/test_mainline.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_mainline-test_mainline.Tpo tests/$(DEPDIR)/test_mainline-test_mainline.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_mainline.c' object='tests/test_mainline-test_mainline.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_mainline_CFLAGS) $(CFLAGS) -c -o tests/test_mainline-test_mainline.o `test -f 'tests/test_mainline.c' || echo '$(srcdir)/'`tests/test_mainline.c
+
+tests/test_mainline-test_mainline.obj: tests/test_mainline.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_mainline_CFLAGS) $(CFLAGS) -MT tests/test_mainline-test_mainline.obj -MD -MP -MF tests/$(DEPDIR)/test_mainline-test_mainline.Tpo -c -o tests/test_mainline-test_mainline.obj `if test -f 'tests/test_mainline.c'; then $(CYGPATH_W) 'tests/test_mainline.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_mainline.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_mainline-test_mainline.Tpo tests/$(DEPDIR)/test_mainline-test_mainline.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_mainline.c' object='tests/test_mainline-test_mainline.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_mainline_CFLAGS) $(CFLAGS) -c -o tests/test_mainline-test_mainline.obj `if test -f 'tests/test_mainline.c'; then $(CYGPATH_W) 'tests/test_mainline.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_mainline.c'; fi`
+
 tests/test_norn-test_norn.o: tests/test_norn.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_CFLAGS) $(CFLAGS) -MT tests/test_norn-test_norn.o -MD -MP -MF tests/$(DEPDIR)/test_norn-test_norn.Tpo -c -o tests/test_norn-test_norn.o `test -f 'tests/test_norn.c' || echo '$(srcdir)/'`tests/test_norn.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_norn-test_norn.Tpo tests/$(DEPDIR)/test_norn-test_norn.Po
@@ -1042,6 +1732,188 @@ tests/test_norn-test_norn.obj: tests/test_norn.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_norn.c' object='tests/test_norn-test_norn.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_CFLAGS) $(CFLAGS) -c -o tests/test_norn-test_norn.obj `if test -f 'tests/test_norn.c'; then $(CYGPATH_W) 'tests/test_norn.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_norn.c'; fi`
+
+tests/test_norn_async-test_norn_async.o: tests/test_norn_async.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_async_CFLAGS) $(CFLAGS) -MT tests/test_norn_async-test_norn_async.o -MD -MP -MF tests/$(DEPDIR)/test_norn_async-test_norn_async.Tpo -c -o tests/test_norn_async-test_norn_async.o `test -f 'tests/test_norn_async.c' || echo '$(srcdir)/'`tests/test_norn_async.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_norn_async-test_norn_async.Tpo tests/$(DEPDIR)/test_norn_async-test_norn_async.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_norn_async.c' object='tests/test_norn_async-test_norn_async.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_async_CFLAGS) $(CFLAGS) -c -o tests/test_norn_async-test_norn_async.o `test -f 'tests/test_norn_async.c' || echo '$(srcdir)/'`tests/test_norn_async.c
+
+tests/test_norn_async-test_norn_async.obj: tests/test_norn_async.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_async_CFLAGS) $(CFLAGS) -MT tests/test_norn_async-test_norn_async.obj -MD -MP -MF tests/$(DEPDIR)/test_norn_async-test_norn_async.Tpo -c -o tests/test_norn_async-test_norn_async.obj `if test -f 'tests/test_norn_async.c'; then $(CYGPATH_W) 'tests/test_norn_async.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_norn_async.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_norn_async-test_norn_async.Tpo tests/$(DEPDIR)/test_norn_async-test_norn_async.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_norn_async.c' object='tests/test_norn_async-test_norn_async.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_async_CFLAGS) $(CFLAGS) -c -o tests/test_norn_async-test_norn_async.obj `if test -f 'tests/test_norn_async.c'; then $(CYGPATH_W) 'tests/test_norn_async.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_norn_async.c'; fi`
+
+tests/test_recstore-test_recstore.o: tests/test_recstore.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_recstore_CFLAGS) $(CFLAGS) -MT tests/test_recstore-test_recstore.o -MD -MP -MF tests/$(DEPDIR)/test_recstore-test_recstore.Tpo -c -o tests/test_recstore-test_recstore.o `test -f 'tests/test_recstore.c' || echo '$(srcdir)/'`tests/test_recstore.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_recstore-test_recstore.Tpo tests/$(DEPDIR)/test_recstore-test_recstore.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_recstore.c' object='tests/test_recstore-test_recstore.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_recstore_CFLAGS) $(CFLAGS) -c -o tests/test_recstore-test_recstore.o `test -f 'tests/test_recstore.c' || echo '$(srcdir)/'`tests/test_recstore.c
+
+tests/test_recstore-test_recstore.obj: tests/test_recstore.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_recstore_CFLAGS) $(CFLAGS) -MT tests/test_recstore-test_recstore.obj -MD -MP -MF tests/$(DEPDIR)/test_recstore-test_recstore.Tpo -c -o tests/test_recstore-test_recstore.obj `if test -f 'tests/test_recstore.c'; then $(CYGPATH_W) 'tests/test_recstore.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_recstore.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_recstore-test_recstore.Tpo tests/$(DEPDIR)/test_recstore-test_recstore.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_recstore.c' object='tests/test_recstore-test_recstore.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_recstore_CFLAGS) $(CFLAGS) -c -o tests/test_recstore-test_recstore.obj `if test -f 'tests/test_recstore.c'; then $(CYGPATH_W) 'tests/test_recstore.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_recstore.c'; fi`
+
+tests/test_replaycache-test_replaycache.o: tests/test_replaycache.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_replaycache_CFLAGS) $(CFLAGS) -MT tests/test_replaycache-test_replaycache.o -MD -MP -MF tests/$(DEPDIR)/test_replaycache-test_replaycache.Tpo -c -o tests/test_replaycache-test_replaycache.o `test -f 'tests/test_replaycache.c' || echo '$(srcdir)/'`tests/test_replaycache.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_replaycache-test_replaycache.Tpo tests/$(DEPDIR)/test_replaycache-test_replaycache.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_replaycache.c' object='tests/test_replaycache-test_replaycache.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_replaycache_CFLAGS) $(CFLAGS) -c -o tests/test_replaycache-test_replaycache.o `test -f 'tests/test_replaycache.c' || echo '$(srcdir)/'`tests/test_replaycache.c
+
+tests/test_replaycache-test_replaycache.obj: tests/test_replaycache.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_replaycache_CFLAGS) $(CFLAGS) -MT tests/test_replaycache-test_replaycache.obj -MD -MP -MF tests/$(DEPDIR)/test_replaycache-test_replaycache.Tpo -c -o tests/test_replaycache-test_replaycache.obj `if test -f 'tests/test_replaycache.c'; then $(CYGPATH_W) 'tests/test_replaycache.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_replaycache.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_replaycache-test_replaycache.Tpo tests/$(DEPDIR)/test_replaycache-test_replaycache.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_replaycache.c' object='tests/test_replaycache-test_replaycache.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_replaycache_CFLAGS) $(CFLAGS) -c -o tests/test_replaycache-test_replaycache.obj `if test -f 'tests/test_replaycache.c'; then $(CYGPATH_W) 'tests/test_replaycache.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_replaycache.c'; fi`
+
+tests/test_stream-test_stream.o: tests/test_stream.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_CFLAGS) $(CFLAGS) -MT tests/test_stream-test_stream.o -MD -MP -MF tests/$(DEPDIR)/test_stream-test_stream.Tpo -c -o tests/test_stream-test_stream.o `test -f 'tests/test_stream.c' || echo '$(srcdir)/'`tests/test_stream.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_stream-test_stream.Tpo tests/$(DEPDIR)/test_stream-test_stream.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_stream.c' object='tests/test_stream-test_stream.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_CFLAGS) $(CFLAGS) -c -o tests/test_stream-test_stream.o `test -f 'tests/test_stream.c' || echo '$(srcdir)/'`tests/test_stream.c
+
+tests/test_stream-test_stream.obj: tests/test_stream.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_CFLAGS) $(CFLAGS) -MT tests/test_stream-test_stream.obj -MD -MP -MF tests/$(DEPDIR)/test_stream-test_stream.Tpo -c -o tests/test_stream-test_stream.obj `if test -f 'tests/test_stream.c'; then $(CYGPATH_W) 'tests/test_stream.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_stream.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_stream-test_stream.Tpo tests/$(DEPDIR)/test_stream-test_stream.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_stream.c' object='tests/test_stream-test_stream.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_CFLAGS) $(CFLAGS) -c -o tests/test_stream-test_stream.obj `if test -f 'tests/test_stream.c'; then $(CYGPATH_W) 'tests/test_stream.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_stream.c'; fi`
+
+tests/test_stream_cc-test_stream_cc.o: tests/test_stream_cc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_cc_CFLAGS) $(CFLAGS) -MT tests/test_stream_cc-test_stream_cc.o -MD -MP -MF tests/$(DEPDIR)/test_stream_cc-test_stream_cc.Tpo -c -o tests/test_stream_cc-test_stream_cc.o `test -f 'tests/test_stream_cc.c' || echo '$(srcdir)/'`tests/test_stream_cc.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_stream_cc-test_stream_cc.Tpo tests/$(DEPDIR)/test_stream_cc-test_stream_cc.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_stream_cc.c' object='tests/test_stream_cc-test_stream_cc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_cc_CFLAGS) $(CFLAGS) -c -o tests/test_stream_cc-test_stream_cc.o `test -f 'tests/test_stream_cc.c' || echo '$(srcdir)/'`tests/test_stream_cc.c
+
+tests/test_stream_cc-test_stream_cc.obj: tests/test_stream_cc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_cc_CFLAGS) $(CFLAGS) -MT tests/test_stream_cc-test_stream_cc.obj -MD -MP -MF tests/$(DEPDIR)/test_stream_cc-test_stream_cc.Tpo -c -o tests/test_stream_cc-test_stream_cc.obj `if test -f 'tests/test_stream_cc.c'; then $(CYGPATH_W) 'tests/test_stream_cc.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_stream_cc.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_stream_cc-test_stream_cc.Tpo tests/$(DEPDIR)/test_stream_cc-test_stream_cc.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_stream_cc.c' object='tests/test_stream_cc-test_stream_cc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_cc_CFLAGS) $(CFLAGS) -c -o tests/test_stream_cc-test_stream_cc.obj `if test -f 'tests/test_stream_cc.c'; then $(CYGPATH_W) 'tests/test_stream_cc.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_stream_cc.c'; fi`
+
+tests/test_stream_edges-test_stream_edges.o: tests/test_stream_edges.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_edges_CFLAGS) $(CFLAGS) -MT tests/test_stream_edges-test_stream_edges.o -MD -MP -MF tests/$(DEPDIR)/test_stream_edges-test_stream_edges.Tpo -c -o tests/test_stream_edges-test_stream_edges.o `test -f 'tests/test_stream_edges.c' || echo '$(srcdir)/'`tests/test_stream_edges.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_stream_edges-test_stream_edges.Tpo tests/$(DEPDIR)/test_stream_edges-test_stream_edges.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_stream_edges.c' object='tests/test_stream_edges-test_stream_edges.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_edges_CFLAGS) $(CFLAGS) -c -o tests/test_stream_edges-test_stream_edges.o `test -f 'tests/test_stream_edges.c' || echo '$(srcdir)/'`tests/test_stream_edges.c
+
+tests/test_stream_edges-test_stream_edges.obj: tests/test_stream_edges.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_edges_CFLAGS) $(CFLAGS) -MT tests/test_stream_edges-test_stream_edges.obj -MD -MP -MF tests/$(DEPDIR)/test_stream_edges-test_stream_edges.Tpo -c -o tests/test_stream_edges-test_stream_edges.obj `if test -f 'tests/test_stream_edges.c'; then $(CYGPATH_W) 'tests/test_stream_edges.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_stream_edges.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_stream_edges-test_stream_edges.Tpo tests/$(DEPDIR)/test_stream_edges-test_stream_edges.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_stream_edges.c' object='tests/test_stream_edges-test_stream_edges.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_edges_CFLAGS) $(CFLAGS) -c -o tests/test_stream_edges-test_stream_edges.obj `if test -f 'tests/test_stream_edges.c'; then $(CYGPATH_W) 'tests/test_stream_edges.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_stream_edges.c'; fi`
+
+tests/test_stream_random-test_stream_random.o: tests/test_stream_random.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_random_CFLAGS) $(CFLAGS) -MT tests/test_stream_random-test_stream_random.o -MD -MP -MF tests/$(DEPDIR)/test_stream_random-test_stream_random.Tpo -c -o tests/test_stream_random-test_stream_random.o `test -f 'tests/test_stream_random.c' || echo '$(srcdir)/'`tests/test_stream_random.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_stream_random-test_stream_random.Tpo tests/$(DEPDIR)/test_stream_random-test_stream_random.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_stream_random.c' object='tests/test_stream_random-test_stream_random.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_random_CFLAGS) $(CFLAGS) -c -o tests/test_stream_random-test_stream_random.o `test -f 'tests/test_stream_random.c' || echo '$(srcdir)/'`tests/test_stream_random.c
+
+tests/test_stream_random-test_stream_random.obj: tests/test_stream_random.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_random_CFLAGS) $(CFLAGS) -MT tests/test_stream_random-test_stream_random.obj -MD -MP -MF tests/$(DEPDIR)/test_stream_random-test_stream_random.Tpo -c -o tests/test_stream_random-test_stream_random.obj `if test -f 'tests/test_stream_random.c'; then $(CYGPATH_W) 'tests/test_stream_random.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_stream_random.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_stream_random-test_stream_random.Tpo tests/$(DEPDIR)/test_stream_random-test_stream_random.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_stream_random.c' object='tests/test_stream_random-test_stream_random.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_random_CFLAGS) $(CFLAGS) -c -o tests/test_stream_random-test_stream_random.obj `if test -f 'tests/test_stream_random.c'; then $(CYGPATH_W) 'tests/test_stream_random.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_stream_random.c'; fi`
+
+tests/test_stream_recovery-test_stream_recovery.o: tests/test_stream_recovery.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_recovery_CFLAGS) $(CFLAGS) -MT tests/test_stream_recovery-test_stream_recovery.o -MD -MP -MF tests/$(DEPDIR)/test_stream_recovery-test_stream_recovery.Tpo -c -o tests/test_stream_recovery-test_stream_recovery.o `test -f 'tests/test_stream_recovery.c' || echo '$(srcdir)/'`tests/test_stream_recovery.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_stream_recovery-test_stream_recovery.Tpo tests/$(DEPDIR)/test_stream_recovery-test_stream_recovery.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_stream_recovery.c' object='tests/test_stream_recovery-test_stream_recovery.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_recovery_CFLAGS) $(CFLAGS) -c -o tests/test_stream_recovery-test_stream_recovery.o `test -f 'tests/test_stream_recovery.c' || echo '$(srcdir)/'`tests/test_stream_recovery.c
+
+tests/test_stream_recovery-test_stream_recovery.obj: tests/test_stream_recovery.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_recovery_CFLAGS) $(CFLAGS) -MT tests/test_stream_recovery-test_stream_recovery.obj -MD -MP -MF tests/$(DEPDIR)/test_stream_recovery-test_stream_recovery.Tpo -c -o tests/test_stream_recovery-test_stream_recovery.obj `if test -f 'tests/test_stream_recovery.c'; then $(CYGPATH_W) 'tests/test_stream_recovery.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_stream_recovery.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_stream_recovery-test_stream_recovery.Tpo tests/$(DEPDIR)/test_stream_recovery-test_stream_recovery.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_stream_recovery.c' object='tests/test_stream_recovery-test_stream_recovery.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_stream_recovery_CFLAGS) $(CFLAGS) -c -o tests/test_stream_recovery-test_stream_recovery.obj `if test -f 'tests/test_stream_recovery.c'; then $(CYGPATH_W) 'tests/test_stream_recovery.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_stream_recovery.c'; fi`
+
+tests/test_streammux-test_streammux.o: tests/test_streammux.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_streammux_CFLAGS) $(CFLAGS) -MT tests/test_streammux-test_streammux.o -MD -MP -MF tests/$(DEPDIR)/test_streammux-test_streammux.Tpo -c -o tests/test_streammux-test_streammux.o `test -f 'tests/test_streammux.c' || echo '$(srcdir)/'`tests/test_streammux.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_streammux-test_streammux.Tpo tests/$(DEPDIR)/test_streammux-test_streammux.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_streammux.c' object='tests/test_streammux-test_streammux.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_streammux_CFLAGS) $(CFLAGS) -c -o tests/test_streammux-test_streammux.o `test -f 'tests/test_streammux.c' || echo '$(srcdir)/'`tests/test_streammux.c
+
+tests/test_streammux-test_streammux.obj: tests/test_streammux.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_streammux_CFLAGS) $(CFLAGS) -MT tests/test_streammux-test_streammux.obj -MD -MP -MF tests/$(DEPDIR)/test_streammux-test_streammux.Tpo -c -o tests/test_streammux-test_streammux.obj `if test -f 'tests/test_streammux.c'; then $(CYGPATH_W) 'tests/test_streammux.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_streammux.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_streammux-test_streammux.Tpo tests/$(DEPDIR)/test_streammux-test_streammux.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_streammux.c' object='tests/test_streammux-test_streammux.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_streammux_CFLAGS) $(CFLAGS) -c -o tests/test_streammux-test_streammux.obj `if test -f 'tests/test_streammux.c'; then $(CYGPATH_W) 'tests/test_streammux.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_streammux.c'; fi`
+
+tests/test_streammux_random-test_streammux_random.o: tests/test_streammux_random.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_streammux_random_CFLAGS) $(CFLAGS) -MT tests/test_streammux_random-test_streammux_random.o -MD -MP -MF tests/$(DEPDIR)/test_streammux_random-test_streammux_random.Tpo -c -o tests/test_streammux_random-test_streammux_random.o `test -f 'tests/test_streammux_random.c' || echo '$(srcdir)/'`tests/test_streammux_random.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_streammux_random-test_streammux_random.Tpo tests/$(DEPDIR)/test_streammux_random-test_streammux_random.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_streammux_random.c' object='tests/test_streammux_random-test_streammux_random.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_streammux_random_CFLAGS) $(CFLAGS) -c -o tests/test_streammux_random-test_streammux_random.o `test -f 'tests/test_streammux_random.c' || echo '$(srcdir)/'`tests/test_streammux_random.c
+
+tests/test_streammux_random-test_streammux_random.obj: tests/test_streammux_random.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_streammux_random_CFLAGS) $(CFLAGS) -MT tests/test_streammux_random-test_streammux_random.obj -MD -MP -MF tests/$(DEPDIR)/test_streammux_random-test_streammux_random.Tpo -c -o tests/test_streammux_random-test_streammux_random.obj `if test -f 'tests/test_streammux_random.c'; then $(CYGPATH_W) 'tests/test_streammux_random.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_streammux_random.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_streammux_random-test_streammux_random.Tpo tests/$(DEPDIR)/test_streammux_random-test_streammux_random.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_streammux_random.c' object='tests/test_streammux_random-test_streammux_random.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_streammux_random_CFLAGS) $(CFLAGS) -c -o tests/test_streammux_random-test_streammux_random.obj `if test -f 'tests/test_streammux_random.c'; then $(CYGPATH_W) 'tests/test_streammux_random.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_streammux_random.c'; fi`
+
+tests/test_transport-test_transport.o: tests/test_transport.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_transport_CFLAGS) $(CFLAGS) -MT tests/test_transport-test_transport.o -MD -MP -MF tests/$(DEPDIR)/test_transport-test_transport.Tpo -c -o tests/test_transport-test_transport.o `test -f 'tests/test_transport.c' || echo '$(srcdir)/'`tests/test_transport.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_transport-test_transport.Tpo tests/$(DEPDIR)/test_transport-test_transport.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_transport.c' object='tests/test_transport-test_transport.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_transport_CFLAGS) $(CFLAGS) -c -o tests/test_transport-test_transport.o `test -f 'tests/test_transport.c' || echo '$(srcdir)/'`tests/test_transport.c
+
+tests/test_transport-test_transport.obj: tests/test_transport.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_transport_CFLAGS) $(CFLAGS) -MT tests/test_transport-test_transport.obj -MD -MP -MF tests/$(DEPDIR)/test_transport-test_transport.Tpo -c -o tests/test_transport-test_transport.obj `if test -f 'tests/test_transport.c'; then $(CYGPATH_W) 'tests/test_transport.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_transport.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_transport-test_transport.Tpo tests/$(DEPDIR)/test_transport-test_transport.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_transport.c' object='tests/test_transport-test_transport.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_transport_CFLAGS) $(CFLAGS) -c -o tests/test_transport-test_transport.obj `if test -f 'tests/test_transport.c'; then $(CYGPATH_W) 'tests/test_transport.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_transport.c'; fi`
+
+tests/test_transport_tcp-test_transport_tcp.o: tests/test_transport_tcp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_transport_tcp_CFLAGS) $(CFLAGS) -MT tests/test_transport_tcp-test_transport_tcp.o -MD -MP -MF tests/$(DEPDIR)/test_transport_tcp-test_transport_tcp.Tpo -c -o tests/test_transport_tcp-test_transport_tcp.o `test -f 'tests/test_transport_tcp.c' || echo '$(srcdir)/'`tests/test_transport_tcp.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_transport_tcp-test_transport_tcp.Tpo tests/$(DEPDIR)/test_transport_tcp-test_transport_tcp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_transport_tcp.c' object='tests/test_transport_tcp-test_transport_tcp.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_transport_tcp_CFLAGS) $(CFLAGS) -c -o tests/test_transport_tcp-test_transport_tcp.o `test -f 'tests/test_transport_tcp.c' || echo '$(srcdir)/'`tests/test_transport_tcp.c
+
+tests/test_transport_tcp-test_transport_tcp.obj: tests/test_transport_tcp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_transport_tcp_CFLAGS) $(CFLAGS) -MT tests/test_transport_tcp-test_transport_tcp.obj -MD -MP -MF tests/$(DEPDIR)/test_transport_tcp-test_transport_tcp.Tpo -c -o tests/test_transport_tcp-test_transport_tcp.obj `if test -f 'tests/test_transport_tcp.c'; then $(CYGPATH_W) 'tests/test_transport_tcp.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_transport_tcp.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_transport_tcp-test_transport_tcp.Tpo tests/$(DEPDIR)/test_transport_tcp-test_transport_tcp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_transport_tcp.c' object='tests/test_transport_tcp-test_transport_tcp.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_transport_tcp_CFLAGS) $(CFLAGS) -c -o tests/test_transport_tcp-test_transport_tcp.obj `if test -f 'tests/test_transport_tcp.c'; then $(CYGPATH_W) 'tests/test_transport_tcp.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_transport_tcp.c'; fi`
+
+tests/test_transport_udp-test_transport_udp.o: tests/test_transport_udp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_transport_udp_CFLAGS) $(CFLAGS) -MT tests/test_transport_udp-test_transport_udp.o -MD -MP -MF tests/$(DEPDIR)/test_transport_udp-test_transport_udp.Tpo -c -o tests/test_transport_udp-test_transport_udp.o `test -f 'tests/test_transport_udp.c' || echo '$(srcdir)/'`tests/test_transport_udp.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_transport_udp-test_transport_udp.Tpo tests/$(DEPDIR)/test_transport_udp-test_transport_udp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_transport_udp.c' object='tests/test_transport_udp-test_transport_udp.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_transport_udp_CFLAGS) $(CFLAGS) -c -o tests/test_transport_udp-test_transport_udp.o `test -f 'tests/test_transport_udp.c' || echo '$(srcdir)/'`tests/test_transport_udp.c
+
+tests/test_transport_udp-test_transport_udp.obj: tests/test_transport_udp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_transport_udp_CFLAGS) $(CFLAGS) -MT tests/test_transport_udp-test_transport_udp.obj -MD -MP -MF tests/$(DEPDIR)/test_transport_udp-test_transport_udp.Tpo -c -o tests/test_transport_udp-test_transport_udp.obj `if test -f 'tests/test_transport_udp.c'; then $(CYGPATH_W) 'tests/test_transport_udp.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_transport_udp.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_transport_udp-test_transport_udp.Tpo tests/$(DEPDIR)/test_transport_udp-test_transport_udp.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_transport_udp.c' object='tests/test_transport_udp-test_transport_udp.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_transport_udp_CFLAGS) $(CFLAGS) -c -o tests/test_transport_udp-test_transport_udp.obj `if test -f 'tests/test_transport_udp.c'; then $(CYGPATH_W) 'tests/test_transport_udp.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_transport_udp.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -1341,6 +2213,160 @@ test_dhtstore.log: test_dhtstore$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_bencode.log: test_bencode$(EXEEXT)
+	@p='test_bencode$(EXEEXT)'; \
+	b='test_bencode'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_crypto.log: test_crypto$(EXEEXT)
+	@p='test_crypto$(EXEEXT)'; \
+	b='test_crypto'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_log.log: test_log$(EXEEXT)
+	@p='test_log$(EXEEXT)'; \
+	b='test_log'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_kademlia.log: test_kademlia$(EXEEXT)
+	@p='test_kademlia$(EXEEXT)'; \
+	b='test_kademlia'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_recstore.log: test_recstore$(EXEEXT)
+	@p='test_recstore$(EXEEXT)'; \
+	b='test_recstore'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_norn_async.log: test_norn_async$(EXEEXT)
+	@p='test_norn_async$(EXEEXT)'; \
+	b='test_norn_async'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_mainline.log: test_mainline$(EXEEXT)
+	@p='test_mainline$(EXEEXT)'; \
+	b='test_mainline'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_channel.log: test_channel$(EXEEXT)
+	@p='test_channel$(EXEEXT)'; \
+	b='test_channel'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_channel_edges.log: test_channel_edges$(EXEEXT)
+	@p='test_channel_edges$(EXEEXT)'; \
+	b='test_channel_edges'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_replaycache.log: test_replaycache$(EXEEXT)
+	@p='test_replaycache$(EXEEXT)'; \
+	b='test_replaycache'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_stream.log: test_stream$(EXEEXT)
+	@p='test_stream$(EXEEXT)'; \
+	b='test_stream'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_stream_edges.log: test_stream_edges$(EXEEXT)
+	@p='test_stream_edges$(EXEEXT)'; \
+	b='test_stream_edges'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_stream_recovery.log: test_stream_recovery$(EXEEXT)
+	@p='test_stream_recovery$(EXEEXT)'; \
+	b='test_stream_recovery'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_stream_cc.log: test_stream_cc$(EXEEXT)
+	@p='test_stream_cc$(EXEEXT)'; \
+	b='test_stream_cc'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_stream_random.log: test_stream_random$(EXEEXT)
+	@p='test_stream_random$(EXEEXT)'; \
+	b='test_stream_random'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_streammux.log: test_streammux$(EXEEXT)
+	@p='test_streammux$(EXEEXT)'; \
+	b='test_streammux'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_streammux_random.log: test_streammux_random$(EXEEXT)
+	@p='test_streammux_random$(EXEEXT)'; \
+	b='test_streammux_random'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_transport.log: test_transport$(EXEEXT)
+	@p='test_transport$(EXEEXT)'; \
+	b='test_transport'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_transport_udp.log: test_transport_udp$(EXEEXT)
+	@p='test_transport_udp$(EXEEXT)'; \
+	b='test_transport_udp'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_transport_tcp.log: test_transport_tcp$(EXEEXT)
+	@p='test_transport_tcp$(EXEEXT)'; \
+	b='test_transport_tcp'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_idexch.log: test_idexch$(EXEEXT)
+	@p='test_idexch$(EXEEXT)'; \
+	b='test_idexch'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_attr.log: test_attr$(EXEEXT)
+	@p='test_attr$(EXEEXT)'; \
+	b='test_attr'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 .test.log:
 	@p='$<'; \
 	$(am__set_b); \
@@ -1595,20 +2621,52 @@ clean-am: clean-binPROGRAMS clean-checkPROGRAMS clean-generic \
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -f src/$(DEPDIR)/norn-norn.Po
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-attr.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-bencode.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-bep44.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-channel.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-crypto.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-dhtstore.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-idexch.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-kademlia.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-log.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-net.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-recstore.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-replaycache.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-sha1.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-stream.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-streammux.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-transport.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-transport_tcp.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-transport_udp.Plo
+	-rm -f tests/$(DEPDIR)/test_attr-test_attr.Po
+	-rm -f tests/$(DEPDIR)/test_bencode-test_bencode.Po
 	-rm -f tests/$(DEPDIR)/test_bep44-test_bep44.Po
+	-rm -f tests/$(DEPDIR)/test_channel-test_channel.Po
+	-rm -f tests/$(DEPDIR)/test_channel_edges-test_channel_edges.Po
+	-rm -f tests/$(DEPDIR)/test_crypto-test_crypto.Po
 	-rm -f tests/$(DEPDIR)/test_dhtstore-test_dhtstore.Po
+	-rm -f tests/$(DEPDIR)/test_idexch-test_idexch.Po
+	-rm -f tests/$(DEPDIR)/test_kademlia-test_kademlia.Po
+	-rm -f tests/$(DEPDIR)/test_log-test_log.Po
+	-rm -f tests/$(DEPDIR)/test_mainline-test_mainline.Po
 	-rm -f tests/$(DEPDIR)/test_norn-test_norn.Po
+	-rm -f tests/$(DEPDIR)/test_norn_async-test_norn_async.Po
+	-rm -f tests/$(DEPDIR)/test_recstore-test_recstore.Po
+	-rm -f tests/$(DEPDIR)/test_replaycache-test_replaycache.Po
+	-rm -f tests/$(DEPDIR)/test_stream-test_stream.Po
+	-rm -f tests/$(DEPDIR)/test_stream_cc-test_stream_cc.Po
+	-rm -f tests/$(DEPDIR)/test_stream_edges-test_stream_edges.Po
+	-rm -f tests/$(DEPDIR)/test_stream_random-test_stream_random.Po
+	-rm -f tests/$(DEPDIR)/test_stream_recovery-test_stream_recovery.Po
+	-rm -f tests/$(DEPDIR)/test_streammux-test_streammux.Po
+	-rm -f tests/$(DEPDIR)/test_streammux_random-test_streammux_random.Po
+	-rm -f tests/$(DEPDIR)/test_transport-test_transport.Po
+	-rm -f tests/$(DEPDIR)/test_transport_tcp-test_transport_tcp.Po
+	-rm -f tests/$(DEPDIR)/test_transport_udp-test_transport_udp.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-hdr distclean-libtool distclean-tags
@@ -1657,20 +2715,52 @@ maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
 	-rm -f src/$(DEPDIR)/norn-norn.Po
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-attr.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-bencode.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-bep44.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-channel.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-crypto.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-dhtstore.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-idexch.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-kademlia.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-log.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-net.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-recstore.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-replaycache.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-sha1.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-stream.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-streammux.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-transport.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-transport_tcp.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-transport_udp.Plo
+	-rm -f tests/$(DEPDIR)/test_attr-test_attr.Po
+	-rm -f tests/$(DEPDIR)/test_bencode-test_bencode.Po
 	-rm -f tests/$(DEPDIR)/test_bep44-test_bep44.Po
+	-rm -f tests/$(DEPDIR)/test_channel-test_channel.Po
+	-rm -f tests/$(DEPDIR)/test_channel_edges-test_channel_edges.Po
+	-rm -f tests/$(DEPDIR)/test_crypto-test_crypto.Po
 	-rm -f tests/$(DEPDIR)/test_dhtstore-test_dhtstore.Po
+	-rm -f tests/$(DEPDIR)/test_idexch-test_idexch.Po
+	-rm -f tests/$(DEPDIR)/test_kademlia-test_kademlia.Po
+	-rm -f tests/$(DEPDIR)/test_log-test_log.Po
+	-rm -f tests/$(DEPDIR)/test_mainline-test_mainline.Po
 	-rm -f tests/$(DEPDIR)/test_norn-test_norn.Po
+	-rm -f tests/$(DEPDIR)/test_norn_async-test_norn_async.Po
+	-rm -f tests/$(DEPDIR)/test_recstore-test_recstore.Po
+	-rm -f tests/$(DEPDIR)/test_replaycache-test_replaycache.Po
+	-rm -f tests/$(DEPDIR)/test_stream-test_stream.Po
+	-rm -f tests/$(DEPDIR)/test_stream_cc-test_stream_cc.Po
+	-rm -f tests/$(DEPDIR)/test_stream_edges-test_stream_edges.Po
+	-rm -f tests/$(DEPDIR)/test_stream_random-test_stream_random.Po
+	-rm -f tests/$(DEPDIR)/test_stream_recovery-test_stream_recovery.Po
+	-rm -f tests/$(DEPDIR)/test_streammux-test_streammux.Po
+	-rm -f tests/$(DEPDIR)/test_streammux_random-test_streammux_random.Po
+	-rm -f tests/$(DEPDIR)/test_transport-test_transport.Po
+	-rm -f tests/$(DEPDIR)/test_transport_tcp-test_transport_tcp.Po
+	-rm -f tests/$(DEPDIR)/test_transport_udp-test_transport_udp.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -1718,7 +2808,31 @@ uninstall-am: uninstall-binPROGRAMS uninstall-includeHEADERS \
 
 
 coverage:
+	@if [ ! -x "$(top_srcdir)/contrib/coverage.sh" ]; then \
+		chmod +x "$(top_srcdir)/contrib/coverage.sh"; \
+	fi
 	$(top_srcdir)/contrib/coverage.sh
+
+# System Integration Tests (SIT)
+check-sit:
+	@if command -v bats >/dev/null 2>&1; then \
+		bats tests/sit/*.bats; \
+	else \
+		echo "ERROR: bats not installed. Install bats or run: ./tests/sit/run.sh"; \
+		exit 1; \
+	fi
+
+# Performance Integration Tests (PIT)
+check-pit:
+	@if command -v bats >/dev/null 2>&1; then \
+		bats tests/pit/*.bats; \
+	else \
+		echo "ERROR: bats not installed. Install bats or run: ./tests/pit/run.sh"; \
+		exit 1; \
+	fi
+
+# All tests (unit + SIT + PIT)
+check-all: check check-sit check-pit
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

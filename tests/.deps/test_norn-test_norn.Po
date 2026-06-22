@@ -220,14 +220,14 @@ tests/test_norn-test_norn.o: tests/test_norn.c src/libnorn/norn.h \
  /opt/local/include/sodium/crypto_stream_salsa2012.h \
  /opt/local/include/sodium/crypto_stream_salsa208.h \
  /opt/local/include/sodium/crypto_stream_xchacha20.h \
- /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/assert.h \
- /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_assert.h \
- /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_static_assert.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/string.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_string.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_strings.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_strings.h \
- /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_string.h
+ /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_string.h \
+ /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/assert.h \
+ /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_assert.h \
+ /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_static_assert.h
 src/libnorn/norn.h:
 /opt/local/lib/gcc14/gcc/aarch64-apple-darwin25/14.3.0/include/stdint.h:
 /opt/local/lib/gcc14/gcc/aarch64-apple-darwin25/14.3.0/include-fixed/stdint.h:
@@ -452,11 +452,11 @@ src/libnorn/norn.h:
 /opt/local/include/sodium/crypto_stream_salsa2012.h:
 /opt/local/include/sodium/crypto_stream_salsa208.h:
 /opt/local/include/sodium/crypto_stream_xchacha20.h:
-/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/assert.h:
-/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_assert.h:
-/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_static_assert.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/string.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_string.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_strings.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_strings.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_string.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/assert.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_assert.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_static_assert.h:
