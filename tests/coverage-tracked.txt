@@ -17,3 +17,4 @@ src/libnorn/net.c
 src/libnorn/log.c
 src/libnorn/channel.c
 src/libnorn/replaycache.c
+src/libnorn/stream.c
