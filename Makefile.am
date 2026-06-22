@@ -18,7 +18,10 @@ libnorn_la_SOURCES = \
 	src/libnorn/channel.c \
 	src/libnorn/replaycache.c \
 	src/libnorn/stream.c \
-	src/libnorn/streammux.c
+	src/libnorn/streammux.c \
+	src/libnorn/transport.c \
+	src/libnorn/transport_udp.c \
+	src/libnorn/transport_tcp.c
 
 libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -O2 -I$(top_srcdir)/src/libnorn
 
@@ -30,7 +33,7 @@ norn_SOURCES = src/norn.c
 norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -O2 -I$(top_srcdir)/src/libnorn
 norn_LDADD = libnorn.la $(SODIUM_LIBS)
 
-check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random
+check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_transport test_transport_udp test_transport_tcp
 
 test_norn_SOURCES = tests/test_norn.c
 test_norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
@@ -111,6 +114,18 @@ test_streammux_LDADD = libnorn.la $(SODIUM_LIBS)
 test_streammux_random_SOURCES = tests/test_streammux_random.c
 test_streammux_random_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
 test_streammux_random_LDADD = libnorn.la $(SODIUM_LIBS)
+
+test_transport_SOURCES = tests/test_transport.c
+test_transport_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_transport_LDADD = libnorn.la $(SODIUM_LIBS)
+
+test_transport_udp_SOURCES = tests/test_transport_udp.c
+test_transport_udp_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_transport_udp_LDADD = libnorn.la $(SODIUM_LIBS)
+
+test_transport_tcp_SOURCES = tests/test_transport_tcp.c
+test_transport_tcp_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_transport_tcp_LDADD = libnorn.la $(SODIUM_LIBS)
 
 TESTS = $(check_PROGRAMS)
 
