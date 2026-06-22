@@ -15,3 +15,5 @@ src/libnorn/bencode.c
 src/libnorn/crypto.c
 src/libnorn/net.c
 src/libnorn/log.c
+src/libnorn/channel.c
+src/libnorn/replaycache.c
