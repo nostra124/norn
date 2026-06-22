@@ -98,6 +98,20 @@ static void test_keypair_load_secret_only(void) {
     printf("  test_keypair_load_secret_only: OK\n");
 }
 
+static void test_keypair_save_short_write(void) {
+    const char *path = "/tmp/norn_test_keypair_short_write";
+    unlink(path);
+    
+    keypair_t kp;
+    crypto_keypair_new(&kp);
+    
+    int ret = crypto_keypair_save(&kp, path);
+    assert(ret == 0);
+    
+    unlink(path);
+    printf("  test_keypair_save_short_write: OK\n");
+}
+
 static void test_bf_sign_verify(void) {
     unsigned char pk[32], sk[64];
     crypto_sign_keypair(pk, sk);
@@ -330,6 +344,7 @@ int main(void) {
     test_keypair_save_load();
     test_keypair_load_short();
     test_keypair_load_secret_only();
+    test_keypair_save_short_write();
     test_bf_sign_verify();
     test_bf_seal();
     test_bf_seal_open();
