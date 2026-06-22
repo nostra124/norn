@@ -411,31 +411,98 @@ static void test_accept_max_capacity(void) {
     
     recstore_init(path);
     
-    unsigned char pk_base[32], sk_base[64];
-    crypto_sign_keypair(pk_base, sk_base);
-    
     unsigned char value[] = "test";
     unsigned char buf[256];
     unsigned char sig[64];
     
     for (int i = 0; i < RECSTORE_MAX + 10; i++) {
-        unsigned char pk[32], sk[64];
-        memcpy(pk, pk_base, 32);
-        pk[0] = (unsigned char)i;
-        memcpy(sk, sk_base, 64);
-        sk[0] = (unsigned char)i;
+        keypair_t kp;
+        crypto_keypair_new(&kp);
         
-        int buflen = bep44_signbuf(1, value, sizeof(value) - 1, buf, sizeof(buf));
-        bf_sign(sig, buf, (size_t)buflen, sk);
+        int buflen = bep44_signbuf((uint32_t)i + 1, value, sizeof(value) - 1, buf, sizeof(buf));
+        bf_sign(sig, buf, (size_t)buflen, kp.secret_key);
         
-        int ret = recstore_accept(pk, 1, value, sizeof(value) - 1, sig);
-        (void)ret;
+        int ret = recstore_accept(kp.public_key, (uint32_t)i + 1, value, sizeof(value) - 1, sig);
+        if (i < RECSTORE_MAX) {
+            assert(ret == 1);
+        } else {
+            assert(ret == 0);
+        }
     }
     
-    assert(recstore_count() <= RECSTORE_MAX);
+    assert(recstore_count() == RECSTORE_MAX);
     
     unlink(path);
     printf("  test_accept_max_capacity: OK\n");
+}
+
+static void test_load_malformed_file(void) {
+    const char *path = "/tmp/norn_test_recstore_malformed";
+    
+    FILE *f = fopen(path, "w");
+    assert(f);
+    fprintf(f, "malformed line without enough fields\n");
+    fclose(f);
+    
+    int ret = recstore_init(path);
+    assert(ret == 0);
+    
+    unlink(path);
+    
+    f = fopen(path, "w");
+    assert(f);
+    fprintf(f, "1234567890123456789012345678901234567890 1234567890123456789012345678901234567890123456789012345678901234 1 5 12345 abcdef1234567890 1609459200\n");
+    fclose(f);
+    
+    ret = recstore_init(path);
+    assert(ret == 0);
+    
+    unlink(path);
+    printf("  test_load_malformed_file: OK\n");
+}
+
+static void test_get_by_node_id_with_record(void) {
+    const char *path = "/tmp/norn_test_recstore_nodeid";
+    unlink(path);
+    
+    recstore_init(path);
+    
+    keypair_t kp;
+    crypto_keypair_new(&kp);
+    
+    bep44_record_t rec;
+    memset(&rec, 0, sizeof(rec));
+    strcpy(rec.version, "0.1.0");
+    rec.ip = 0x7f000001;
+    rec.port = 8080;
+    rec.caps = 1;
+    memset(rec.node_id, 0x42, 20);
+    
+    unsigned char value[256];
+    int vlen = bep44_record_encode(&rec, value, sizeof(value));
+    assert(vlen > 0);
+    
+    unsigned char buf[256];
+    int buflen = bep44_signbuf(1, value, (size_t)vlen, buf, sizeof(buf));
+    
+    unsigned char sig[64];
+    bf_sign(sig, buf, (size_t)buflen, kp.secret_key);
+    
+    int ret = recstore_accept(kp.public_key, 1, value, (size_t)vlen, sig);
+    assert(ret == 1);
+    
+    rec_t out;
+    ret = recstore_get_by_node_id(rec.node_id, &out);
+    assert(ret == 1);
+    assert(memcmp(out.k, kp.public_key, 32) == 0);
+    
+    unsigned char wrong_id[20];
+    memset(wrong_id, 0xFF, 20);
+    ret = recstore_get_by_node_id(wrong_id, &out);
+    assert(ret == 0);
+    
+    unlink(path);
+    printf("  test_get_by_node_id_with_record: OK\n");
 }
 
 int main(void) {
@@ -466,6 +533,8 @@ int main(void) {
     test_save_load();
     test_private_not_saved();
     test_accept_max_capacity();
+    test_get_by_node_id_with_record();
+    test_load_malformed_file();
     
     printf("test_recstore: OK\n");
     return 0;
