@@ -103,6 +103,37 @@ static void test_null_dispatch(void) {
     assert(norn_transport_recv(NULL, NULL, 0) == -1);
 }
 
+/* Test send/recv on socketpair (simplest way to test TCP send/recv without hanging) */
+static void test_send_recv(void) {
+    int fds[2];
+    int rc = socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
+    assert(rc == 0);
+    
+    norn_transport_t *t = norn_tcp_new(fds[0], 1);
+    assert(t != NULL);
+    
+    /* Send from transport, recv from other end */
+    const char *msg = "hello";
+    int sent = norn_transport_send(t, msg, 5);
+    assert(sent == 5);
+    
+    char buf[64];
+    int n = recv(fds[1], buf, sizeof(buf), 0);
+    assert(n == 5);
+    assert(memcmp(buf, "hello", 5) == 0);
+    
+    /* Send from other end, recv via transport */
+    n = send(fds[1], "world", 5, 0);
+    assert(n == 5);
+    
+    n = norn_transport_recv(t, buf, sizeof(buf));
+    assert(n == 5);
+    assert(memcmp(buf, "world", 5) == 0);
+    
+    norn_transport_close(t);
+    close(fds[1]);
+}
+
 int main(void) {
     test_invalid_fd();
     test_create_close();
@@ -111,6 +142,7 @@ int main(void) {
     test_cap();
     test_local_endpoint();
     test_null_dispatch();
+    test_send_recv();
     printf("transport_tcp tests passed\n");
     return 0;
 }
