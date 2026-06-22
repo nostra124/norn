@@ -11,13 +11,13 @@ Foundation work ensuring robust, well-tested core functionality with 100% covera
 - ⚠️ norn_impl.c: 73.6% lines, 93.3% branches — Needs async callback tests
 
 ### Near-Done Modules (80-99% coverage)
-- ⚠️ bep44.c: 99.1% lines, 100% branches — 1 line missing
-- ⚠️ crypto.c: 95.4% lines, 100% branches — 10 lines missing
-- ⚠️ channel.c: 94.4% lines, 95.5% branches — 12 lines missing
-- ⚠️ recstore.c: 91.3% lines, 100% branches — 9 lines missing
-- ⚠️ dhtstore.c: 85.7% lines, 87.5% branches — Budget enforcement tests added
-- ⚠️ bencode.c: 82.6% lines, 100% branches — Needs error path tests
-- ⚠️ kademlia.c: 80.7% lines, 100% branches — Needs routing edge cases
+- ⚠️ bep44.c: 99.1% lines, 100% branches — 1-2 lines missing
+- ⚠️ crypto.c: 95.4% lines, 100% branches — ~10 lines missing
+- ⚠️ channel.c: 94.4% lines, 95.5% branches — ~12 lines missing
+- ⚠️ recstore.c: 91.3% lines, 100% branches — ~9 lines missing
+- ⚠️ dhtstore.c: 85.7% lines, 87.5% branches — Budget/eviction tests added
+- ⚠️ bencode.c: 82.6% lines, 100% branches — Error path tests exist
+- ⚠️ kademlia.c: 80.7% lines, 100% branches — Routing tests exist
 - ⚠️ net.c: 81.6% lines, 100% branches — Network layer tests added
 
 ### Passing Modules (100% coverage)
