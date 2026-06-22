@@ -22,3 +22,4 @@ src/libnorn/streammux.c
 src/libnorn/transport.c
 src/libnorn/transport_udp.c
 src/libnorn/transport_tcp.c
+src/libnorn/idexch.c
