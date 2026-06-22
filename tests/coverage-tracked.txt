@@ -19,3 +19,6 @@ src/libnorn/channel.c
 src/libnorn/replaycache.c
 src/libnorn/stream.c
 src/libnorn/streammux.c
+src/libnorn/transport.c
+src/libnorn/transport_udp.c
+src/libnorn/transport_tcp.c
