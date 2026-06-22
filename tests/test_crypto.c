@@ -108,8 +108,33 @@ static void test_keypair_save_short_write(void) {
     int ret = crypto_keypair_save(&kp, path);
     assert(ret == 0);
     
+    FILE *f = fopen(path, "rb");
+    assert(f);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fclose(f);
+    assert(size == CRYPTO_SECRETKEYBYTES + CRYPTO_PUBLICKEYBYTES);
+    
     unlink(path);
     printf("  test_keypair_save_short_write: OK\n");
+}
+
+static void test_keypair_load_error_paths(void) {
+    const char *path = "/tmp/norn_test_keypair_err";
+    keypair_t kp;
+    
+    int ret = crypto_keypair_load(&kp, "/nonexistent/path/key");
+    assert(ret == -1);
+    
+    FILE *f = fopen(path, "wb");
+    fprintf(f, "short");
+    fclose(f);
+    
+    ret = crypto_keypair_load(&kp, path);
+    assert(ret == -1);
+    
+    unlink(path);
+    printf("  test_keypair_load_error_paths: OK\n");
 }
 
 static void test_bf_sign_verify(void) {
@@ -345,6 +370,7 @@ int main(void) {
     test_keypair_load_short();
     test_keypair_load_secret_only();
     test_keypair_save_short_write();
+    test_keypair_load_error_paths();
     test_bf_sign_verify();
     test_bf_seal();
     test_bf_seal_open();
