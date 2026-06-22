@@ -201,6 +201,87 @@ static void test_encode_decode(void) {
     printf("  test_encode_decode: OK\n");
 }
 
+static void test_encode_null(void) {
+    unsigned char pk[32], sk[64], out[1024], value[] = "test";
+    crypto_sign_keypair(pk, sk);
+    
+    assert(bep44_encode(NULL, sizeof(out), pk, value, 4, 1, sk) == -1);
+    assert(bep44_encode(out, sizeof(out), NULL, value, 4, 1, sk) == -1);
+    assert(bep44_encode(out, sizeof(out), pk, NULL, 4, 1, sk) == -1);
+    assert(bep44_encode(out, sizeof(out), pk, value, 4, 1, NULL) == -1);
+    
+    printf("  test_encode_null: OK\n");
+}
+
+static void test_encode_overflow(void) {
+    unsigned char pk[32], sk[64], out[1024];
+    crypto_sign_keypair(pk, sk);
+    
+    unsigned char big[1001];
+    memset(big, 'X', sizeof(big));
+    assert(bep44_encode(out, sizeof(out), pk, big, sizeof(big), 1, sk) == -1);
+    
+    unsigned char small[10];
+    int len = bep44_encode(out, 50, pk, small, sizeof(small), 1, sk);
+    assert(len == -1);
+    
+    printf("  test_encode_overflow: OK\n");
+}
+
+static void test_decode_truncated(void) {
+    unsigned char pk[32], sk[64], out[1024];
+    crypto_sign_keypair(pk, sk);
+    
+    unsigned char value[] = "test";
+    int len = bep44_encode(out, sizeof(out), pk, value, 4, 1, sk);
+    assert(len > 0);
+    
+    unsigned char pk2[32], sig[64];
+    unsigned char *vout;
+    size_t vlen;
+    uint32_t seq2;
+    
+    assert(bep44_decode(NULL, len, pk2, &vout, &vlen, &seq2, sig) == -1);
+    
+    assert(bep44_decode(out, 10, pk2, &vout, &vlen, &seq2, sig) == -1);
+    
+    printf("  test_decode_truncated: OK\n");
+}
+
+static void test_decode_bad_sig(void) {
+    unsigned char pk[32], sk[64], out[1024];
+    crypto_sign_keypair(pk, sk);
+    
+    unsigned char value[] = "test";
+    int len = bep44_encode(out, sizeof(out), pk, value, 4, 1, sk);
+    assert(len > 0);
+    
+    unsigned char pk2[32], sig[64];
+    unsigned char *vout;
+    size_t vlen;
+    uint32_t seq2;
+    
+    out[len - 1] ^= 0xFF;
+    int ret = bep44_decode(out, len, pk2, &vout, &vlen, &seq2, sig);
+    assert(ret == -1);
+    
+    printf("  test_decode_bad_sig: OK\n");
+}
+
+static void test_record_decode_invalid(void) {
+    unsigned char buf[256];
+    bep44_record_t r;
+    
+    assert(bep44_record_decode(NULL, 10, &r) == -1);
+    
+    assert(bep44_record_decode(buf, 0, &r) == -1);
+    
+    buf[0] = 255;
+    assert(bep44_record_decode(buf, 10, &r) == -1);
+    
+    printf("  test_record_decode_invalid: OK\n");
+}
+
 int main(void) {
     if (sodium_init() < 0) {
         fprintf(stderr, "Failed to initialize libsodium\n");
@@ -218,6 +299,11 @@ int main(void) {
     test_record_encode_decode();
     test_record_with_services();
     test_encode_decode();
+    test_encode_null();
+    test_encode_overflow();
+    test_decode_truncated();
+    test_decode_bad_sig();
+    test_record_decode_invalid();
     
     printf("test_bep44: OK\n");
     return 0;
