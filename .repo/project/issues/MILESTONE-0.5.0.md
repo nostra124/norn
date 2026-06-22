@@ -2,6 +2,10 @@
 
 Automation and continuous integration.
 
+## Status (2026-06-22)
+
+Pending completion of v0.4.0 (code quality).
+
 ## Tickets
 
 | ID | Title | Status |
