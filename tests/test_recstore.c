@@ -371,6 +371,73 @@ static void test_save_load(void) {
     printf("  test_save_load: OK\n");
 }
 
+static void test_private_not_saved(void) {
+    const char *path = "/tmp/norn_test_recstore_private_not_saved";
+    unlink(path);
+    
+    recstore_init(path);
+    
+    unsigned char pk[32], sk[64];
+    crypto_sign_keypair(pk, sk);
+    
+    unsigned char value[] = "private record";
+    unsigned char buf[256];
+    int buflen = bep44_signbuf(1, value, sizeof(value) - 1, buf, sizeof(buf));
+    
+    unsigned char sig[64];
+    bf_sign(sig, buf, (size_t)buflen, sk);
+    
+    int ret = recstore_accept(pk, 1, value, sizeof(value) - 1, sig);
+    assert(ret == 1);
+    
+    recstore_set_private(pk, 1);
+    
+    recstore_init(path);
+    
+    unsigned char target[20];
+    bep44_target(pk, target);
+    
+    rec_t out;
+    ret = recstore_get(target, &out);
+    assert(ret == 0);
+    
+    unlink(path);
+    printf("  test_private_not_saved: OK\n");
+}
+
+static void test_accept_max_capacity(void) {
+    const char *path = "/tmp/norn_test_recstore_max";
+    unlink(path);
+    
+    recstore_init(path);
+    
+    unsigned char pk_base[32], sk_base[64];
+    crypto_sign_keypair(pk_base, sk_base);
+    
+    unsigned char value[] = "test";
+    unsigned char buf[256];
+    unsigned char sig[64];
+    
+    for (int i = 0; i < RECSTORE_MAX + 10; i++) {
+        unsigned char pk[32], sk[64];
+        memcpy(pk, pk_base, 32);
+        pk[0] = (unsigned char)i;
+        memcpy(sk, sk_base, 64);
+        sk[0] = (unsigned char)i;
+        
+        int buflen = bep44_signbuf(1, value, sizeof(value) - 1, buf, sizeof(buf));
+        bf_sign(sig, buf, (size_t)buflen, sk);
+        
+        int ret = recstore_accept(pk, 1, value, sizeof(value) - 1, sig);
+        (void)ret;
+    }
+    
+    assert(recstore_count() <= RECSTORE_MAX);
+    
+    unlink(path);
+    printf("  test_accept_max_capacity: OK\n");
+}
+
 int main(void) {
     if (sodium_init() < 0) {
         fprintf(stderr, "Failed to initialize libsodium\n");
@@ -397,6 +464,8 @@ int main(void) {
     test_list();
     test_list_null();
     test_save_load();
+    test_private_not_saved();
+    test_accept_max_capacity();
     
     printf("test_recstore: OK\n");
     return 0;
