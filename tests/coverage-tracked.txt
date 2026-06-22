@@ -1,9 +1,17 @@
 # Coverage-tracked sources for norn
 # 100% line AND branch coverage required before commit
 # Add LCOV_EXCL_LINE / LCOV_EXCL_BR_LINE for genuinely untestable paths
+# Paths are relative to src/libnorn/
 
-norn.c
-bep44.c
-sha1.c
-dhtstore.c
-bencode.c
+src/libnorn/norn.c
+src/libnorn/norn_impl.c
+src/libnorn/norn_transaction.c
+src/libnorn/kademlia.c
+src/libnorn/bep44.c
+src/libnorn/sha1.c
+src/libnorn/dhtstore.c
+src/libnorn/recstore.c
+src/libnorn/bencode.c
+src/libnorn/crypto.c
+src/libnorn/net.c
+src/libnorn/log.c

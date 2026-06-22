@@ -23,11 +23,22 @@ while read -r src; do
     [ -z "$src" ] && continue
     [ "${src:0:1}" = "#" ] && continue
     
-    LINE=$(lcov --rc branch_coverage=1 --summary coverage.info 2>&1 | grep "$src" | grep -oP 'Lines.*' || echo "Lines: 0%")
-    BRANCH=$(lcov --rc branch_coverage=1 --summary coverage.info 2>&1 | grep "$src" | grep -oP 'Branches.*' || echo "Branches: 0%")
+    LINE=$(lcov --list coverage.info 2>/dev/null | grep "$src" | head -1)
+    if [ -z "$LINE" ]; then
+        echo "FAIL: $src - Not found in coverage report"
+        FAILED=1
+        continue
+    fi
     
-    LINE_PCT=$(echo "$LINE" | grep -oP '\d+' | head -1)
-    BRANCH_PCT=$(echo "$BRANCH" | grep -oP '\d+' | head -1)
+    LINE_PCT=$(echo "$LINE" | awk -F'|' '{split($2,a,"%"); split(a[1],b," "); for(i in b) if(b[i] ~ /[0-9]/) {print b[i]; break}}')
+    BRANCH_PCT=$(echo "$LINE" | awk -F'|' '{split($3,a,"%"); split(a[1],b," "); for(i in b) if(b[i] ~ /[0-9]/) {print b[i]; break}}')
+    
+    if [ -z "$LINE_PCT" ]; then
+        LINE_PCT=0
+    fi
+    if [ -z "$BRANCH_PCT" ]; then
+        BRANCH_PCT=0
+    fi
     
     if [ "$LINE_PCT" != "100" ] || [ "$BRANCH_PCT" != "100" ]; then
         echo "FAIL: $src - Lines: ${LINE_PCT}%, Branches: ${BRANCH_PCT}%"
