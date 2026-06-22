@@ -1,0 +1,52 @@
+# Build artifacts
+*.o
+*.lo
+*.la
+*.a
+*.so
+*.dylib
+.libs/
+.deps/
+.dirstamp
+
+# Autotools generated
+Makefile
+Makefile.in
+aclocal.m4
+autom4te.cache/
+build-aux/
+config.h
+config.h.in
+config.h.in~
+config.log
+config.status
+configure
+configure~
+libtool
+stamp-h1
+*.pc
+
+# Test artifacts
+test_*
+*.log
+*.trs
+test-suite.log
+
+# Coverage artifacts
+*.gcno
+*.gcda
+*.gcov
+coverage.info
+coverage_html/
+covhtml/
+
+# Generated files
+norn
+*.dylib
+
+# IDE/Editor
+*.swp
+*.swo
+*~
+.idea/
+.vscode/

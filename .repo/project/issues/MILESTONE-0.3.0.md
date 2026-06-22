@@ -2,6 +2,10 @@
 
 Complete documentation for contributors and users.
 
+## Status (2026-06-22)
+
+Pending completion of v0.2.0 (100% test coverage).
+
 ## Tickets
 
 | ID | Title | Status |

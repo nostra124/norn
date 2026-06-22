@@ -56,6 +56,38 @@ The current test suite covers only happy paths in a few modules. Missing tests f
 7. ✅ Buffer boundary tests for encode/decode functions
 8. ✅ LCOV_EXCL_LINE used only for genuinely untestable code
 
+## Current Status (2026-06-22)
+
+**Progress: 11/20 modules at 100% (55%)**
+
+### Completed Modules (100% coverage)
+- norn_transaction.c ✅
+- sha1.c ✅
+- log.c ✅
+- replaycache.c ✅
+- stream.c ✅
+- streammux.c ✅
+- transport.c ✅
+- transport_udp.c ✅
+- transport_tcp.c ✅
+- idexch.c ✅
+- attr.c ✅
+
+### In Progress (< 100% coverage)
+
+| Module | Lines | Branches | Priority |
+|--------|-------|----------|----------|
+| norn.c | 26.1% | 60.0% | CRITICAL |
+| net.c | 18.9% | 19.0% | CRITICAL |
+| dhtstore.c | 53.6% | 50.0% | CRITICAL |
+| norn_impl.c | 73.6% | 93.3% | HIGH |
+| kademlia.c | 80.7% | 100% | MEDIUM |
+| bencode.c | 82.6% | 100% | MEDIUM |
+| recstore.c | 91.3% | 100% | LOW |
+| crypto.c | 95.4% | 100% | LOW |
+| bep44.c | 98.3% | 100% | LOW |
+| channel.c | 94.4% | 95.5% | LOW |
+
 ## Test Levels
 
 This ticket covers **unit tests only**. Integration tests are tracked separately:

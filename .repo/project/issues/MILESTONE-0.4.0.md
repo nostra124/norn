@@ -2,6 +2,10 @@
 
 Refactoring for maintainability.
 
+## Status (2026-06-22)
+
+Pending completion of v0.3.0 (documentation).
+
 ## Tickets
 
 | ID | Title | Status |
