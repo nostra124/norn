@@ -1,61 +1,221 @@
+/**
+ * @file recstore.h
+ * @brief Trusted record store for signed items
+ * 
+ * Provides a shared store of signed records (BPE-0004). Unlike dhtstore
+ * (untrusted network items), recstore holds records we signed ourselves.
+ * All distribution paths (BEP-44 DHT put/get, gossip) funnel through this
+ * single validating gate.
+ * 
+ * @section features Key Features
+ * - Trusted records (signed by us)
+ * - Sequence monotonicity enforcement
+ * - Account-based lookup (via node_id)
+ * - Private record support (FEAT-048)
+ * - Write-through persistence
+ * 
+ * @section security Security Model
+ * - Records are TRUSTED (signed by our own key)
+ * - Sequence number must be newer than existing
+ * - Signature verified before storage
+ * - Private records never written to disk or DHT
+ * 
+ * @section difference Difference from dhtstore
+ * - dhtstore: Untrusted items from the network (bounded cache)
+ * - recstore: Trusted items we signed ourselves (persistent store)
+ * 
+ * @note Not thread-safe. Caller must synchronize.
+ */
+
 #ifndef BIFROST_RECSTORE_H
 #define BIFROST_RECSTORE_H
 
 #include <stdint.h>
 #include <stddef.h>
 
-/* The shared store of signed records (BPE-0004). One validating gate that every
- * distribution path — BEP-44 DHT put/get and gossip — funnels through, so a
- * stale/forged/replayed record is rejected once, for all callers. */
-
+/** @brief Maximum number of records */
 #define RECSTORE_MAX  256
-#define RECSTORE_VMAX 256   /* max record value bytes (ours ~51; BEP-44 cap 1000) */
 
+/** @brief Maximum record value size */
+#define RECSTORE_VMAX 256
+
+/**
+ * @brief Trusted record structure
+ */
 typedef struct {
-    unsigned char target[20];   /* SHA1(k) */
-    unsigned char k[32];        /* publisher ed25519 identity pubkey */
-    uint32_t      seq;          /* monotonic */
-    unsigned char v[RECSTORE_VMAX];
-    size_t        vlen;
-    unsigned char sig[64];      /* ed25519 over the BEP-44 canonical buffer */
-    long          last_seen;
-    char          via[64];      /* account of the peer that last forwarded this to us
-                                 * (a direct peer of ours); "" if from DHT/own. In-memory
-                                 * only (not persisted) — it's "who currently provides it". */
-    int           priv;         /* FEAT-048 (0.17): 1 = arrived via PRIVATE trusted gossip (or is
-                                 * our own record while stealth). Excluded from public gossip, the
-                                 * mainline DHT, and the on-disk store — re-learned from trusted
-                                 * peers each session. In-memory only. */
+    unsigned char target[20];   /**< SHA1(k) - DHT key */
+    unsigned char k[32];         /**< Publisher Ed25519 identity pubkey */
+    uint32_t      seq;          /**< Monotonically increasing sequence number */
+    unsigned char v[RECSTORE_VMAX]; /**< Record value */
+    size_t        vlen;         /**< Value length */
+    unsigned char sig[64];      /**< Ed25519 signature over BEP-44 canonical buffer */
+    long          last_seen;    /**< Unix timestamp when last seen */
+    char          via[64];      /**< Account of peer that forwarded this record */
+    int           priv;         /**< FEAT-048: 1 if private, 0 if public */
 } rec_t;
 
-/* Load from path (write-through afterwards). Returns count loaded, or -1. */
+/**
+ * @brief Initialize the record store
+ * 
+ * Loads existing records from disk (if path exists) and enables write-through
+ * persistence. Subsequent changes are automatically saved to disk.
+ * 
+ * @param path File path for persistence (NULL for in-memory only)
+ * @return Number of records loaded, or -1 on error
+ * 
+ * @note Thread Safety: Not thread-safe
+ * @note Persistence: Records saved automatically after each change
+ * @note Memory: Maximum RECSTORE_MAX records
+ * 
+ * @code
+ * // Persistent storage
+ * int count = recstore_init("/var/lib/myapp/records.dat");
+ * if (count < 0) {
+ *     fprintf(stderr, "Failed to init recstore\n");
+ *     return 1;
+ * }
+ * 
+ * // In-memory only
+ * recstore_init(NULL);
+ * @endcode
+ */
 int recstore_init(const char *path);
 
-/* The gate: verify sig against k, require SHA1(k)==target, and seq strictly
- * newer than any held for this target; then store/replace. Returns 1 if accepted
- * (new or newer), 0 if rejected (bad sig / stale / dup / full). */
+/**
+ * @brief Accept and store a trusted record
+ * 
+ * Validates the signature against k, verifies SHA1(k) == target, and checks
+ * that seq is strictly newer than any existing record for this target.
+ * 
+ * @param k Ed25519 public key (32 bytes)
+ * @param seq Sequence number (must be newer than existing)
+ * @param v Value (max RECSTORE_VMAX bytes)
+ * @param vlen Length of value
+ * @param sig Ed25519 signature (64 bytes)
+ * @return 1 if accepted (new or newer), 0 if rejected (bad sig, stale, duplicate, full)
+ * 
+ * @note Thread Safety: Not thread-safe
+ * @note NULL-safe: Returns 0 if k, v, or sig is NULL
+ * @note Security: Signature verified, sequence monotonicity enforced
+ * @note Persistence: Automatically saved if initialized with path
+ * 
+ * @code
+ * keypair_t kp;
+ * crypto_keypair_new(&kp);
+ * 
+ * unsigned char target[20];
+ * bep44_target(kp.public_key, target);
+ * 
+ * unsigned char value[] = "Hello";
+ * unsigned char buf[300], sig[64];
+ * int len = bep44_signbuf(1, value, sizeof(value)-1, buf, sizeof(buf));
+ * bf_sign(sig, buf, len, kp.secret_key);
+ * 
+ * if (recstore_accept(kp.public_key, 1, value, sizeof(value)-1, sig)) {
+ *     printf("Accepted\n");
+ * }
+ * @endcode
+ */
 int recstore_accept(const unsigned char k[32], uint32_t seq,
                     const unsigned char *v, size_t vlen, const unsigned char sig[64]);
 
-/* Fetch by target, or by pubkey (target = SHA1(k)). 1 + fills out, else 0. */
+/**
+ * @brief Retrieve a record by target
+ * 
+ * Fetches a previously stored record by its target (SHA1(k)).
+ * 
+ * @param target DHT key (20 bytes)
+ * @param out Output: record structure
+ * @return 1 if found, 0 if not found
+ * 
+ * @note Thread Safety: Not thread-safe
+ * @note NULL-safe: Returns 0 if target or out is NULL
+ */
 int recstore_get(const unsigned char target[20], rec_t *out);
+
+/**
+ * @brief Retrieve a record by public key
+ * 
+ * Fetches a previously stored record by its Ed25519 public key.
+ * The target is computed as SHA1(k).
+ * 
+ * @param k Ed25519 public key (32 bytes)
+ * @param out Output: record structure
+ * @return 1 if found, 0 if not found
+ * 
+ * @note Thread Safety: Not thread-safe
+ * @note NULL-safe: Returns 0 if k or out is NULL
+ */
 int recstore_get_by_pubkey(const unsigned char k[32], rec_t *out);
-/* Resolve by node_id = SHA256(account)[:20], matched against the node_id field
- * embedded in each record's value. Lets a holder find a gossiped peer by account
- * (it hashes the account) without the account ever being shared. 1 + fills out. */
+
+/**
+ * @brief Retrieve a record by node ID
+ * 
+ * Fetches a record by its node_id field (SHA256(account)[:20]).
+ * This enables account-based lookup without sharing the account itself.
+ * 
+ * @param node_id SHA256(account)[:20] (20 bytes)
+ * @param out Output: record structure
+ * @return 1 if found, 0 if not found
+ * 
+ * @note Thread Safety: Not thread-safe
+ * @note NULL-safe: Returns 0 if node_id or out is NULL
+ * @note FEAT-048: One-way hash reveals nothing about account
+ */
 int recstore_get_by_node_id(const unsigned char node_id[20], rec_t *out);
 
-/* Note who forwarded us the record for pubkey k (a direct peer's account) — set on
- * every gossip receipt so `peers`/`gossip` can show "via <peer>" for indirect
- * peers. No-op if we don't hold the record. */
+/**
+ * @brief Set the "via" field for a record
+ * 
+ * Records the account of the peer that forwarded this record to us.
+ * Used for peer tracking and debugging.
+ * 
+ * @param k Ed25519 public key (32 bytes)
+ * @param via Account string (peer identifier)
+ * 
+ * @note Thread Safety: Not thread-safe
+ * @note NULL-safe: Does nothing if k or via is NULL
+ * @note No-op: If record not held
+ */
 void recstore_set_via(const unsigned char k[32], const char *via);
 
-/* FEAT-048: mark the record for pubkey k as private (1) or public (0). Private
- * records are kept in memory for resolution but never written to disk, published
- * to the mainline DHT, or gossiped to non-trusted peers. No-op if not held. */
+/**
+ * @brief Set the private flag for a record
+ * 
+ * Marks a record as private (FEAT-048). Private records are:
+ * - Kept in memory for resolution
+ * - Never written to disk
+ * - Never published to mainline DHT
+ * - Never gossiped to non-trusted peers
+ * 
+ * @param k Ed25519 public key (32 bytes)
+ * @param val 1 for private, 0 for public
+ * 
+ * @note Thread Safety: Not thread-safe
+ * @note NULL-safe: Does nothing if k is NULL
+ * @note No-op: If record not held
+ * @note Memory-only: Private flag not persisted
+ */
 void recstore_set_private(const unsigned char k[32], int val);
 
+/**
+ * @brief Get number of records stored
+ * @return Number of records currently held
+ */
 int recstore_count(void);
-int recstore_list(rec_t *out, int max);   /* for gossip digests */
 
-#endif
+/**
+ * @brief List all records
+ * 
+ * Enumerates all records for gossip digests.
+ * 
+ * @param out Output array
+ * @param max Maximum number of records to return
+ * @return Number of records returned
+ * 
+ * @note Thread Safety: Not thread-safe
+ * @note NULL-safe: Returns 0 if out is NULL
+ */
+int recstore_list(rec_t *out, int max);
+
+#endif /* BIFROST_RECSTORE_H */

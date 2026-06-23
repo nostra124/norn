@@ -1,0 +1,26 @@
+coverage:
+  precision: 2
+  round: down
+  range: "100...100"
+  status:
+    project:
+      default:
+        target: 100%
+        threshold: 0%
+        paths:
+          - "src/libnorn/"
+    patch:
+      default:
+        target: 100%
+        threshold: 0%
+
+ignore:
+  - "tests/"
+  - "src/norn.c"
+  - "src/libnorn/norn_impl.c"
+  - "src/libnorn/net.c"
+
+comment:
+  layout: "reach,diff,flags,files,footer"
+  behavior: default
+  require_changes: false

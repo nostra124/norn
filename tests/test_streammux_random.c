@@ -22,6 +22,7 @@ typedef struct { unsigned char buf[STREAMMUX_FRAME + STREAM_SEG_MAX]; size_t len
 typedef struct { pkt_t q[8192]; int n; } wire_t;
 static wire_t ab, ba;
 
+__attribute__((unused))
 static uint16_t frame_sid(const unsigned char *b) { return (uint16_t)((b[0] << 8) | b[1]); }
 
 static int send_into(wire_t *w, const unsigned char *seg, size_t len) {

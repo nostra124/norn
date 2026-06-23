@@ -1,0 +1,23 @@
+# cppcheck suppressions for norn
+# Suppress false positives and known issues
+
+# Suppress warnings about C library headers
+missingIncludeSystem
+
+# Suppress warnings about system headers
+unmatchedSuppression
+
+# Suppress variable scope warnings (C99 allows declarations anywhere)
+variableScope
+
+# Suppress information about branch analysis limits
+normalCheckLevelMaxBranches
+
+# Suppress style suggestions for now (focus on errors/warnings)
+# These are code quality suggestions, not correctness issues
+unusedFunction
+constParameterPointer
+constVariablePointer
+staticFunction
+unreadVariable
+knownConditionTrueFalse

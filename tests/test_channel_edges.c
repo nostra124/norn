@@ -66,6 +66,66 @@ static void test_derive_guards(void) {
     printf("  derive_guards: OK\n");
 }
 
+static void test_resumption_success(void) {
+    channel_t i, r;
+    keypair_t ki, kr;
+    crypto_keypair_new(&ki);
+    crypto_keypair_new(&kr);
+    
+    assert(channel_gen_ephemeral(&i) == 0);
+    assert(channel_gen_ephemeral(&r) == 0);
+    
+    unsigned char psk[CHANNEL_RESUMEBYTES];
+    memset(psk, 0xAA, sizeof(psk));
+    
+    assert(channel_derive_resumption(&i, r.eph_pub, 1, psk) == 0);
+    assert(channel_derive_resumption(&r, i.eph_pub, 0, psk) == 0);
+    
+    assert(i.established == 1);
+    assert(r.established == 1);
+    
+    printf("  resumption_success: OK\n");
+}
+
+static void test_0rtt_replay_detection(void) {
+    unsigned char psk[CHANNEL_RESUMEBYTES];
+    memset(psk, 0xBB, sizeof(psk));
+    
+    const unsigned char early[] = "early data";
+    unsigned char buf[I + sizeof(early) + CHANNEL_OVERHEAD];
+    channel_t c;
+    
+    int il = channel_hs_build_init_0rtt(&c, ki.public_key, psk, early, sizeof(early), buf, sizeof(buf));
+    assert(il > 0);
+    
+    replaycache_t rpc;
+    replaycache_init(&rpc, 60);
+    
+    channel_t r;
+    memset(&r, 0, sizeof(r));
+    unsigned char peer_pk[32], early_out[64];
+    size_t early_len;
+    int status;
+    unsigned char resp[R];
+    
+    int len1 = channel_hs_accept_0rtt(&r, kr.public_key, kr.secret_key, buf, il, psk, &rpc, 1, peer_pk, early_out, sizeof(early_out), &early_len, &status, resp, sizeof(resp));
+    assert(len1 == R);
+    assert(status == CHANNEL_0RTT_OK);
+    
+    channel_t r2;
+    memset(&r2, 0, sizeof(r2));
+    unsigned char peer_pk2[32], early_out2[64];
+    size_t early_len2;
+    int status2;
+    unsigned char resp2[R];
+    
+    int len2 = channel_hs_accept_0rtt(&r2, kr.public_key, kr.secret_key, buf, il, psk, &rpc, 1, peer_pk2, early_out2, sizeof(early_out2), &early_len2, &status2, resp2, sizeof(resp2));
+    assert(len2 == R);
+    assert(status2 == CHANNEL_0RTT_REPLAY);
+    
+    printf("  0rtt_replay_detection: OK\n");
+}
+
 static void test_auth_guards(void) {
     unsigned char sig[CHANNEL_SIGBYTES], e1[32], e2[32];
     memset(e1, 1, 32); memset(e2, 2, 32);
@@ -252,6 +312,8 @@ int main(void) {
     handshake();
     test_resumption_secret_guards();
     test_derive_guards();
+    test_resumption_success();
+    test_0rtt_replay_detection();
     test_auth_guards();
     test_build_init_guards();
     test_accept_guards();

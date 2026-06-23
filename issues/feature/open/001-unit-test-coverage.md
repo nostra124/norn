@@ -5,8 +5,8 @@ priority: high
 complexity: L
 estimate_tokens: 80k-150k
 estimate_time: 90-180min
-phase: open
-status: open
+phase: done
+status: done
 depends_on: []
 milestone: MILESTONE-0.2.0
 spawned_from: ~

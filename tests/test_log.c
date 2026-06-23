@@ -6,6 +6,7 @@
 static char last_log[2048];
 static int log_count = 0;
 
+__attribute__((unused))
 static void test_sink(log_level_t level, const char *fmt, va_list ap) {
     (void)level;
     vsnprintf(last_log, sizeof(last_log), fmt, ap);

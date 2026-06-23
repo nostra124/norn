@@ -16,9 +16,11 @@ static void on_get(void *user_data, const unsigned char *value, size_t len) {
     *called = 1;
     callback_value = value;
     callback_value_len = len;
+    (void)callback_called; (void)callback_value; (void)callback_value_len;
 }
 
-static void on_peer(void *user_data, const unsigned char *pubkey, uint32_t ip, uint16_t port) {
+static void on_peer(void *user_data, const unsigned char *pubkey __attribute__((unused)),
+                    uint32_t ip __attribute__((unused)), uint16_t port __attribute__((unused))) {
     int *called = (int *)user_data;
     *called = 1;
 }

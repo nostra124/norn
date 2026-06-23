@@ -9,11 +9,6 @@ AM_INIT_AUTOMAKE([foreign -Wall -Werror subdir-objects])
 
 # Checks for programs.
 AC_PROG_CC
-AM_PROG_AR
-LT_INIT
-
-# Checks for programs.
-AC_PROG_CC
 AC_PROG_INSTALL
 AM_PROG_AR
 LT_INIT

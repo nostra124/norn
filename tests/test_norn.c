@@ -175,7 +175,7 @@ static void test_encode_decode_mutable(void) {
     
     norn_mutable_t rec2;
     memset(&rec2, 0, sizeof(rec2));
-    int ret = norn_decode_mutable(out, (size_t)(len > 0 ? len : 0), &rec2);
+    (void)norn_decode_mutable(out, (size_t)(len > 0 ? len : 0), &rec2);
     
     printf("  test_encode_decode_mutable: OK\n");
 }

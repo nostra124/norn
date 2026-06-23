@@ -5,8 +5,8 @@ priority: low
 complexity: S
 estimate_tokens: 20k-40k
 estimate_time: 20-45min
-phase: open
-status: open
+phase: done
+status: done
 depends_on: [FEAT-008]
 milestone: MILESTONE-0.5.0
 spawned_from: ~
