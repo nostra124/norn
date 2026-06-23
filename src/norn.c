@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <sodium.h>
+#include "config.h"
 #include "libnorn/norn.h"
 #include "libnorn/crypto.h"
 #include "libnorn/log.h"
@@ -17,7 +18,6 @@
 #define MAX_VALUE_SIZE 1000
 
 static const char *prog_name = "norn";
-static const char *version_string = "norn 0.1.0";
 
 static char *key_file = NULL;
 static int port = DEFAULT_PORT;
@@ -128,7 +128,7 @@ static int load_keypair(unsigned char pubkey[32], unsigned char secret[64]) {
 }
 
 static int do_version(void) {
-    printf("%s\n", version_string);
+    printf("norn %s\n", NORN_VERSION);
     return 0;
 }
 
@@ -290,7 +290,7 @@ static int do_get(int argc, char **argv) {
     
     norn_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
-    cfg.version = version_string;
+    cfg.version = NORN_VERSION;
     
     norn_client_t *client = norn_new(pubkey, secret, &cfg);
     if (!client) {
@@ -379,7 +379,7 @@ static int do_set(int argc, char **argv) {
     
     norn_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
-    cfg.version = version_string;
+    cfg.version = NORN_VERSION;
     
     norn_client_t *client = norn_new(pubkey, secret, &cfg);
     if (!client) {
@@ -465,7 +465,7 @@ static int do_daemon(int argc, char **argv) {
     
     norn_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
-    cfg.version = version_string;
+    cfg.version = NORN_VERSION;
     cfg.read_only = daemon_read_only;
     cfg.private_mode = private_mode;
     

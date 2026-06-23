@@ -205,7 +205,7 @@ man_MANS = man/norn.1
 EXTRA_DIST = README.md LICENSE docs AGENTS.md tests/sit tests/pit \
              .clang-format .clang-tidy cppcheck.supp codecov.yml \
              contrib/coverage.sh tests/coverage-tracked.txt \
-             man/norn.1 \
+             man/norn.1 VERSION \
              src/libnorn/mainline.h \
              src/libnorn/norn_transaction.h \
              src/libnorn/crypto.h \

@@ -1,11 +1,13 @@
 AC_PREREQ([2.69])
-AC_INIT([norn], [0.1.0], [noreply@example.com])
+AC_INIT([norn], m4_esyscmd_s([cat VERSION]), [noreply@example.com])
 AC_CONFIG_SRCDIR([src/libnorn/norn.c])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 
 AM_INIT_AUTOMAKE([foreign -Wall -Werror subdir-objects])
+
+AC_DEFINE_UNQUOTED([NORN_VERSION], ["$PACKAGE_VERSION"], [norn version string])
 
 # Checks for programs.
 AC_PROG_CC
