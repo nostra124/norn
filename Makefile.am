@@ -23,13 +23,15 @@ libnorn_la_SOURCES = \
 	src/libnorn/transport_udp.c \
 	src/libnorn/transport_tcp.c \
 	src/libnorn/idexch.c \
-	src/libnorn/attr.c
+	src/libnorn/attr.c \
+	src/libnorn/norn_suite_sodium.c
 
 libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 
 include_HEADERS = src/libnorn/norn.h \
                    src/libnorn/mainline.h \
                    src/libnorn/norn_transaction.h \
+                   src/libnorn/norn_suite.h \
                    src/libnorn/crypto.h \
                    src/libnorn/bep44.h \
                    src/libnorn/bencode.h \
@@ -55,7 +57,7 @@ norn_SOURCES = src/norn.c
 norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 norn_LDADD = libnorn.la $(SODIUM_LIBS)
 
-check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_transport test_transport_udp test_transport_tcp test_idexch test_attr test_net
+check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_transport test_transport_udp test_transport_tcp test_idexch test_attr test_net test_suite
 
 test_norn_SOURCES = tests/test_norn.c
 test_norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
@@ -161,6 +163,10 @@ test_net_SOURCES = tests/test_net.c
 test_net_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_net_LDADD = libnorn.la $(SODIUM_LIBS)
 
+test_suite_SOURCES = tests/test_suite.c
+test_suite_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
+test_suite_LDADD = libnorn.la $(SODIUM_LIBS)
+
 TESTS = $(check_PROGRAMS)
 
 # Coverage support
@@ -208,6 +214,7 @@ EXTRA_DIST = README.md LICENSE docs AGENTS.md tests/sit tests/pit \
              man/norn.1 VERSION \
              src/libnorn/mainline.h \
              src/libnorn/norn_transaction.h \
+             src/libnorn/norn_suite.h \
              src/libnorn/crypto.h \
              src/libnorn/bep44.h \
              src/libnorn/bencode.h \
