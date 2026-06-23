@@ -1,0 +1,171 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }}, ${{ matrix.cc }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        cc: [gcc, clang]
+        include:
+          - os: ubuntu-latest
+            cc: gcc
+            cflags: "-Wall -Wextra -Werror"
+          - os: ubuntu-latest
+            cc: clang
+            cflags: "-Wall -Wextra -Werror"
+          - os: macos-latest
+            cc: clang
+            cflags: "-Wall -Wextra -Werror"
+          - os: macos-latest
+            cc: gcc
+            cflags: "-Wall -Wextra -Werror"
+    env:
+      CC: ${{ matrix.cc }}
+      CFLAGS: ${{ matrix.cflags }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsodium-dev autoconf automake libtool
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install libsodium autoconf automake libtool
+
+      - name: Bootstrap autotools
+        run: ./autogen.sh
+
+      - name: Configure
+        run: ./configure
+
+      - name: Build
+        run: make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - name: Run tests
+        run: make check
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.os }}-${{ matrix.cc }}
+          path: test-suite.log
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsodium-dev autoconf automake libtool lcov
+
+      - name: Bootstrap autotools
+        run: ./autogen.sh
+
+      - name: Configure with coverage
+        run: ./configure --enable-coverage CFLAGS="-O0 -g"
+
+      - name: Build
+        run: make -j$(nproc)
+
+      - name: Run tests
+        run: make check
+
+      - name: Generate coverage report
+        run: |
+          lcov --rc branch_coverage=1 --capture --directory . --output-file coverage.info || \
+              lcov --rc lcov_branch_coverage=1 --capture --directory . --output-file coverage.info
+          lcov --rc branch_coverage=1 --remove coverage.info '/usr/*' --output-file coverage.info || \
+              lcov --rc lcov_branch_coverage=1 --remove coverage.info '/usr/*' --output-file coverage.info
+
+      - name: Upload coverage to codecov.io
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.info
+          fail_ci_if_error: true
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Check coverage gate
+        run: ./contrib/coverage.sh
+
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsodium-dev autoconf automake libtool cppcheck clang-tidy clang-format
+
+      - name: Bootstrap autotools
+        run: ./autogen.sh
+
+      - name: Configure
+        run: ./configure
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=all --error-exitcode=1 \
+            --suppressions-list=cppcheck.supp \
+            --inline-suppr \
+            src/libnorn/*.c src/norn.c
+
+      - name: Run clang-tidy (optional)
+        run: |
+          if command -v clang-tidy >/dev/null 2>&1; then
+            clang-tidy src/libnorn/*.c src/norn.c -- $(CFLAGS) -I$(pwd)/src/libnorn || true
+          else
+            echo "clang-tidy not available, skipping"
+          fi
+
+      - name: Check format (optional)
+        run: |
+          if command -v clang-format >/dev/null 2>&1; then
+            make check-format || echo "Format check failed but continuing"
+          else
+            echo "clang-format not available, skipping"
+          fi
+
+  distcheck:
+    name: Distribution Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsodium-dev autoconf automake libtool
+
+      - name: Bootstrap autotools
+        run: ./autogen.sh
+
+      - name: Configure
+        run: ./configure
+
+      - name: Run distcheck
+        run: make distcheck

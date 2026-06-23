@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <assert.h>
 
 static void test_encode_int(void) {
@@ -218,6 +219,18 @@ static void test_decode_overflow(void) {
     printf("  test_decode_overflow: OK\n");
 }
 
+static void test_decode_int_min(void) {
+    const char *data = "i-9223372036854775808e";
+    size_t pos = 0;
+    bencode_value_t *val = bencode_decode(data, strlen(data), &pos);
+    assert(val != NULL);
+    assert(val->type == BENCODE_INT);
+    assert(val->val.int_val == INT64_MIN);
+    bencode_free(val);
+    
+    printf("  test_decode_int_min: OK\n");
+}
+
 static void test_decode_depth(void) {
     char data[100];
     size_t len = 0;
@@ -307,6 +320,7 @@ int main(void) {
     test_decode_truncated();
     test_decode_malformed();
     test_decode_overflow();
+    test_decode_int_min();
     test_decode_depth();
     test_dict_get();
     test_free_null();

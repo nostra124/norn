@@ -3,6 +3,7 @@
 #include "bep44.h"
 #include "crypto.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <time.h>
@@ -219,6 +220,34 @@ static void test_budget_eviction(void) {
     printf("  test_budget_eviction: OK\n");
 }
 
+static void test_lru_eviction(void) {
+    size_t budget = dhtstore_init(1, 0);
+    assert(budget == 1 * 1024 * 1024);
+    
+    int added = 0;
+    for (int i = 0; i < 1200; i++) {
+        keypair_t kp2;
+        crypto_keypair_new(&kp2);
+        unsigned char t[20];
+        bep44_target(kp2.public_key, t);
+        
+        unsigned char value[900];
+        memset(value, 'X' + (i % 26), sizeof(value));
+        unsigned char b[3000];
+        int l = bep44_signbuf(1, value, sizeof(value), b, sizeof(b));
+        unsigned char s[64];
+        bf_sign(s, b, (size_t)l, kp2.secret_key);
+        
+        if (dhtstore_put(t, kp2.public_key, 1, value, sizeof(value), s, NULL, 0, (uint32_t)(0x01020304 + i)) == 1)
+            added++;
+    }
+    
+    printf("    Added %d items, count=%d, bytes=%zu, budget=%zu\n", added, dhtstore_count(), dhtstore_bytes(), budget);
+    assert(added > 0);
+    assert(dhtstore_bytes() <= budget);
+    printf("  test_lru_eviction: OK\n");
+}
+
 static void test_salted_item(void) {
     dhtstore_init(2, 0);
     
@@ -327,12 +356,20 @@ static void test_large_value_reject(void) {
     printf("  test_large_value_reject: OK\n");
 }
 
+static void test_auto_budget(void) {
+    size_t budget = dhtstore_init(0, 0);
+    assert(budget >= 2 * 1024 * 1024);
+    assert(budget <= 64 * 1024 * 1024);
+    printf("  test_auto_budget: OK\n");
+}
+
 int main(void) {
     crypto_init();
     printf("test_dhtstore:\n");
     
     test_init();
     test_client_only();
+    test_auto_budget();
     test_put_immutable_basic();
     test_put_immutable_null();
     test_get_null();
@@ -342,6 +379,7 @@ int main(void) {
     test_per_ip_cap();
     test_seq_monotonicity();
     test_budget_eviction();
+    test_lru_eviction();
     test_salted_item();
     test_invalid_signature();
     test_wrong_target();

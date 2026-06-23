@@ -1,94 +1,235 @@
+/**
+ * @file bep44.h
+ * @brief BEP-44 mutable and immutable items for DHT
+ * 
+ * Implements BEP-44: Mutable and immutable items for BitTorrent DHT.
+ * Mutable items are signed with Ed25519 keys and can be updated by the
+ * key holder. Immutable items are content-addressed (SHA1 hash).
+ * 
+ * @section mutable Mutable Items
+ * - target = SHA1("k" || pubkey)
+ * - Value signed with Ed25519 secret key
+ * - Sequence number must increase monotonically
+ * - Max value size: 1000 bytes
+ * 
+ * @section immutable Immutable Items
+ * - target = SHA1(bencode(value))
+ * - Content-addressed, self-verifying
+ * - No signature or sequence number
+ * - Max value size: 1000 bytes
+ * 
+ * @section security Security
+ * - Ed25519 signatures prevent forgery
+ * - Sequence numbers prevent replay attacks
+ * - SHA1 hashes ensure content integrity
+ */
+
 #ifndef BIFROST_BEP44_H
 #define BIFROST_BEP44_H
 
 #include <stdint.h>
 #include <stddef.h>
 
-#define BEP44_REC_SVC_MAX 140   /* FEAT-035: cap on the trailing services blob (fits RECSTORE_VMAX) */
+/** @brief Maximum service advertisement size (FEAT-035) */
+#define BEP44_REC_SVC_MAX 140
 
-/* BEP-44 mutable items (FEAT-022). A bifrost node publishes a small signed record
- * — its current reachability + capabilities — under target = SHA1(its ed25519
- * pubkey), so a peer that already knows the pubkey can fetch the latest endpoint
- * even while the node is offline (any DHT node holding the item answers). */
-
+/**
+ * @brief BEP-44 mutable record structure
+ * 
+ * Represents a signed record published by a bifrost node. Contains
+ * reachability information, capabilities, and optional service advertisements.
+ */
 typedef struct {
-    char          version[24];
-    uint32_t      ip;          /* reflexive endpoint (network byte order) */
-    uint16_t      port;
-    unsigned char ula[16];
-    uint32_t      caps;        /* capability bitmask (idexch.h CAP_*) */
-    unsigned char host_pubkey[32]; /* the node's SSH HOST ed25519 key (0 if none),
-                                    * attested by the identity key k that signs this
-                                    * record — so a fetcher can verify the host key */
-    unsigned char node_id[20];     /* SHA256(account)[:20] — lets a holder resolve
-                                    * this node BY ACCOUNT (it computes the same
-                                    * hash) without the account ever being shared.
-                                    * A one-way hash: reveals nothing about the account. */
-    /* FEAT-031 (0.17) route-hint: "reach me via this hub" — the endpoint of a relay/anchor hub
-     * that forwards to me when I'm inbound-blocked. 0 = none. The initiator source-routes its
-     * session through this hub (the Lightning route-hint model). */
-    uint32_t      route_ip;
-    uint16_t      route_port;
-    /* FEAT-035 (0.22) service advertisements: an OPTIONAL trailing section carrying
-     * the services this node publishes (servicestore svc_encode entries). The blob is
-     * opaque to bep44 — the daemon fills/parses it with servicestore's codec. Trailing
-     * + optional: a record with no services encodes exactly as before (no gossip
-     * churn), and older decoders simply stop before this section. */
-    uint8_t       nsvc;            /* number of advertised services (0 = none) */
-    uint16_t      svc_len;         /* bytes used in svc[] */
-    unsigned char svc[BEP44_REC_SVC_MAX];
+    char          version[24];       /**< Record format version */
+    uint32_t      ip;                /**< Reflexive endpoint IP (network byte order) */
+    uint16_t      port;              /**< Reflexive endpoint port (network byte order) */
+    unsigned char ula[16];           /**< ULA (IPv6 local address) */
+    uint32_t      caps;              /**< Capability bitmask (idexch.h CAP_*) */
+    unsigned char host_pubkey[32];   /**< SSH host Ed25519 key (optional) */
+    unsigned char node_id[20];       /**< SHA256(account)[:20] for account-based lookup */
+    uint32_t      route_ip;          /**< Route-hint IP (FEAT-031) */
+    uint16_t      route_port;        /**< Route-hint port */
+    uint8_t       nsvc;              /**< Number of advertised services */
+    uint16_t      svc_len;           /**< Bytes used in svc[] */
+    unsigned char svc[BEP44_REC_SVC_MAX]; /**< Service advertisements */
 } bep44_record_t;
 
-/* target = SHA1(pubkey) — the DHT key to publish under (no salt). */
+/**
+ * @brief Compute DHT target from public key (no salt)
+ * 
+ * target = SHA1(pubkey)
+ * 
+ * @param pubkey Ed25519 public key (32 bytes)
+ * @param target Output buffer (20 bytes)
+ * 
+ * @note Thread-safe
+ * @note NULL-safe: Does nothing if pubkey or target is NULL
+ */
 void bep44_target(const unsigned char pubkey[32], unsigned char target[20]);
 
-/* Compute target for pubkey: target = SHA1("k" || pubkey) for mutable items. */
+/**
+ * @brief Compute DHT target from public key (mutable items)
+ * 
+ * target = SHA1("k" || pubkey)
+ * 
+ * @param pubkey Ed25519 public key (32 bytes)
+ * @param target Output buffer (20 bytes)
+ * 
+ * @note Thread-safe
+ * @note NULL-safe: Does nothing if pubkey or target is NULL
+ */
 void bep44_target_for_pubkey(unsigned char target[20], const unsigned char pubkey[32]);
 
-/* Salted target = SHA1(pubkey || salt) — BEP-44 with salt, for per-name signed
- * DHT keys (`spub`/`sget`, salt = the key name). salt clamped to 64 bytes. */
+/**
+ * @brief Compute salted DHT target
+ * 
+ * target = SHA1(pubkey || salt)
+ * 
+ * Used for per-name signed DHT keys (spub/sget operations).
+ * 
+ * @param pubkey Ed25519 public key (32 bytes)
+ * @param salt Salt value (max 64 bytes)
+ * @param saltlen Length of salt
+ * @param target Output buffer (20 bytes)
+ * 
+ * @note Thread-safe
+ * @note NULL-safe: Does nothing if pubkey or target is NULL
+ */
 void bep44_target_salted(const unsigned char pubkey[32],
                          const unsigned char *salt, size_t saltlen,
                          unsigned char target[20]);
 
-/* Immutable target = SHA1(bencode(v)) — the BEP-44 content-addressed key for an
- * UNSIGNED item (`pub`/`get`). bencode(v) of a byte string is "<vlen>:<v>".
- * Returns 0 on success, or -1 if vlen > 1000 (the BEP-44 value limit) — callers
- * must reject rather than store a truncated-hash alias (BUG-059). */
+/**
+ * @brief Compute DHT target for immutable value
+ * 
+ * target = SHA1(bencode(value))
+ * 
+ * Used for content-addressed immutable items.
+ * 
+ * @param v Value to hash
+ * @param vlen Length of value
+ * @param target Output buffer (20 bytes)
+ * @return 0 on success, -1 if vlen > 1000 (BEP-44 limit)
+ * 
+ * @note Thread-safe
+ * @note NULL-safe: Returns -1 if v or target is NULL
+ * @note BEP-44: Rejects values > 1000 bytes (BUG-059)
+ */
 int bep44_immutable_target(const unsigned char *v, size_t vlen, unsigned char target[20]);
 
-/* Canonical buffer to sign/verify: "3:seqi<seq>e1:v<vlen>:<value>" (no salt).
- * Returns its length, or -1 on overflow. */
+/**
+ * @brief Build canonical buffer for signing (no salt)
+ * 
+ * Creates the canonical buffer: "3:seqi<seq>e1:v<vlen>:<value>"
+ * 
+ * @param seq Sequence number
+ * @param value Value to sign
+ * @param vlen Length of value
+ * @param out Output buffer
+ * @param outcap Capacity of output buffer
+ * @return Buffer length, or -1 on overflow
+ * 
+ * @note Thread-safe
+ * @note NULL-safe: Returns -1 if value or out is NULL
+ */
 int bep44_signbuf(uint32_t seq, const unsigned char *value, size_t vlen,
                   unsigned char *out, size_t outcap);
 
-/* As bep44_signbuf, but with a salt prefix per BEP-44:
- * "4:salt<saltlen>:<salt>3:seqi<seq>e1:v<vlen>:<value>". salt NULL/0 = no salt
- * (identical to bep44_signbuf). Returns length, or -1 on overflow. */
+/**
+ * @brief Build canonical buffer for signing (with salt)
+ * 
+ * Creates the canonical buffer: "4:salt<saltlen>:<salt>3:seqi<seq>e1:v<vlen>:<value>"
+ * 
+ * @param salt Salt value (NULL for no salt)
+ * @param saltlen Length of salt
+ * @param seq Sequence number
+ * @param value Value to sign
+ * @param vlen Length of value
+ * @param out Output buffer
+ * @param outcap Capacity of output buffer
+ * @return Buffer length, or -1 on overflow
+ * 
+ * @note Thread-safe
+ * @note NULL-safe: Returns -1 if value or out is NULL
+ */
 int bep44_signbuf_salted(const unsigned char *salt, size_t saltlen, uint32_t seq,
                          const unsigned char *value, size_t vlen,
                          unsigned char *out, size_t outcap);
 
-/* Compact record value codec.
- * Wire: ver_len(1) ver ip(4) port(2,BE) ula(16) caps(4,BE) host_pubkey(32) node_id(20).
- * node_id is optional on decode (older records lack it → left zeroed).
- * encode returns bytes written (or -1); decode returns 0 (or -1). */
+/**
+ * @brief Encode a BEP-44 record to wire format
+ * 
+ * @param r Record to encode
+ * @param out Output buffer
+ * @param outcap Capacity of output buffer
+ * @return Bytes written, or -1 on error
+ * 
+ * @note Thread-safe
+ * @note NULL-safe: Returns -1 if r or out is NULL
+ * @note Wire format: ver_len(1) ver ip(4) port(2,BE) ula(16) caps(4,BE) host_pubkey(32) node_id(20)
+ */
 int bep44_record_encode(const bep44_record_t *r, unsigned char *out, size_t outcap);
+
+/**
+ * @brief Decode a BEP-44 record from wire format
+ * 
+ * @param in Input buffer (wire format)
+ * @param len Length of input buffer
+ * @param r Output record structure
+ * @return 0 on success, -1 on error
+ * 
+ * @note Thread-safe
+ * @note NULL-safe: Returns -1 if in or r is NULL
+ * @note Backwards-compatible: node_id is optional (zeroed if missing)
+ */
 int bep44_record_decode(const unsigned char *in, size_t len, bep44_record_t *r);
 
-/* BEP-44 mutable item encode/decode with signature.
- * encode: sign the value with sk and produce the wire format.
- * decode: verify signature with pk and extract value.
- * Returns bytes/0 on success, -1 on error. */
+/**
+ * @brief Sign and encode a mutable item
+ * 
+ * Creates a BEP-44 mutable item: signs the value and produces wire format.
+ * 
+ * @param out Output buffer (wire format)
+ * @param outcap Capacity of output buffer
+ * @param pk Ed25519 public key (32 bytes)
+ * @param value Value to sign
+ * @param vlen Length of value
+ * @param seq Sequence number
+ * @param sk Ed25519 secret key (64 bytes)
+ * @return Bytes written, or -1 on error
+ * 
+ * @note Thread-safe
+ * @note NULL-safe: Returns -1 if out, pk, value, or sk is NULL
+ * @note BEP-44: Max value length is 1000 bytes
+ */
 int bep44_encode(unsigned char *out, size_t outcap,
                  const unsigned char pk[32],
                  const unsigned char *value, size_t vlen,
                  uint32_t seq,
                  const unsigned char sk[64]);
+
+/**
+ * @brief Verify and decode a mutable item
+ * 
+ * Verifies the Ed25519 signature and extracts the value from wire format.
+ * 
+ * @param in Input buffer (wire format)
+ * @param len Length of input buffer
+ * @param pk Output: Ed25519 public key (32 bytes)
+ * @param value Output: pointer to value (points into in)
+ * @param vlen Output: length of value
+ * @param seq Output: sequence number
+ * @param sig Output: Ed25519 signature (64 bytes)
+ * @return 0 on success, -1 on error (bad signature, invalid format)
+ * 
+ * @note Thread-safe
+ * @note NULL-safe: Returns -1 if in, pk, value, vlen, or sig is NULL
+ * @note Ownership: value points into in; do not free separately
+ */
 int bep44_decode(const unsigned char *in, size_t len,
                  unsigned char pk[32],
                  unsigned char **value, size_t *vlen,
                  uint32_t *seq,
                  unsigned char sig[64]);
 
-#endif
+#endif /* BIFROST_BEP44_H */

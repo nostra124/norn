@@ -1,0 +1,27 @@
+---
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  modernize-*,
+  performance-*,
+  readability-identifier-naming,
+  readability-inconsistent-declaration-parameter-name
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*'
+CheckOptions:
+  - key: readability-identifier-naming.FunctionCase
+    value: lower_case
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key: readability-identifier-naming.StructCase
+    value: lower_case
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.ConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
