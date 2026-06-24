@@ -114,7 +114,8 @@ static void on_holepunch_response(norn_client_t *client,
     
     /* FEAT-023: Send simultaneous probes */
     if (resp->peer_external_ip != 0 && resp->peer_external_port != 0) {
-        norn_send_probes(client, resp->peer_external_ip, resp->peer_external_port, 3, 100);
+        norn_send_probes(client, ctx->ephemeral_pub, 
+                         resp->peer_external_ip, resp->peer_external_port, 3, 100);
         
         /* FEAT-023 TODO: Wait for probe response, then establish session
          * This requires:

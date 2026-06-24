@@ -143,3 +143,34 @@ int norn_decode_holepunch_resp(norn_holepunch_resp_t *out,
     
     return 0;
 }
+
+int norn_encode_probe(const norn_probe_t *probe, uint8_t *out) {
+    if (!probe || !out) return -1;
+    
+    size_t off = 0;
+    
+    /* Message type */
+    out[off++] = probe->msg_type;
+    
+    /* Ephemeral pubkey */
+    memcpy(out + off, probe->ephemeral_pubkey, 32);
+    off += 32;
+    
+    return (off == NORN_PROBE_LEN) ? 0 : -1;
+}
+
+int norn_decode_probe(norn_probe_t *out, const uint8_t *in, size_t len) {
+    if (!out || !in) return -1;
+    if (len < NORN_PROBE_LEN) return -1;
+    
+    size_t off = 0;
+    
+    /* Message type */
+    out->msg_type = in[off++];
+    
+    /* Ephemeral pubkey */
+    memcpy(out->ephemeral_pubkey, in + off, 32);
+    off += 32;
+    
+    return 0;
+}

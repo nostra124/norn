@@ -5,7 +5,9 @@
 
 #include "norn_rendezvous.h"
 #include "norn_internal.h"
+#include "norn_nat.h"
 #include "crypto.h"
+#include "net.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -196,18 +198,28 @@ int norn_send_holepunch_req_async(norn_client_t *client,
 }
 
 int norn_send_probes(norn_client_t *client,
+                     const uint8_t ephemeral_pubkey[32],
                      uint32_t peer_ip,
                      uint16_t peer_port,
                      int count,
                      int interval_ms) {
-    if (!client) return -1;
+    if (!client || !ephemeral_pubkey) return -1;
     if (count <= 0) count = 3;
     if (interval_ms <= 0) interval_ms = 100;
     
-    uint8_t probe[1] = {0};
+    /* FEAT-023: Build probe message with ephemeral pubkey */
+    norn_probe_t probe = {
+        .msg_type = NORN_MSG_PROBE
+    };
+    memcpy(probe.ephemeral_pubkey, ephemeral_pubkey, 32);
+    
+    uint8_t probe_buf[NORN_PROBE_LEN];
+    if (norn_encode_probe(&probe, probe_buf) != 0) {
+        return -1;
+    }
     
     for (int i = 0; i < count; i++) {
-        if (net_send(&client->net, probe, sizeof(probe), peer_ip, peer_port) < 0) {
+        if (net_send(&client->net, probe_buf, sizeof(probe_buf), peer_ip, peer_port) < 0) {
             return -1;
         }
         

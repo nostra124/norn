@@ -124,6 +124,7 @@ int norn_send_holepunch_req_async(norn_client_t *client,
  * After receiving HolePunchResponse, send probes to peer's external IP.
  *
  * @param client Norn client
+ * @param ephemeral_pubkey Our ephemeral pubkey for this session
  * @param peer_ip Peer's external IP
  * @param peer_port Peer's external port
  * @param count Number of probes to send
@@ -131,6 +132,7 @@ int norn_send_holepunch_req_async(norn_client_t *client,
  * @return 0 on success, -1 on error
  */
 int norn_send_probes(norn_client_t *client,
+                     const uint8_t ephemeral_pubkey[32],
                      uint32_t peer_ip,
                      uint16_t peer_port,
                      int count,
