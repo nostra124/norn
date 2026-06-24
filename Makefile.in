@@ -108,7 +108,7 @@ check_PROGRAMS = test_norn$(EXEEXT) test_bep44$(EXEEXT) \
 	test_idexch$(EXEEXT) test_attr$(EXEEXT) test_net$(EXEEXT) \
 	test_suite$(EXEEXT) test_norn_kad$(EXEEXT) \
 	test_norn_idexch$(EXEEXT) test_norn_session$(EXEEXT) \
-	test_rendezvous$(EXEEXT)
+	test_rendezvous$(EXEEXT) test_relay$(EXEEXT)
 @ENABLE_COVERAGE_TRUE@am__append_1 = $(COV_FLAGS)
 @ENABLE_COVERAGE_TRUE@am__append_2 = $(COV_FLAGS)
 subdir = .
@@ -186,7 +186,8 @@ am_libnorn_la_OBJECTS = src/libnorn/libnorn_la-norn.lo \
 	src/libnorn/libnorn_la-norn_session_udp.lo \
 	src/libnorn/libnorn_la-norn_endpoint_cache.lo \
 	src/libnorn/libnorn_la-norn_nat.lo \
-	src/libnorn/libnorn_la-norn_rendezvous.lo
+	src/libnorn/libnorn_la-norn_rendezvous.lo \
+	src/libnorn/libnorn_la-norn_relay.lo
 libnorn_la_OBJECTS = $(am_libnorn_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -323,6 +324,12 @@ test_recstore_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
 test_recstore_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_recstore_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_test_relay_OBJECTS = tests/test_relay-test_relay.$(OBJEXT)
+test_relay_OBJECTS = $(am_test_relay_OBJECTS)
+test_relay_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_relay_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_relay_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_test_rendezvous_OBJECTS =  \
 	tests/test_rendezvous-test_rendezvous.$(OBJEXT)
 test_rendezvous_OBJECTS = $(am_test_rendezvous_OBJECTS)
@@ -455,6 +462,7 @@ am__depfiles_remade = src/$(DEPDIR)/norn-norn.Po \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn_nat.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-norn_relay.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn_rendezvous.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn_session_udp.Plo \
@@ -486,6 +494,7 @@ am__depfiles_remade = src/$(DEPDIR)/norn-norn.Po \
 	tests/$(DEPDIR)/test_norn_kad-test_norn_kad.Po \
 	tests/$(DEPDIR)/test_norn_session-test_norn_session.Po \
 	tests/$(DEPDIR)/test_recstore-test_recstore.Po \
+	tests/$(DEPDIR)/test_relay-test_relay.Po \
 	tests/$(DEPDIR)/test_rendezvous-test_rendezvous.Po \
 	tests/$(DEPDIR)/test_replaycache-test_replaycache.Po \
 	tests/$(DEPDIR)/test_stream-test_stream.Po \
@@ -527,13 +536,14 @@ SOURCES = $(libnorn_la_SOURCES) $(norn_SOURCES) $(test_attr_SOURCES) \
 	$(test_net_SOURCES) $(test_norn_SOURCES) \
 	$(test_norn_async_SOURCES) $(test_norn_idexch_SOURCES) \
 	$(test_norn_kad_SOURCES) $(test_norn_session_SOURCES) \
-	$(test_recstore_SOURCES) $(test_rendezvous_SOURCES) \
-	$(test_replaycache_SOURCES) $(test_stream_SOURCES) \
-	$(test_stream_cc_SOURCES) $(test_stream_edges_SOURCES) \
-	$(test_stream_random_SOURCES) $(test_stream_recovery_SOURCES) \
-	$(test_streammux_SOURCES) $(test_streammux_random_SOURCES) \
-	$(test_suite_SOURCES) $(test_transport_SOURCES) \
-	$(test_transport_tcp_SOURCES) $(test_transport_udp_SOURCES)
+	$(test_recstore_SOURCES) $(test_relay_SOURCES) \
+	$(test_rendezvous_SOURCES) $(test_replaycache_SOURCES) \
+	$(test_stream_SOURCES) $(test_stream_cc_SOURCES) \
+	$(test_stream_edges_SOURCES) $(test_stream_random_SOURCES) \
+	$(test_stream_recovery_SOURCES) $(test_streammux_SOURCES) \
+	$(test_streammux_random_SOURCES) $(test_suite_SOURCES) \
+	$(test_transport_SOURCES) $(test_transport_tcp_SOURCES) \
+	$(test_transport_udp_SOURCES)
 DIST_SOURCES = $(libnorn_la_SOURCES) $(norn_SOURCES) \
 	$(test_attr_SOURCES) $(test_bencode_SOURCES) \
 	$(test_bep44_SOURCES) $(test_channel_SOURCES) \
@@ -544,13 +554,13 @@ DIST_SOURCES = $(libnorn_la_SOURCES) $(norn_SOURCES) \
 	$(test_norn_SOURCES) $(test_norn_async_SOURCES) \
 	$(test_norn_idexch_SOURCES) $(test_norn_kad_SOURCES) \
 	$(test_norn_session_SOURCES) $(test_recstore_SOURCES) \
-	$(test_rendezvous_SOURCES) $(test_replaycache_SOURCES) \
-	$(test_stream_SOURCES) $(test_stream_cc_SOURCES) \
-	$(test_stream_edges_SOURCES) $(test_stream_random_SOURCES) \
-	$(test_stream_recovery_SOURCES) $(test_streammux_SOURCES) \
-	$(test_streammux_random_SOURCES) $(test_suite_SOURCES) \
-	$(test_transport_SOURCES) $(test_transport_tcp_SOURCES) \
-	$(test_transport_udp_SOURCES)
+	$(test_relay_SOURCES) $(test_rendezvous_SOURCES) \
+	$(test_replaycache_SOURCES) $(test_stream_SOURCES) \
+	$(test_stream_cc_SOURCES) $(test_stream_edges_SOURCES) \
+	$(test_stream_random_SOURCES) $(test_stream_recovery_SOURCES) \
+	$(test_streammux_SOURCES) $(test_streammux_random_SOURCES) \
+	$(test_suite_SOURCES) $(test_transport_SOURCES) \
+	$(test_transport_tcp_SOURCES) $(test_transport_udp_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -954,7 +964,8 @@ libnorn_la_SOURCES = \
 	src/libnorn/norn_session_udp.c \
 	src/libnorn/norn_endpoint_cache.c \
 	src/libnorn/norn_nat.c \
-	src/libnorn/norn_rendezvous.c
+	src/libnorn/norn_rendezvous.c \
+	src/libnorn/norn_relay.c
 
 libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 \
 	-I$(top_srcdir)/src/libnorn $(am__append_1)
@@ -967,6 +978,7 @@ include_HEADERS = src/libnorn/norn.h \
                    src/libnorn/norn_session.h \
                    src/libnorn/norn_nat.h \
                    src/libnorn/norn_rendezvous.h \
+                   src/libnorn/norn_relay.h \
                    src/libnorn/crypto.h \
                    src/libnorn/bep44.h \
                    src/libnorn/bencode.h \
@@ -1083,6 +1095,9 @@ test_norn_session_LDADD = libnorn.la $(SODIUM_LIBS)
 test_rendezvous_SOURCES = tests/test_rendezvous.c
 test_rendezvous_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_rendezvous_LDADD = libnorn.la $(SODIUM_LIBS)
+test_relay_SOURCES = tests/test_relay.c
+test_relay_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
+test_relay_LDADD = libnorn.la $(SODIUM_LIBS)
 TESTS = $(check_PROGRAMS)
 
 # Coverage support
@@ -1321,6 +1336,8 @@ src/libnorn/libnorn_la-norn_nat.lo: src/libnorn/$(am__dirstamp) \
 src/libnorn/libnorn_la-norn_rendezvous.lo:  \
 	src/libnorn/$(am__dirstamp) \
 	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-norn_relay.lo: src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
 
 libnorn.la: $(libnorn_la_OBJECTS) $(libnorn_la_DEPENDENCIES) $(EXTRA_libnorn_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(libnorn_la_LINK) -rpath $(libdir) $(libnorn_la_OBJECTS) $(libnorn_la_LIBADD) $(LIBS)
@@ -1450,6 +1467,12 @@ tests/test_recstore-test_recstore.$(OBJEXT): tests/$(am__dirstamp) \
 test_recstore$(EXEEXT): $(test_recstore_OBJECTS) $(test_recstore_DEPENDENCIES) $(EXTRA_test_recstore_DEPENDENCIES) 
 	@rm -f test_recstore$(EXEEXT)
 	$(AM_V_CCLD)$(test_recstore_LINK) $(test_recstore_OBJECTS) $(test_recstore_LDADD) $(LIBS)
+tests/test_relay-test_relay.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_relay$(EXEEXT): $(test_relay_OBJECTS) $(test_relay_DEPENDENCIES) $(EXTRA_test_relay_DEPENDENCIES) 
+	@rm -f test_relay$(EXEEXT)
+	$(AM_V_CCLD)$(test_relay_LINK) $(test_relay_OBJECTS) $(test_relay_LDADD) $(LIBS)
 tests/test_rendezvous-test_rendezvous.$(OBJEXT):  \
 	tests/$(am__dirstamp) tests/$(DEPDIR)/$(am__dirstamp)
 
@@ -1556,6 +1579,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-norn_nat.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-norn_relay.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-norn_rendezvous.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@src/libnorn/$(DEPDIR)/libnorn_la-norn_session_udp.Plo@am__quote@ # am--include-marker
@@ -1587,6 +1611,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_norn_kad-test_norn_kad.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_norn_session-test_norn_session.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_recstore-test_recstore.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_relay-test_relay.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_rendezvous-test_rendezvous.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_replaycache-test_replaycache.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@tests/$(DEPDIR)/test_stream-test_stream.Po@am__quote@ # am--include-marker
@@ -1833,6 +1858,13 @@ src/libnorn/libnorn_la-norn_rendezvous.lo: src/libnorn/norn_rendezvous.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='src/libnorn/norn_rendezvous.c' object='src/libnorn/libnorn_la-norn_rendezvous.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-norn_rendezvous.lo `test -f 'src/libnorn/norn_rendezvous.c' || echo '$(srcdir)/'`src/libnorn/norn_rendezvous.c
+
+src/libnorn/libnorn_la-norn_relay.lo: src/libnorn/norn_relay.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-norn_relay.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-norn_relay.Tpo -c -o src/libnorn/libnorn_la-norn_relay.lo `test -f 'src/libnorn/norn_relay.c' || echo '$(srcdir)/'`src/libnorn/norn_relay.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-norn_relay.Tpo src/libnorn/$(DEPDIR)/libnorn_la-norn_relay.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='src/libnorn/norn_relay.c' object='src/libnorn/libnorn_la-norn_relay.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-norn_relay.lo `test -f 'src/libnorn/norn_relay.c' || echo '$(srcdir)/'`src/libnorn/norn_relay.c
 
 src/norn-norn.o: src/norn.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(norn_CFLAGS) $(CFLAGS) -MT src/norn-norn.o -MD -MP -MF src/$(DEPDIR)/norn-norn.Tpo -c -o src/norn-norn.o `test -f 'src/norn.c' || echo '$(srcdir)/'`src/norn.c
@@ -2099,6 +2131,20 @@ tests/test_recstore-test_recstore.obj: tests/test_recstore.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_recstore.c' object='tests/test_recstore-test_recstore.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_recstore_CFLAGS) $(CFLAGS) -c -o tests/test_recstore-test_recstore.obj `if test -f 'tests/test_recstore.c'; then $(CYGPATH_W) 'tests/test_recstore.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_recstore.c'; fi`
+
+tests/test_relay-test_relay.o: tests/test_relay.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_relay_CFLAGS) $(CFLAGS) -MT tests/test_relay-test_relay.o -MD -MP -MF tests/$(DEPDIR)/test_relay-test_relay.Tpo -c -o tests/test_relay-test_relay.o `test -f 'tests/test_relay.c' || echo '$(srcdir)/'`tests/test_relay.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_relay-test_relay.Tpo tests/$(DEPDIR)/test_relay-test_relay.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_relay.c' object='tests/test_relay-test_relay.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_relay_CFLAGS) $(CFLAGS) -c -o tests/test_relay-test_relay.o `test -f 'tests/test_relay.c' || echo '$(srcdir)/'`tests/test_relay.c
+
+tests/test_relay-test_relay.obj: tests/test_relay.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_relay_CFLAGS) $(CFLAGS) -MT tests/test_relay-test_relay.obj -MD -MP -MF tests/$(DEPDIR)/test_relay-test_relay.Tpo -c -o tests/test_relay-test_relay.obj `if test -f 'tests/test_relay.c'; then $(CYGPATH_W) 'tests/test_relay.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_relay.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_relay-test_relay.Tpo tests/$(DEPDIR)/test_relay-test_relay.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tests/test_relay.c' object='tests/test_relay-test_relay.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_relay_CFLAGS) $(CFLAGS) -c -o tests/test_relay-test_relay.obj `if test -f 'tests/test_relay.c'; then $(CYGPATH_W) 'tests/test_relay.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_relay.c'; fi`
 
 tests/test_rendezvous-test_rendezvous.o: tests/test_rendezvous.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_rendezvous_CFLAGS) $(CFLAGS) -MT tests/test_rendezvous-test_rendezvous.o -MD -MP -MF tests/$(DEPDIR)/test_rendezvous-test_rendezvous.Tpo -c -o tests/test_rendezvous-test_rendezvous.o `test -f 'tests/test_rendezvous.c' || echo '$(srcdir)/'`tests/test_rendezvous.c
@@ -2819,6 +2865,13 @@ test_rendezvous.log: test_rendezvous$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_relay.log: test_relay$(EXEEXT)
+	@p='test_relay$(EXEEXT)'; \
+	b='test_relay'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 .test.log:
 	@p='$<'; \
 	$(am__set_b); \
@@ -3089,6 +3142,7 @@ distclean: distclean-am
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_nat.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_relay.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_rendezvous.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_session_udp.Plo
@@ -3120,6 +3174,7 @@ distclean: distclean-am
 	-rm -f tests/$(DEPDIR)/test_norn_kad-test_norn_kad.Po
 	-rm -f tests/$(DEPDIR)/test_norn_session-test_norn_session.Po
 	-rm -f tests/$(DEPDIR)/test_recstore-test_recstore.Po
+	-rm -f tests/$(DEPDIR)/test_relay-test_relay.Po
 	-rm -f tests/$(DEPDIR)/test_rendezvous-test_rendezvous.Po
 	-rm -f tests/$(DEPDIR)/test_replaycache-test_replaycache.Po
 	-rm -f tests/$(DEPDIR)/test_stream-test_stream.Po
@@ -3198,6 +3253,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_nat.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_relay.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_rendezvous.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_session_udp.Plo
@@ -3229,6 +3285,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f tests/$(DEPDIR)/test_norn_kad-test_norn_kad.Po
 	-rm -f tests/$(DEPDIR)/test_norn_session-test_norn_session.Po
 	-rm -f tests/$(DEPDIR)/test_recstore-test_recstore.Po
+	-rm -f tests/$(DEPDIR)/test_relay-test_relay.Po
 	-rm -f tests/$(DEPDIR)/test_rendezvous-test_rendezvous.Po
 	-rm -f tests/$(DEPDIR)/test_replaycache-test_replaycache.Po
 	-rm -f tests/$(DEPDIR)/test_stream-test_stream.Po

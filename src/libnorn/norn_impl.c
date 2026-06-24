@@ -79,6 +79,7 @@ norn_client_t *norn_new(const unsigned char *self_pub,
     client->listen_fd = -1;
     norn_endpoint_cache_init(&client->endpoint_cache);
     norn_rendezvous_init(&client->rv);
+    norn_relay_init(&client->relay);
     return client;
 }
 
@@ -100,6 +101,9 @@ void norn_free(norn_client_t *client) {
     
     /* Cleanup rendezvous service */
     norn_rendezvous_cleanup(&client->rv);
+    
+    /* Cleanup relay service */
+    norn_relay_cleanup(&client->relay);
     
     mainline_cleanup(&client->ml);
     net_cleanup(&client->net);
@@ -307,28 +311,61 @@ static void dispatch_response(norn_client_t *client,
                               uint32_t from_ip, uint16_t from_port) {
     if (len < 1) return;
     
-    if (data[0] == NORN_MSG_HOLEPUNCH_REQ || data[0] == NORN_MSG_HOLEPUNCH_RESP) {
-        norn_holepunch_req_t req;
-        norn_holepunch_resp_t resp;
-        
-        if (data[0] == NORN_MSG_HOLEPUNCH_REQ && len >= NORN_HOLEPUNCH_REQ_LEN) {
-            if (norn_decode_holepunch_req(&req, data, len) == 0) {
-                norn_holepunch_resp_t resp_out;
-                int result = norn_rendezvous_handle_req(&client->rv, &req, from_ip, from_port, client, &resp_out);
-                if (result == 1) {
-                    uint8_t resp_buf[NORN_HOLEPUNCH_RESP_LEN];
-                    if (norn_encode_holepunch_resp(&resp_out, resp_buf) == 0) {
-                        net_send(&client->net, resp_buf, NORN_HOLEPUNCH_RESP_LEN, from_ip, from_port);
+    /* Route binary protocol messages */
+    if (data[0] >= 0x10 && data[0] <= 0x2F) {
+        /* NAT traversal messages (0x10-0x1F) */
+        if (data[0] == NORN_MSG_HOLEPUNCH_REQ || data[0] == NORN_MSG_HOLEPUNCH_RESP) {
+            norn_holepunch_req_t req;
+            norn_holepunch_resp_t resp;
+            
+            if (data[0] == NORN_MSG_HOLEPUNCH_REQ && len >= NORN_HOLEPUNCH_REQ_LEN) {
+                if (norn_decode_holepunch_req(&req, data, len) == 0) {
+                    norn_holepunch_resp_t resp_out;
+                    int result = norn_rendezvous_handle_req(&client->rv, &req, from_ip, from_port, client, &resp_out);
+                    if (result == 1) {
+                        uint8_t resp_buf[NORN_HOLEPUNCH_RESP_LEN];
+                        if (norn_encode_holepunch_resp(&resp_out, resp_buf) == 0) {
+                            net_send(&client->net, resp_buf, NORN_HOLEPUNCH_RESP_LEN, from_ip, from_port);
+                        }
                     }
                 }
+            } else if (data[0] == NORN_MSG_HOLEPUNCH_RESP && len >= NORN_HOLEPUNCH_RESP_LEN) {
+                if (norn_decode_holepunch_resp(&resp, data, len) == 0) {
+                    /* TODO FEAT-017: Handle hole punch response callback */
+                    (void)resp;
+                }
             }
-        } else if (data[0] == NORN_MSG_HOLEPUNCH_RESP && len >= NORN_HOLEPUNCH_RESP_LEN) {
-            if (norn_decode_holepunch_resp(&resp, data, len) == 0) {
-                /* TODO FEAT-017: Handle hole punch response callback */
-                (void)resp;
-            }
+            return;
         }
-        return;
+        
+        /* Relay messages (0x20-0x2F) */
+        if (data[0] >= NORN_MSG_RELAY_CREATE && data[0] <= NORN_MSG_RELAY_CLOSE) {
+            if (data[0] == NORN_MSG_RELAY_CREATE && len >= NORN_RELAY_CREATE_LEN) {
+                norn_relay_create_t req;
+                if (norn_decode_relay_create(&req, data, len) == 0) {
+                    uint8_t session_id[NORN_RELAY_SESSION_ID_LEN];
+                    int result = norn_relay_handle_create(&client->relay, &req, from_ip, from_port, session_id);
+                    if (result == 0) {
+                        /* TODO: Forward create request to target */
+                        (void)session_id;
+                    }
+                }
+            } else if (data[0] == NORN_MSG_RELAY_FORWARD) {
+                norn_relay_forward_t msg;
+                if (norn_decode_relay_forward(&msg, data, len) == 0) {
+                    norn_relay_handle_forward(&client->relay, &msg, from_ip, from_port);
+                }
+            } else if (data[0] == NORN_MSG_RELAY_ACCEPT && len >= NORN_RELAY_ACCEPT_LEN) {
+                norn_relay_accept_t accept;
+                if (norn_decode_relay_accept(&accept, data, len) == 0) {
+                    /* TODO: Handle relay accept */
+                    (void)accept;
+                }
+            } else if (data[0] == NORN_MSG_RELAY_CLOSE) {
+                /* TODO: Handle relay close */
+            }
+            return;
+        }
     }
     
     /* Process through mainline state machine */
