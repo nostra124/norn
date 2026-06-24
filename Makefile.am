@@ -26,7 +26,8 @@ libnorn_la_SOURCES = \
 	src/libnorn/attr.c \
 	src/libnorn/norn_suite_sodium.c \
 	src/libnorn/norn_kad.c \
-	src/libnorn/norn_idexch.c
+	src/libnorn/norn_idexch.c \
+	src/libnorn/norn_session.c
 
 libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 
@@ -36,6 +37,7 @@ include_HEADERS = src/libnorn/norn.h \
                    src/libnorn/norn_suite.h \
                    src/libnorn/norn_kad.h \
                    src/libnorn/norn_idexch.h \
+                   src/libnorn/norn_session.h \
                    src/libnorn/crypto.h \
                    src/libnorn/bep44.h \
                    src/libnorn/bencode.h \
@@ -61,7 +63,7 @@ norn_SOURCES = src/norn.c
 norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 norn_LDADD = libnorn.la $(SODIUM_LIBS)
 
-check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_transport test_transport_udp test_transport_tcp test_idexch test_attr test_net test_suite test_norn_kad test_norn_idexch
+check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_transport test_transport_udp test_transport_tcp test_idexch test_attr test_net test_suite test_norn_kad test_norn_idexch test_norn_session
 
 test_norn_SOURCES = tests/test_norn.c
 test_norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
@@ -178,6 +180,10 @@ test_norn_kad_LDADD = libnorn.la $(SODIUM_LIBS)
 test_norn_idexch_SOURCES = tests/test_norn_idexch.c
 test_norn_idexch_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_norn_idexch_LDADD = libnorn.la $(SODIUM_LIBS)
+
+test_norn_session_SOURCES = tests/test_norn_session.c
+test_norn_session_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
+test_norn_session_LDADD = libnorn.la $(SODIUM_LIBS)
 
 TESTS = $(check_PROGRAMS)
 
