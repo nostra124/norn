@@ -69,24 +69,32 @@ These tickets enable norn to serve multiple sister projects (bifrost, wyrd) with
 - wyrd FEAT-291 (secp256k1/ChaCha20 suite)
 
 ### ✅ v0.8.0 — Dial & Session Orchestration
-**Status:** DONE (2026-06-24)
+**Status:** MOSTLY DONE (2026-06-24)
 
 | Ticket | Description | Priority | Depends On | Status |
 |--------|-------------|----------|-----------|--------|
 | FEAT-016 | norn_dial(pubkey) → session | high | FEAT-013, FEAT-015 | done |
-| FEAT-017 | Harmonised NAT traversal | high | FEAT-013, FEAT-016 | done |
+| FEAT-017 | Harmonised NAT traversal | high | FEAT-013, FEAT-016 | **partial** |
 
 **Key Features:**
 - `norn_dial(client, pubkey)` — connect by public key, not IP
 - `norn_listen()` / accept for inbound sessions
 - NAT traversal: rendezvous hole-punch + static relay fallback
 
-**Implementation:**
-- Phase 1: Endpoint discovery with async DHT ✅
-- Phase 2: Direct connection integration ✅
-- Phase 3: Hole punching (rendezvous) ✅
-- Phase 4: Relay fallback (static routing) ✅
-- Phase 5: Integration (connection ladder) ✅
+**Implementation Status:**
+- Phase 1: Endpoint discovery ✅
+- Phase 2: Direct connection ✅
+- Phase 3: Hole punch wire protocol ✅
+- Phase 3: Hole punch integration ❌ (FEAT-023)
+- Phase 4: Relay wire protocol ✅
+- Phase 4: Relay path integration ❌ (FEAT-022)
+- Phase 5: Connection ladder ✅ (but needs FEAT-023, FEAT-022)
+- UPnP/NAT-PMP ❌ (FEAT-021)
+
+**Remaining Work:**
+- FEAT-021: UPnP/NAT-PMP implementation
+- FEAT-022: Multi-hop relay path integration
+- FEAT-023: Hole punch connection integration
 
 **Consumers:**
 - bifrost FEAT-080 (session/sio retirement)
