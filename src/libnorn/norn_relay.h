@@ -26,6 +26,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+/* Forward declarations - types defined elsewhere */
+typedef struct norn_client norn_client_t;
+typedef struct norn_session norn_session_t;
+
 #define NORN_RELAY_SESSION_ID_LEN 16
 #define NORN_RELAY_CREATE_LEN (1 + 32 + NORN_RELAY_SESSION_ID_LEN + 64)
 #define NORN_RELAY_FORWARD_LEN (1 + NORN_RELAY_SESSION_ID_LEN)
@@ -60,7 +64,7 @@ typedef struct {
 typedef struct {
     uint8_t msg_type;                   /* NORN_MSG_RELAY_FORWARD */
     uint8_t session_id[NORN_RELAY_SESSION_ID_LEN];
-    uint8_t payload_len;                /* Payload length (uint16_t) */
+    uint16_t payload_len;               /* Payload length (supports up to 1400 bytes) */
     uint8_t payload[NORN_RELAY_MAX_PAYLOAD]; /* Encrypted for target */
 } norn_relay_forward_t;
 
@@ -202,39 +206,5 @@ norn_relay_session_t *norn_relay_find_session(norn_relay_t *relay,
  * @brief Close relay session.
  */
 int norn_relay_close_session(norn_relay_t *relay, const uint8_t *session_id);
-
-/**
- * @brief Discover relay path to target.
- *
- * Finds a sequence of relay nodes to reach target.
- * Path is discovered dynamically but remains stable for session.
- *
- * @param client Norn client
- * @param target_pubkey Final destination
- * @param path Output path (filled with relay hints)
- * @return 0 on success, -1 on error
- */
-int norn_relay_discover_path(norn_client_t *client,
-                              const uint8_t *target_pubkey,
-                              norn_relay_path_t *path);
-
-/**
- * @brief Connect via multi-hop relay path.
- *
- * Establishes connection through sequence of relay nodes.
- * Path is stable for session lifetime.
- *
- * @param client Norn client
- * @param target_pubkey Final destination
- * @param path Relay path (discovered or configured)
- * @param callback Session callback
- * @param user_data User data
- * @return 0 on success, -1 on error
- */
-int norn_relay_connect_path_async(norn_client_t *client,
-                                   const uint8_t *target_pubkey,
-                                   const norn_relay_path_t *path,
-                                   norn_session_callback_t callback,
-                                   void *user_data);
 
 #endif /* NORN_RELAY_H */

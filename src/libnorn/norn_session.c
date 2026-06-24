@@ -125,13 +125,25 @@ static void on_endpoint_resolved(const norn_endpoint_t *endpoint, void *user_dat
     
     /* Direct not available - fall back to hole punch (Phase 3) */
     if (endpoint->caps & NORN_EP_CAP_RENDEZVOUS) {
-        /* TODO FEAT-017 Phase 3: Implement hole punch via rendezvous
+        /* Endpoint can act as rendezvous/introducer for hole punch */
+        /* TODO FEAT-017 Phase 3: Wire up hole punch request
          * ctx->state = DIAL_HOLEPUNCH;
-         * norn_send_holepunch_req_async(...);
+         * norn_hole_punch_async(ctx->client, ctx->peer_pubkey, 
+         *                      endpoint->pubkey, ctx->callback, ctx->user_data);
+         * return;
          */
+        ctx->state = DIAL_HOLEPUNCH;
+        /* For now, continue to try relay */
     }
     
-    /* Hole punch not available - fall back to relay (Phase 4) */
+    /* Hole punch not available or failed - fall back to relay (Phase 4) */
+    if (endpoint->caps & NORN_EP_CAP_RELAY) {
+        /* TODO FEAT-017 Phase 4: Use relay path from endpoint->payload */
+        ctx->state = DIAL_RELAY;
+        /* Relay implementation pending - for now fail */
+    }
+    
+    /* No connection method available */
     ctx->state = DIAL_FAILED;
     if (ctx->callback) {
         ctx->callback(NULL, NORN_SESSION_CLOSED, ctx->user_data);
