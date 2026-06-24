@@ -4,7 +4,7 @@ Connect by public key, not IP address.
 
 ## Status (2026-06-24)
 
-**IN PROGRESS** — FEAT-016 API stub complete, full implementation pending
+**IN PROGRESS** — FEAT-016 Phase 1 complete (handshake message processing)
 
 ## Tickets
 
@@ -12,6 +12,23 @@ Connect by public key, not IP address.
 |----|-------|----------|------------|--------|
 | FEAT-016 | norn_dial(pubkey) → session | high | FEAT-013, FEAT-015 | in_progress |
 | FEAT-017 | Harmonised NAT traversal | high | FEAT-013, FEAT-016 | open |
+
+## Phase 1 Progress
+
+**Completed:**
+- ✅ Session API structure (`norn_session.h`)
+- ✅ Integration with `channel.h` (ECDH handshake)
+- ✅ Integration with `streammux.h` (stream multiplexing)
+- ✅ Identity key management
+- ✅ Handshake message functions
+- ✅ Direct connection endpoints (`norn_direct_endpoint_t`)
+- ✅ Dial/accept API signatures
+- ✅ 30 tests passing
+
+**Remaining:**
+- ⏳ Network I/O (send INIT/RESP/CONFIRM via UDP socket)
+- ⏳ Loopback integration tests (SIT)
+- ⏳ Event loop integration
 
 ## Overview
 
