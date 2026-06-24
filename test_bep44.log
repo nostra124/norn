@@ -8,5 +8,10 @@ test_bep44:
   test_record_encode_decode: OK
   test_record_with_services: OK
   test_encode_decode: OK
+  test_encode_null: OK
+  test_encode_overflow: OK
+  test_decode_truncated: OK
+  test_decode_bad_sig: OK
+  test_record_decode_invalid: OK
 test_bep44: OK
 PASS test_bep44 (exit status: 0)
