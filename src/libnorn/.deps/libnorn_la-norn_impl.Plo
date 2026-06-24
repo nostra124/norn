@@ -43,8 +43,8 @@ src/libnorn/libnorn_la-norn_impl.lo: src/libnorn/norn_impl.c \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_size_t.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_time_t.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_timespec.h \
- src/libnorn/norn_nat.h src/libnorn/net.h src/libnorn/mainline.h \
- src/libnorn/bencode.h src/libnorn/crypto.h \
+ src/libnorn/norn_nat.h src/libnorn/norn_rendezvous.h src/libnorn/net.h \
+ src/libnorn/mainline.h src/libnorn/bencode.h src/libnorn/crypto.h \
  src/libnorn/norn_transaction.h src/libnorn/bep44.h \
  /opt/local/include/sodium.h /opt/local/include/sodium/version.h \
  /opt/local/include/sodium/export.h \
@@ -290,6 +290,7 @@ src/libnorn/norn_endpoint_cache.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_time_t.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_timespec.h:
 src/libnorn/norn_nat.h:
+src/libnorn/norn_rendezvous.h:
 src/libnorn/net.h:
 src/libnorn/mainline.h:
 src/libnorn/bencode.h:

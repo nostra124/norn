@@ -88,6 +88,17 @@ int norn_rendezvous_handle_req(norn_rendezvous_t *rv,
                                norn_holepunch_resp_t *resp_out);
 
 /**
+ * @brief Callback for hole punch response.
+ *
+ * @param client Norn client
+ * @param resp Response from rendezvous
+ * @param user_data User data from request
+ */
+typedef void (*norn_holepunch_callback_t)(norn_client_t *client,
+                                          const norn_holepunch_resp_t *resp,
+                                          void *user_data);
+
+/**
  * @brief Send HolePunchRequest to rendezvous.
  *
  * Called when we want to connect to a peer through rendezvous.
@@ -104,9 +115,7 @@ int norn_send_holepunch_req_async(norn_client_t *client,
                                    const uint8_t *target_pubkey,
                                    const uint8_t *rendezvous_pubkey,
                                    const uint8_t *my_ephemeral,
-                                   void (*callback)(norn_client_t *,
-                                                    const norn_holepunch_resp_t *,
-                                                    void *),
+                                   norn_holepunch_callback_t callback,
                                    void *user_data);
 
 /**
