@@ -461,4 +461,73 @@ int norn_resolve_endpoint_async(norn_client_t *client,
                                 void *callback,
                                 void *user_data);
 
+/* === NAT Traversal === */
+
+/**
+ * @brief Request hole punch via rendezvous
+ *
+ * Sends punch request to rendezvous peer, which signals both sides
+ * to send simultaneous probes.
+ *
+ * @param client Client handle
+ * @param target_pubkey Peer to connect to
+ * @param rendezvous_pubkey Rendezvous peer (must be publicly reachable)
+ * @param callback State change callback
+ * @param user_data User data
+ * @return 0 on success, -1 on error
+ */
+int norn_hole_punch_async(norn_client_t *client,
+                          const unsigned char *target_pubkey,
+                          const unsigned char *rendezvous_pubkey,
+                          norn_session_callback_t callback,
+                          void *user_data);
+
+/**
+ * @brief Act as rendezvous for hole punching
+ *
+ * When two peers want to connect, both send punch requests to this client.
+ * This client signals both to send probes at the same time.
+ *
+ * @param client Client handle (must be publicly reachable)
+ * @param callback Called when peers need coordination
+ * @param user_data User data
+ * @return 0 on success, -1 on error
+ */
+int norn_rendezvous_enable(norn_client_t *client,
+                          void *callback,
+                          void *user_data);
+
+/**
+ * @brief Connect via relay
+ *
+ * Establishes a relayed connection through a relay peer.
+ * Traffic is encrypted end-to-end; relay cannot see content.
+ *
+ * @param client Client handle
+ * @param target_pubkey Peer to connect to
+ * @param relay_pubkey Relay peer (must be publicly reachable)
+ * @param callback State change callback
+ * @param user_data User data
+ * @return 0 on success, -1 on error
+ */
+int norn_relay_connect_async(norn_client_t *client,
+                             const unsigned char *target_pubkey,
+                             const unsigned char *relay_pubkey,
+                             norn_session_callback_t callback,
+                             void *user_data);
+
+/**
+ * @brief Act as relay
+ *
+ * Forwards traffic between two peers. Cannot see encrypted payload.
+ *
+ * @param client Client handle (must be publicly reachable)
+ * @param callback Called when relay circuit is requested
+ * @param user_data User data
+ * @return 0 on success, -1 on error
+ */
+int norn_relay_enable(norn_client_t *client,
+                      void *callback,
+                      void *user_data);
+
 #endif /* NORN_SESSION_H */
