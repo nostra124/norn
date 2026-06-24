@@ -135,6 +135,24 @@ int norn_send_holepunch_req_async(norn_client_t *client,
         return -1;
     }
     
+    /* FEAT-023: Find rendezvous peer endpoint
+     * In production, this would query the DHT if not cached.
+     * For now, we require the rendezvous endpoint to be cached.
+     */
+    const norn_endpoint_t *rendezvous_ep = norn_endpoint_cache_lookup(&client->endpoint_cache, 
+                                                                       rendezvous_pubkey);
+    if (!rendezvous_ep) {
+        /* Rendezvous peer not found in cache - would need DHT query
+         * FEAT-023: Add DHT query integration for rendezvous lookup */
+        return -1;
+    }
+    
+    if (rendezvous_ep->ip == 0) {
+        /* Rendezvous peer has no public IP - cannot use as rendezvous */
+        return -1;
+    }
+    
+    /* Construct hole punch request */
     norn_holepunch_req_t req;
     memset(&req, 0, sizeof(req));
     
@@ -142,22 +160,43 @@ int norn_send_holepunch_req_async(norn_client_t *client,
     memcpy(req.target_pubkey, target_pubkey, 32);
     memcpy(req.my_ephemeral_pubkey, my_ephemeral, 32);
     
+    /* Get our external endpoint (from DHT responses) */
     if (net_get_external_endpoint(&client->net, &req.my_external_ip, &req.my_external_port) != 0) {
         req.my_external_ip = 0;
         req.my_external_port = 0;
     }
     
+    /* Sign request with our identity key */
     bf_sign(req.signature, (const unsigned char *)&req, 
             offsetof(norn_holepunch_req_t, signature), client->self_sec);
     
+    /* Encode request */
     uint8_t buf[NORN_HOLEPUNCH_REQ_LEN];
     if (norn_encode_holepunch_req(&req, buf) != 0) {
         return -1;
     }
     
+    /* Send to rendezvous peer via UDP */
+    ssize_t sent = net_send(&client->net, buf, sizeof(buf), 
+                            rendezvous_ep->ip, rendezvous_ep->port);
+    if (sent < 0) {
+        return -1;
+    }
+    
+    /* FEAT-023 TODO: Store callback for response handling
+     * This requires a transaction tracking system:
+     * 1. Store callback and user_data with my_ephemeral_pubkey as key
+     * 2. When HolePunchResponse arrives, match by peer_ephemeral_pubkey
+     * 3. Invoke callback with response
+     * 4. Set up timeout (5 seconds) to fail if no response
+     * 
+     * For now, caller must handle timeout manually.
+     * Transaction tracking will be added in a follow-up.
+     */
+    (void)callback;
     (void)user_data;
     
-    return -1;
+    return 0;
 }
 
 int norn_send_probes(norn_client_t *client,
