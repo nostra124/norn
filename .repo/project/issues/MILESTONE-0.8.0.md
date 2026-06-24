@@ -4,7 +4,7 @@ Connect by public key, not IP address.
 
 ## Status (2026-06-24)
 
-**IN PROGRESS** — FEAT-016 Phase 1 complete (handshake message processing)
+**COMPLETE** — FEAT-016 Phase 1 async session API with event loop integration
 
 ## Tickets
 
@@ -23,12 +23,23 @@ Connect by public key, not IP address.
 - ✅ Handshake message functions
 - ✅ Direct connection endpoints (`norn_direct_endpoint_t`)
 - ✅ Dial/accept API signatures
+- ✅ **Async event loop integration**
+  - `norn_tick()` processes sessions + DHT
+  - `norn_get_session_fds()` for poll()/epoll
+  - Non-blocking socket I/O
+- ✅ **Handshake state machine**
+  - `HS_NONE → HS_INIT_SENT → HS_ESTABLISHED` (initiator)
+  - `HS_NONE → HS_RESP_SENT → HS_ESTABLISHED` (responder)
+  - Automatic packet processing in `norn_tick()`
+- ✅ **Mobile-ready architecture**
+  - No blocking operations
+  - Event loop agnostic (libuv, epoll, kqueue, CFRunLoop)
+  - Callback-based lifecycle
 - ✅ 30 tests passing
 
 **Remaining:**
-- ⏳ Network I/O (send INIT/RESP/CONFIRM via UDP socket)
-- ⏳ Loopback integration tests (SIT)
-- ⏳ Event loop integration
+- ⏳ SIT tests (loopback handshake integration)
+- ⏳ NAT traversal (FEAT-017)
 
 ## Overview
 

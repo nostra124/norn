@@ -1,6 +1,7 @@
 /* norn_impl.c — Mainline DHT client library implementation.
  * Async non-blocking implementation with transaction queue. */
 #include "norn.h"
+#include "norn_internal.h"
 #include "norn_transaction.h"
 #include "mainline.h"
 #include "bep44.h"
@@ -11,16 +12,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-
-struct norn_client {
-    net_t net;
-    mainline_state_t ml;
-    norn_transaction_state_t txn;
-    unsigned char self_pub[NORN_PUBKEY_BYTES];
-    unsigned char self_sec[NORN_SECRETKEY_BYTES];
-    norn_config_t cfg;
-    int initialized;
-};
 
 /* Forward declarations */
 static void dispatch_response(norn_client_t *client,
@@ -83,11 +74,25 @@ norn_client_t *norn_new(const unsigned char *self_pub,
     }
     
     client->initialized = 1;
+    client->listen_fd = -1;
     return client;
 }
 
 void norn_free(norn_client_t *client) {
     if (!client) return;
+    
+    /* Close listener socket */
+    if (client->listen_fd >= 0) {
+        close(client->listen_fd);
+    }
+    
+    /* Free all sessions */
+    for (int i = 0; i < client->session_count; i++) {
+        if (client->sessions[i]) {
+            norn_session_free(client->sessions[i]);
+        }
+    }
+    free(client->sessions);
     
     mainline_cleanup(&client->ml);
     net_cleanup(&client->net);
@@ -108,11 +113,19 @@ int norn_bootstrap(norn_client_t *client) {
 int norn_tick(norn_client_t *client) {
     if (!client || !client->initialized) return -1;
     
+    int total_processed = 0;
+    
     /* Process pending transactions */
     mainline_process_transactions(&client->ml);
     
     /* Expire old transactions */
     norn_transaction_expire(&client->txn, NORN_TRANSACTION_TIMEOUT);
+    
+    /* Process sessions (FEAT-016) */
+    int session_processed = norn_client_tick_sessions(client);
+    if (session_processed > 0) {
+        total_processed += session_processed;
+    }
     
     /* Non-blocking receive */
     uint8_t buf[2048];
@@ -125,10 +138,9 @@ int norn_tick(norn_client_t *client) {
     FD_SET(client->net.fd, &rf);
     
     int nfds = select(client->net.fd + 1, &rf, NULL, NULL, &tv);
-    if (nfds <= 0) return 0;
+    if (nfds <= 0) return total_processed;
     
     /* Receive all pending packets */
-    int processed = 0;
     while (1) {
         ssize_t len = net_recv(&client->net, buf, sizeof(buf), &from_ip, &from_port);
         if (len <= 0) {
@@ -137,10 +149,10 @@ int norn_tick(norn_client_t *client) {
         
         /* Process packet */
         dispatch_response(client, buf, len, from_ip, from_port);
-        processed++;
+        total_processed++;
     }
     
-    return processed;
+    return total_processed;
 }
 
 int norn_get_fd(const norn_client_t *client) {

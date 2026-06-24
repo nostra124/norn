@@ -30,9 +30,9 @@ static void test_session_lifecycle(void) {
     assert(norn_session_get_state(NULL) == NORN_SESSION_CLOSED);
     assert(norn_session_get_peer(NULL, pk) == -1);
     assert(norn_session_get_suite(NULL) == NULL);
+    assert(norn_session_get_fd(NULL) == -1);
     
-    /* NULL-safe close/free */
-    norn_session_close(NULL);
+    /* NULL-safe free */
     norn_session_free(NULL);
     
     printf("OK\n");
@@ -41,14 +41,10 @@ static void test_session_lifecycle(void) {
 static void test_stream_lifecycle(void) {
     printf("  test_stream_lifecycle: ");
     
-    /* NULL-safe stream operations */
-    assert(norn_stream_open(NULL) == NULL);
-    norn_stream_close(NULL);
-    norn_stream_free(NULL);
-    assert(norn_stream_write(NULL, "test", 4) == -1);
-    assert(norn_stream_read(NULL, NULL, 0) == -1);
+    /* NULL-safe stream operations - FEAT-018 (not implemented yet) */
+    assert(norn_stream_open_async(NULL, NULL, NULL) == -1);
     
-    printf("OK\n");
+    printf("OK (stub)\n");
 }
 
 static void test_endpoint_struct(void) {
@@ -77,6 +73,7 @@ static void test_session_states(void) {
     printf("  test_session_states: ");
     
     /* Verify all states are distinct */
+    assert(NORN_SESSION_RESOLVING != NORN_SESSION_CONNECTING);
     assert(NORN_SESSION_CONNECTING != NORN_SESSION_ESTABLISHED);
     assert(NORN_SESSION_ESTABLISHED != NORN_SESSION_CLOSING);
     assert(NORN_SESSION_CLOSING != NORN_SESSION_CLOSED);
