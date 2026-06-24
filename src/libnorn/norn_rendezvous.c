@@ -183,18 +183,14 @@ int norn_send_holepunch_req_async(norn_client_t *client,
         return -1;
     }
     
-    /* FEAT-023 TODO: Store callback for response handling
-     * This requires a transaction tracking system:
-     * 1. Store callback and user_data with my_ephemeral_pubkey as key
-     * 2. When HolePunchResponse arrives, match by peer_ephemeral_pubkey
-     * 3. Invoke callback with response
-     * 4. Set up timeout (5 seconds) to fail if no response
-     * 
-     * For now, caller must handle timeout manually.
-     * Transaction tracking will be added in a follow-up.
-     */
-    (void)callback;
-    (void)user_data;
+    /* FEAT-023: Store callback for response handling */
+    if (client->holepunch_pending_count < 8) {
+        int idx = client->holepunch_pending_count++;
+        memcpy(client->holepunch_pending[idx].ephemeral_pubkey, my_ephemeral, 32);
+        client->holepunch_pending[idx].callback = callback;
+        client->holepunch_pending[idx].user_data = user_data;
+        client->holepunch_pending[idx].active = 1;
+    }
     
     return 0;
 }
