@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <time.h>
 #include "norn.h"
+#include "norn_suite.h"
+#include "norn_session.h"
 
 #define NORN_MAX_TRANSACTIONS 256
 #define NORN_TRANSACTION_TIMEOUT 30
@@ -14,7 +16,9 @@ typedef enum {
     TXN_GET_IMMUTABLE,
     TXN_DISCOVER,
     TXN_ANNOUNCE,
-    TXN_FIND_NODE
+    TXN_FIND_NODE,
+    TXN_RESOLVE_ENDPOINT,
+    TXN_ANNOUNCE_ENDPOINT
 } norn_transaction_type_t;
 
 typedef struct {
@@ -26,6 +30,9 @@ typedef struct {
     norn_peer_callback_t peer_callback;
     void *user_data;
     int completed;
+    /* FEAT-017: Endpoint resolution */
+    norn_resolve_callback_t resolve_callback;
+    const norn_crypto_suite_t *suite;
 } norn_transaction_t;
 
 typedef struct {

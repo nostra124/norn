@@ -6,11 +6,15 @@
  * No blocking I/O - all operations callback-based.
  */
 
+#include "norn.h"
 #include "norn_internal.h"
 #include "norn_session_internal.h"
 #include "norn_suite.h"
+#include "norn_transaction.h"
 #include "channel.h"
 #include "streammux.h"
+#include "mainline.h"
+#include "bep44.h"
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -670,6 +674,7 @@ int norn_announce_endpoint_async(norn_client_t *client,
                                 void *callback,
                                 void *user_data) {
     if (!client || !endpoint || !secret) return -1;
+    if (!client->initialized) return -1;
     
     /* Encode endpoint */
     unsigned char value[1024];
@@ -685,17 +690,23 @@ int norn_announce_endpoint_async(norn_client_t *client,
     unsigned char sig[64];
     suite->sign(sig, value, value_len, secret);
     
-    /* Get current sequence number (TODO: should track per-key) */
+    /* Create transaction */
+    norn_transaction_t *txn = norn_transaction_new(&client->txn, TXN_ANNOUNCE_ENDPOINT, target);
+    if (!txn) return -1;
+    
+    txn->user_data = user_data;
+    txn->suite = suite;
+    (void)callback; /* TODO: Add announce callback type */
+    
+    /* Store in DHT (this triggers async announce) */
+    /* Sequence number should be tracked per-key (TODO) */
     uint32_t seq = 1;
     
-    /* Store in DHT via mainline */
-    /* TODO: Convert to async with callback when DHT put is complete */
-    (void)callback;
-    (void)user_data;
-    (void)sig;
-    (void)seq;
+    int ret = mainline_lookup_mutable(&client->ml, target, 1, NULL, 0,
+                                       value, value_len, NULL, NULL, seq, 1,
+                                       NULL, NULL, 0, 0, NULL);
     
-    return -1; /* Not implemented - needs mainline async put */
+    return ret;
 }
 
 int norn_resolve_endpoint_async(norn_client_t *client,
@@ -704,6 +715,7 @@ int norn_resolve_endpoint_async(norn_client_t *client,
                                 void *callback,
                                 void *user_data) {
     if (!client || !pubkey) return -1;
+    if (!client->initialized) return -1;
     if (!callback) return -1;
     
     /* Compute target from pubkey */
@@ -711,14 +723,20 @@ int norn_resolve_endpoint_async(norn_client_t *client,
     suite = suite ? suite : norn_suite_sodium();
     suite->nodeid_from_pubkey(target, pubkey);
     
-    /* Store resolve request in transaction queue */
-    /* TODO: Implement transaction-based async resolve */
-    /* For now, return not implemented */
-    (void)target;
-    (void)callback;
-    (void)user_data;
+    /* Create transaction */
+    norn_transaction_t *txn = norn_transaction_new(&client->txn, TXN_RESOLVE_ENDPOINT, target);
+    if (!txn) return -1;
     
-    return -1; /* Not implemented - needs transaction system */
+    txn->resolve_callback = (norn_resolve_callback_t)callback;
+    txn->user_data = user_data;
+    txn->suite = suite;
+    
+    /* Query DHT */
+    int ret = mainline_lookup_mutable(&client->ml, target, 0, NULL, 0,
+                                       NULL, 0, NULL, NULL, 0, 1,
+                                       NULL, NULL, 0, 0, NULL);
+    
+    return ret;
 }
 
 /* === Stream Multiplexing (FEAT-018, stub) === */
