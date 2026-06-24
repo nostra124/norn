@@ -29,7 +29,8 @@ libnorn_la_SOURCES = \
 	src/libnorn/norn_idexch.c \
 	src/libnorn/norn_session.c \
 	src/libnorn/norn_session_udp.c \
-	src/libnorn/norn_endpoint_cache.c
+	src/libnorn/norn_endpoint_cache.c \
+	src/libnorn/norn_nat.c
 
 libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 
@@ -40,6 +41,7 @@ include_HEADERS = src/libnorn/norn.h \
                    src/libnorn/norn_kad.h \
                    src/libnorn/norn_idexch.h \
                    src/libnorn/norn_session.h \
+                   src/libnorn/norn_nat.h \
                    src/libnorn/crypto.h \
                    src/libnorn/bep44.h \
                    src/libnorn/bencode.h \
