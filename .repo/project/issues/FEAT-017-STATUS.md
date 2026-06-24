@@ -1,13 +1,16 @@
 # FEAT-017 Implementation Status
 
-## Completed (Phase 1-2)
+## Completed (Phase 1-3)
 
 - ✅ Endpoint discovery with async DHT
 - ✅ Endpoint cache with TTL
 - ✅ Direct connection integration
 - ✅ NAT wire protocol (encode/decode)
+- ✅ Rendezvous coordination service
+- ✅ Pending request tracking
+- ✅ External IP discovery (DHT-based, no STUN)
 
-## In Progress (Phase 3)
+## In Progress (Phase 3 Completion)
 
 ### External IP Discovery
 
@@ -17,6 +20,19 @@ We use DHT-based discovery instead of STUN:
 2. **Rendezvous** tells us our IP in HolePunchResponse
 3. **Application** can set IP in `norn_endpoint_t`
 4. **Cache** from previous successful connections
+
+### Rendezvous Coordination
+
+**Implementation**: `norn_rendezvous.h/c`
+
+```c
+// When acting as rendezvous
+norn_rendezvous_init(&rv);
+norn_rendezvous_handle_req(&rv, &req, from_ip, from_port, client, &resp);
+
+// When wanting to connect to peer
+norn_send_holepunch_req_async(client, target, rendezvous, ephemeral, callback, user_data);
+```
 
 ### Hole Punch Algorithm
 
@@ -66,11 +82,11 @@ typedef struct {
 
 ## Remaining Work
 
-### Phase 3 Completion
-1. Store external IP from DHT responses
-2. Implement rendezvous coordination service
-3. Implement simultaneous probe sending
-4. Integrate hole punch into connection ladder
+### Phase 3 Finalization
+1. ✅ Rendezvous coordination (done)
+2. ⏳ Implement `norn_send_holepunch_req_async()`
+3. ⏳ Implement `norn_send_probes()` - simultaneous UDP probe sending
+4. ⏳ Integrate into connection ladder
 
 ### Phase 4
 1. Relay circuit creation
