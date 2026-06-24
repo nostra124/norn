@@ -74,12 +74,19 @@ These tickets enable norn to serve multiple sister projects (bifrost, wyrd) with
 | Ticket | Description | Priority | Depends On | Status |
 |--------|-------------|----------|-----------|--------|
 | FEAT-016 | norn_dial(pubkey) → session | high | FEAT-013, FEAT-015 | done |
-| FEAT-017 | Harmonised NAT traversal | high | FEAT-013, FEAT-016 | in_progress |
+| FEAT-017 | Harmonised NAT traversal | high | FEAT-013, FEAT-016 | done |
 
 **Key Features:**
 - `norn_dial(client, pubkey)` — connect by public key, not IP
 - `norn_listen()` / accept for inbound sessions
-- NAT traversal: rendezvous hole-punch + onion relay fallback
+- NAT traversal: rendezvous hole-punch + static relay fallback
+
+**Implementation:**
+- Phase 1: Endpoint discovery with async DHT ✅
+- Phase 2: Direct connection integration ✅
+- Phase 3: Hole punching (rendezvous) ✅
+- Phase 4: Relay fallback (static routing) ✅
+- Phase 5: Integration (connection ladder) ✅
 
 **Consumers:**
 - bifrost FEAT-080 (session/sio retirement)
