@@ -126,25 +126,46 @@ static void on_endpoint_resolved(const norn_endpoint_t *endpoint, void *user_dat
     /* Direct not available - fall back to hole punch (Phase 3) */
     if (endpoint->caps & NORN_EP_CAP_RENDEZVOUS) {
         /* Endpoint can act as rendezvous/introducer for hole punch */
-        /* TODO FEAT-017 Phase 3: Wire up hole punch request
-         * ctx->state = DIAL_HOLEPUNCH;
-         * norn_hole_punch_async(ctx->client, ctx->peer_pubkey, 
-         *                      endpoint->pubkey, ctx->callback, ctx->user_data);
-         * return;
-         */
         ctx->state = DIAL_HOLEPUNCH;
-        /* For now, continue to try relay */
+        
+        /* FEAT-023: Hole punch integration - wire up the connection
+         * For now, we have the wire protocol complete but the full
+         * integration requires:
+         * 1. Generate ephemeral key for this session
+         * 2. Send HolePunchRequest via rendezvous
+         * 3. Handle HolePunchResponse callback
+         * 4. Send simultaneous probes
+         * 5. Establish session
+         *
+         * This is tracked in .repo/project/issues/FEAT-023-HOLEPUNCH-INTEGRATION.md
+         */
+        
+        /* For now, fall through to relay if available */
     }
     
     /* Hole punch not available or failed - fall back to relay (Phase 4) */
     if (endpoint->caps & NORN_EP_CAP_RELAY) {
-        /* TODO FEAT-017 Phase 4: Use relay path from endpoint->payload */
+        /* FEAT-022: Multi-hop relay - use relay path from endpoint->payload
+         * This requires:
+         * 1. Parse relay hints from endpoint->payload
+         * 2. Discover relay path
+         * 3. Send RelayCreate through chain
+         * 4. Wait for RelayAccept
+         *
+         * Tracked in .repo/project/issues/FEAT-022-MULTIPATH-RELAY.md
+         */
         ctx->state = DIAL_RELAY;
-        /* Relay implementation pending - for now fail */
     }
     
-    /* No connection method available */
-    ctx->state = DIAL_FAILED;
+    /* No connection method available - all methods failed or not implemented */
+    if (ctx->state != DIAL_HOLEPUNCH && ctx->state != DIAL_RELAY) {
+        /* Neither rendezvous nor relay available */
+        ctx->state = DIAL_FAILED;
+    } else {
+        /* Connection method selected but not yet fully implemented */
+        ctx->state = DIAL_FAILED;
+    }
+    
     if (ctx->callback) {
         ctx->callback(NULL, NORN_SESSION_CLOSED, ctx->user_data);
     }
