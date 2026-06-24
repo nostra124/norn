@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <time.h>
 
 #define PENDING_TIMEOUT_MS 30000
 
@@ -130,12 +131,32 @@ int norn_send_holepunch_req_async(norn_client_t *client,
                                                     const norn_holepunch_resp_t *,
                                                     void *),
                                    void *user_data) {
-    (void)client;
-    (void)target_pubkey;
-    (void)rendezvous_pubkey;
-    (void)my_ephemeral;
-    (void)callback;
+    if (!client || !target_pubkey || !rendezvous_pubkey || !my_ephemeral || !callback) {
+        return -1;
+    }
+    
+    norn_holepunch_req_t req;
+    memset(&req, 0, sizeof(req));
+    
+    req.msg_type = NORN_MSG_HOLEPUNCH_REQ;
+    memcpy(req.target_pubkey, target_pubkey, 32);
+    memcpy(req.my_ephemeral_pubkey, my_ephemeral, 32);
+    
+    if (net_get_external_endpoint(&client->net, &req.my_external_ip, &req.my_external_port) != 0) {
+        req.my_external_ip = 0;
+        req.my_external_port = 0;
+    }
+    
+    bf_sign(req.signature, (const unsigned char *)&req, 
+            offsetof(norn_holepunch_req_t, signature), client->self_sec);
+    
+    uint8_t buf[NORN_HOLEPUNCH_REQ_LEN];
+    if (norn_encode_holepunch_req(&req, buf) != 0) {
+        return -1;
+    }
+    
     (void)user_data;
+    
     return -1;
 }
 
@@ -148,10 +169,21 @@ int norn_send_probes(norn_client_t *client,
     if (count <= 0) count = 3;
     if (interval_ms <= 0) interval_ms = 100;
     
-    (void)peer_ip;
-    (void)peer_port;
-    (void)count;
-    (void)interval_ms;
+    uint8_t probe[1] = {0};
+    
+    for (int i = 0; i < count; i++) {
+        if (net_send(&client->net, probe, sizeof(probe), peer_ip, peer_port) < 0) {
+            return -1;
+        }
+        
+        if (i < count - 1) {
+            struct timespec ts = {
+                .tv_sec = interval_ms / 1000,
+                .tv_nsec = (interval_ms % 1000) * 1000000L
+            };
+            nanosleep(&ts, NULL);
+        }
+    }
     
     return 0;
 }
