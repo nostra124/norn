@@ -23,23 +23,23 @@
   - FEAT-014: Parameterised Kademlia ID width — `norn_kad.h`, `norn_kad.c`
   - FEAT-015: De-application-ise idexch — `norn_idexch.h/c` (generic, opaque payload)
 - **v0.8.0 Dial & Session Orchestration** (COMPLETE):
-  - FEAT-016 Phase 1: **Async & Mobile-Ready Session API**
+  - FEAT-016: Async & Mobile-Ready Session API
     - Fully async, non-blocking API (no blocking I/O)
     - Event loop integration via `norn_tick()` and `norn_get_fd()`
     - Mobile-ready: iOS (CFRunLoop), Android (epoll)
     - Session tracking in `norn_client_t`
     - Callback-based lifecycle
-  - FEAT-017 Phase 1-2: **NAT Traversal**
-    - Endpoint discovery with async DHT queries
-    - Endpoint cache with TTL (5min default)
-    - Direct connection integration
-    - Connection ladder: resolve → direct → hole-punch → relay
-  - All tests passing (30/30)
+  - FEAT-017: NAT Traversal (ALL PHASES COMPLETE)
+    - Phase 1: Endpoint discovery with async DHT queries
+    - Phase 2: Direct connection integration
+    - Phase 3: Hole punching with rendezvous coordination
+    - Phase 4: Static relay fallback (single-hop, performance-first)
+    - Phase 5: Connection ladder integration (resolve → direct → hole-punch → relay)
+  - All tests passing (32/32)
 
 ### In Progress
-- **FEAT-017** Phase 3: Hole punching (3 days)
-- **FEAT-017** Phase 4: Relay fallback (4 days)
-- **FEAT-017** Phase 5: Integration (2 days)
+- **FEAT-018**: Stream multiplexing (`norn_stream_open_async`)
+- **FEAT-019**: Language bindings (Rust, Python)
 
 ### Blocked
 - None
@@ -53,29 +53,33 @@
 - **Event loop agnostic** - integrates with libuv, epoll, kqueue, CFRunLoop
 - **Battery efficient** - uses notification-based I/O, not polling
 - **Connection ladder** - resolve → direct → hole-punch → relay
+- **Static relay** - not anonymous, performance-first, trusted friend nodes
+- **Binary protocol** - separate from bencode DHT (message types 0x10-0x2F)
 
 ## Next Steps
-1. FEAT-017 Phase 3: Hole punching with rendezvous
-2. FEAT-017 Phase 4: Relay fallback
-3. FEAT-018: Stream multiplexing implementation
-4. FEAT-019: Platform event loop adapters
+1. FEAT-018: Stream multiplexing implementation
+2. FEAT-019: Platform event loop adapters
+3. v0.9.0 milestone: Tunnel & Bindings
 
 ## Critical Context
-- **Tests**: 30/30 passing
+- **Tests**: 32/32 passing
 - **Build**: Clean build with `-Werror`, all tests pass
 - **Version**: 0.9.0-dev (from VERSION file)
-- **Architecture**: Fully async, mobile-ready, NAT traversal foundation
+- **Architecture**: Fully async, mobile-ready, complete NAT traversal
 - **Session API**: Complete async flow (dial, listen, close)
-- **Event loop**: `norn_tick()` processes all sessions + DHT
-- **NAT Traversal**: Endpoint cache, direct connection, hole punch/relay pending
+- **Event loop**: `norn_tick()` processes all sessions + DHT + NAT messages
+- **NAT Traversal**: Complete - direct, hole-punch, relay all working
 
 ## Relevant Files
 - `VERSION` — Single source of truth for version (0.9.0-dev)
 - `src/libnorn/norn_session.h` — Async session API (FEAT-016)
 - `src/libnorn/norn_session.c` — Async session implementation
 - `src/libnorn/norn_endpoint_cache.h/c` — Endpoint cache (FEAT-017)
+- `src/libnorn/norn_nat.h/c` — NAT wire protocol (FEAT-017)
+- `src/libnorn/norn_rendezvous.h/c` — Hole punch coordination (FEAT-017)
+- `src/libnorn/norn_relay.h/c` — Static relay (FEAT-017)
 - `src/libnorn/norn_internal.h` — Internal struct definitions
 - `src/libnorn/norn_impl.c` — Client with session tracking
 - `.repo/project/issues/FEAT-016-ASYNC.md` — Architecture design
 - `.repo/project/issues/FEAT-017-NAT.md` — NAT traversal design
-- `.repo/project/issues/MILESTONE-0.9.0.md` — v0.9.0 milestone definition
+- `.repo/project/ROADMAP.md` — Milestone overview
