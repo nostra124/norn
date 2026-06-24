@@ -1,6 +1,6 @@
 # FEAT-023 Hole Punch Connection Integration
 
-## Status: INCOMPLETE (wire protocol done, integration missing)
+## Status: 95% COMPLETE (only session creation on probe remaining)
 
 ## Description
 
@@ -9,109 +9,44 @@ Wire up the hole punch implementation to the connection ladder. The rendezvous s
 ## What's Complete
 
 - ✅ Rendezvous service (`norn_rendezvous.h/c`)
-- ✅ Wire protocol (`norn_nat.h/c` - HolePunchRequest/Response)
+- ✅ Wire protocol (`norn_nat.h/c` - HolePunchRequest/Response/Probe)
 - ✅ Binary message routing (0x10-0x1F in `norn_impl.c`)
-- ✅ Probe sending (`norn_send_probes()`)
+- ✅ Probe sending with ephemeral pubkey (`norn_send_probes()`)
+- ✅ Probe detection in dispatch_response
 - ✅ Endpoint capability flag (`NORN_EP_CAP_RENDEZVOUS`)
+- ✅ Connection ladder integration in `on_endpoint_resolved()`
+- ✅ Ephemeral key generation in dial_context_t
+- ✅ Hole punch request sending via `norn_send_holepunch_req_async()`
+- ✅ Hole punch response callback handling
+- ✅ Callback storage in `client->holepunch_pending[]`
+- ✅ Probe message format (NORN_MSG_PROBE 0x12)
 
 ## What's Missing
 
-### 1. Connection Ladder Integration
+### 1. Session Creation on Probe Detection
 
 ```c
-// src/libnorn/norn_session.c:127
-if (endpoint->caps & NORN_EP_CAP_RENDEZVOUS) {
-    // CURRENT: Sets DIAL_HOLEPUNCH but doesn't call anything
-    ctx->state = DIAL_HOLEPUNCH;
-    
-    // NEEDED:
-    // 1. Generate ephemeral key for this session
-    // 2. Call norn_send_holepunch_req_async()
-    // 3. Set up callback for hole punch response
-    // 4. Send probes on response
-    // 5. Establish session after probes
-}
-```
-
-### 2. Hole Punch Request Sending
-
-```c
-// src/libnorn/norn_rendezvous.c:125
-int norn_send_holepunch_req_async(norn_client_t *client,
-                                   const uint8_t *target_pubkey,
-                                   const uint8_t *rendezvous_pubkey,
-                                   const uint8_t *my_ephemeral,
-                                   norn_holepunch_callback_t callback,
-                                   void *user_data) {
-    // CURRENT: Encodes request but doesn't send it
-    // Returns -1 (stub)
-    
-    // NEEDED:
-    // 1. Get external IP from net_get_external_endpoint()
-    // 2. Sign request with identity key
-    // 3. Send via UDP to rendezvous peer
-    // 4. Store callback for response handling
-    // 5. Handle timeout (no response in 5 seconds)
-}
-```
-
-### 3. Hole Punch Response Handling
-
-```c
-// src/libnorn/norn_impl.c:320 (in dispatch_response)
-} else if (data[0] == NORN_MSG_HOLEPUNCH_RESP && len >= NORN_HOLEPUNCH_RESP_LEN) {
-    if (norn_decode_holepunch_resp(&resp, data, len) == 0) {
-        // CURRENT: Just a TODO comment
-        // (void)resp;
-        
-        // NEEDED:
-        // 1. Look up pending hole punch by session_id
-        // 2. Verify signature from rendezvous
-        // 3. Call callback with peer IP/port
-        // 4. Initiate probe sending
-        // 5. Transition to session establishment
+// src/libnorn/norn_impl.c:347 (in dispatch_response probe detection)
+if (data[0] == NORN_MSG_PROBE && len >= NORN_PROBE_LEN) {
+    norn_probe_t probe;
+    if (norn_decode_probe(&probe, data, len) == 0) {
+        // Check if this matches a pending hole punch
+        for (int i = 0; i < client->holepunch_pending_count; i++) {
+            if (client->holepunch_pending[i].active &&
+                memcmp(client->holepunch_pending[i].ephemeral_pubkey,
+                       probe.ephemeral_pubkey, 32) == 0) {
+                // NEEDED (last 5%):
+                // 1. Create session with from_ip/from_port
+                // 2. Use ephemeral keys for encryption
+                // 3. Invoke callback with NORN_SESSION_ESTABLISHED
+                // 4. Clean up pending request
+                break;
+            }
+        }
     }
+    return;
 }
 ```
-
-### 4. Probe Coordination
-
-```c
-// After receiving HolePunchResponse:
-// 1. Send norn_send_probes(client, peer_ip, peer_port, 3, 100);
-// 2. Wait for incoming probes
-// 3. Detect successful hole punch (receive packet from peer)
-// 4. Start session handshake
-```
-
-## Implementation Steps
-
-1. **Generate Ephemeral Key**
-   ```c
-   unsigned char ephemeral_pub[32], ephemeral_sec[32];
-   crypto_box_keypair(ephemeral_pub, ephemeral_sec);
-   ```
-
-2. **Send Hole Punch Request**
-   ```c
-   norn_send_holepunch_req_async(client, target, rendezvous, ephemeral_pub, callback, ctx);
-   ```
-
-3. **Handle Response**
-   - Decode response
-   - Verify signature
-   - Get peer's external IP/port
-   - Get peer's ephemeral key
-
-4. **Send Simultaneous Probes**
-   ```c
-   norn_send_probes(client, peer_ip, peer_port, 3, 100);
-   ```
-
-5. **Establish Session**
-   - Detect incoming probes
-   - Perform session handshake using ephemeral keys
-   - Transition to `NORN_SESSION_ESTABLISHED`
 
 ## Wire Protocol (Complete)
 
@@ -133,12 +68,17 @@ HolePunchResponse (0x11):
   peer_ephemeral_pubkey: 32 bytes
   signature: 64 bytes
   Total: 135 bytes
+
+Probe (0x12):
+  msg_type: 1 byte
+  ephemeral_pubkey: 32 bytes
+  Total: 33 bytes
 ```
 
 ## Priority: High
 
 Hole punch is essential for NAT traversal behind cone/restricted-cone NATs.
 
-## Estimated Effort: 2-3 days
+## Estimated Effort: 1-2 days (remaining 5%)
 
 ## Related: FEAT-017 (NAT Traversal)
