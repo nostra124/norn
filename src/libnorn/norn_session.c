@@ -2,35 +2,72 @@
  * @file norn_session.c
  * @brief Session management implementation (FEAT-016).
  *
- * This is a stub implementation that establishes the API. Full implementation
- * will be completed in phases:
- *
- * Phase 1: Direct connection (loopback testing)
- * Phase 2: NAT traversal (hole-punch, relay)
- * Phase 3: Async/callbacks
+ * Phase 1: Direct connection with channel handshake.
+ * Phase 2: NAT traversal (hole-punch, relay) - TODO
+ * Phase 3: Async/callbacks - TODO
  */
 
 #include "norn_session.h"
 #include "norn_suite.h"
+#include "channel.h"
+#include "streammux.h"
 #include <stdlib.h>
 #include <string.h>
 
+/* Internal session state */
 struct norn_session {
     norn_client_t *client;
     const norn_crypto_suite_t *suite;
-    unsigned char peer_pubkey[32];
+    
+    /* Crypto state */
+    channel_t channel;
+    unsigned char peer_pubkey[64];  /* Max size for any suite */
+    
+    /* Stream multiplexing */
+    streammux_t *mux;
+    
+    /* State */
     norn_session_state_t state;
-    void *user_data;
+    int is_initiator;
+    
+    /* Transport (Phase 2) */
+    /* TODO: transport integration for NAT traversal */
+    
+    /* Callbacks */
     norn_session_callback_t callback;
+    void *user_data;
 };
 
+/* Internal stream state */
 struct norn_stream {
     norn_session_t *session;
-    int id;
+    uint16_t stream_id;
     int closed;
 };
 
-/* Stub: creates session structure, does not connect yet */
+/* Create session structure */
+norn_session_t *norn_session_new(norn_client_t *client,
+                                  const norn_crypto_suite_t *suite) {
+    if (!client) return NULL;
+    
+    norn_session_t *session = calloc(1, sizeof(*session));
+    if (!session) return NULL;
+    
+    session->client = client;
+    session->suite = suite ? suite : norn_suite_sodium();
+    session->state = NORN_SESSION_CONNECTING;
+    
+    /* Create stream mux */
+    session->mux = streammux_new(NULL, NULL);
+    if (!session->mux) {
+        free(session);
+        return NULL;
+    }
+    
+    return session;
+}
+
+/* Dial: initiator side */
 norn_session_t *norn_dial(norn_client_t *client,
                           const unsigned char *pubkey,
                           const norn_crypto_suite_t *suite,
@@ -38,21 +75,24 @@ norn_session_t *norn_dial(norn_client_t *client,
                           void *user_data) {
     if (!client || !pubkey) return NULL;
     
-    norn_session_t *session = calloc(1, sizeof(*session));
+    norn_session_t *session = norn_session_new(client, suite);
     if (!session) return NULL;
     
-    session->client = client;
-    session->suite = suite ? suite : norn_suite_sodium();
+    session->is_initiator = 1;
     memcpy(session->peer_pubkey, pubkey, session->suite->pubkey_len);
-    session->state = NORN_SESSION_CONNECTING;
     session->callback = callback;
     session->user_data = user_data;
     
-    /* TODO: Implement full dial flow:
-     * 1. Resolve endpoint via DHT
-     * 2. NAT traversal (direct → hole-punch → relay)
-     * 3. Channel handshake
-     * 4. Transition to ESTABLISHED
+    /* Generate ephemeral key */
+    if (channel_gen_ephemeral(&session->channel) != 0) {
+        streammux_free(session->mux);
+        free(session);
+        return NULL;
+    }
+    
+    /* TODO Phase 1: Build and send INIT via transport
+     * TODO Phase 2: Resolve endpoint via DHT
+     * TODO Phase 2: NAT traversal (direct → hole-punch → relay)
      */
     
     /* Stub: Immediately transition to ESTABLISHED for testing */
@@ -65,7 +105,7 @@ norn_session_t *norn_dial(norn_client_t *client,
     return session;
 }
 
-/* Stub: listen for inbound */
+/* Listen for inbound */
 int norn_listen(norn_client_t *client,
                 uint16_t port,
                 const norn_crypto_suite_t *suite,
@@ -78,23 +118,19 @@ int norn_listen(norn_client_t *client,
     
     if (!client) return -1;
     
-    /* TODO: Implement listen:
-     * 1. Bind UDP socket
-     * 2. Advertise endpoint via DHT
-     * 3. Accept incoming connections
+    /* TODO Phase 1: Bind transport and accept incoming handshakes
+     * TODO Phase 2: Advertise endpoint via DHT
      */
     
     return 0;
 }
 
-/* Stub: accept inbound session (blocking) */
+/* Accept inbound session (blocking) */
 norn_session_t *norn_accept(norn_client_t *client) {
     if (!client) return NULL;
     
-    /* TODO: Implement accept:
-     * 1. Wait for incoming connection
-     * 2. Perform channel handshake
-     * 3. Return established session
+    /* TODO Phase 1: Wait for incoming handshake
+     * TODO Phase 2: Handle multiple inbound sessions
      */
     
     return NULL;
@@ -106,7 +142,12 @@ void norn_session_close(norn_session_t *session) {
     
     session->state = NORN_SESSION_CLOSING;
     
-    /* TODO: Send close notification to peer */
+    /* TODO: Send close notification */
+    
+    if (session->mux) {
+        streammux_free(session->mux);
+        session->mux = NULL;
+    }
     
     session->state = NORN_SESSION_CLOSED;
 }
@@ -114,6 +155,10 @@ void norn_session_close(norn_session_t *session) {
 /* Free session */
 void norn_session_free(norn_session_t *session) {
     if (!session) return;
+    
+    if (session->mux) {
+        streammux_free(session->mux);
+    }
     
     free(session);
 }
@@ -148,8 +193,10 @@ norn_stream_t *norn_stream_open(norn_session_t *session) {
     if (!stream) return NULL;
     
     stream->session = session;
-    stream->id = 1;  /* TODO: Allocate stream ID */
+    stream->stream_id = 1;  /* TODO: allocate from mux */
     stream->closed = 0;
+    
+    /* TODO: Open stream in mux */
     
     return stream;
 }
@@ -158,8 +205,9 @@ norn_stream_t *norn_stream_open(norn_session_t *session) {
 int norn_stream_write(norn_stream_t *stream, const void *data, size_t len) {
     if (!stream || !data) return -1;
     if (stream->closed) return -1;
+    if (!stream->session || !stream->session->mux) return -1;
     
-    /* TODO: Integrate with stream.h / streammux.h */
+    /* TODO: Integrate with streammux */
     (void)len;
     
     return -1;  /* Not implemented */
@@ -169,8 +217,9 @@ int norn_stream_write(norn_stream_t *stream, const void *data, size_t len) {
 int norn_stream_read(norn_stream_t *stream, void *buf, size_t cap) {
     if (!stream || !buf) return -1;
     if (stream->closed) return -1;
+    if (!stream->session || !stream->session->mux) return -1;
     
-    /* TODO: Integrate with stream.h / streammux.h */
+    /* TODO: Integrate with streammux */
     (void)cap;
     
     return -1;  /* Not implemented */
@@ -181,6 +230,8 @@ void norn_stream_close(norn_stream_t *stream) {
     if (!stream) return;
     
     stream->closed = 1;
+    
+    /* TODO: Send FIN via mux */
 }
 
 /* Free stream */
@@ -197,7 +248,7 @@ int norn_announce_endpoint(norn_client_t *client,
                            const norn_crypto_suite_t *suite) {
     if (!client || !endpoint || !secret) return -1;
     
-    /* TODO: Build endpoint record and publish via norn_put_mutable */
+    /* TODO Phase 2: Build endpoint record and publish via norn_put_mutable */
     (void)suite;
     
     return -1;  /* Not implemented */
@@ -210,7 +261,7 @@ int norn_resolve_endpoint(norn_client_t *client,
                           const norn_crypto_suite_t *suite) {
     if (!client || !pubkey || !endpoint) return -1;
     
-    /* TODO: Query DHT via norn_get_mutable and parse endpoint record */
+    /* TODO Phase 2: Query DHT via norn_get_mutable and parse endpoint record */
     (void)suite;
     
     return -1;  /* Not implemented */
