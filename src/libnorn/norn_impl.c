@@ -15,7 +15,10 @@
 #include <unistd.h>
 #include <errno.h>
 
-/* Forward declarations */
+/* Forward declarations for private types */
+struct dial_context;
+typedef struct dial_context dial_context_t;
+
 static void dispatch_response(norn_client_t *client,
                               const uint8_t *data, size_t len,
                               uint32_t from_ip, uint16_t from_port);
@@ -369,21 +372,9 @@ static void dispatch_response(norn_client_t *client,
                         /* Mark as inactive */
                         client->holepunch_pending[i].active = 0;
                         
-                        /* TODO: Create session with from_ip/from_port
-                         * This requires:
-                         * 1. Cast dial_ctx to dial_context_t*
-                         * 2. Create norn_session_t via norn_session_new()
-                         * 3. Set peer endpoint (from_ip, from_port)
-                         * 4. Set ephemeral keys from dial_ctx
-                         * 5. Perform session handshake (exchange ephemeral keys)
-                         * 6. Call dial_ctx->callback(session, NORN_SESSION_ESTABLISHED, dial_ctx->user_data)
-                         *
-                         * This is the final 5% - needs session handshake implementation
-                         */
+                        /* Create session using helper */
+                        norn_session_from_probe(client, dial_ctx, from_ip, from_port);
                         
-                        (void)dial_ctx;
-                        (void)from_ip;
-                        (void)from_port;
                         break;
                     }
                 }

@@ -74,4 +74,10 @@ struct norn_client {
     int holepunch_pending_count;
 };
 
+/* FEAT-023: Internal helper for probe-to-session transition */
+int norn_session_from_probe(norn_client_t *client,
+                             void *dial_ctx,
+                             uint32_t from_ip,
+                             uint16_t from_port);
+
 #endif /* NORN_INTERNAL_H */
