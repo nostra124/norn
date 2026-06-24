@@ -11,6 +11,7 @@
 
 #include "norn.h"
 #include "norn_session.h"
+#include "norn_endpoint_cache.h"
 #include "net.h"
 #include "mainline.h"
 #include "norn_transaction.h"
@@ -35,6 +36,9 @@ struct norn_client {
     norn_accept_callback_t listen_callback;
     void *listen_user_data;
     const norn_crypto_suite_t *listen_suite;
+    
+    /* Endpoint cache (FEAT-017) */
+    norn_endpoint_cache_t endpoint_cache;
 };
 
 #endif /* NORN_INTERNAL_H */

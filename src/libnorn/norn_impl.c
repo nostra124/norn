@@ -75,6 +75,7 @@ norn_client_t *norn_new(const unsigned char *self_pub,
     
     client->initialized = 1;
     client->listen_fd = -1;
+    norn_endpoint_cache_init(&client->endpoint_cache);
     return client;
 }
 

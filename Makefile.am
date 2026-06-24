@@ -28,7 +28,8 @@ libnorn_la_SOURCES = \
 	src/libnorn/norn_kad.c \
 	src/libnorn/norn_idexch.c \
 	src/libnorn/norn_session.c \
-	src/libnorn/norn_session_udp.c
+	src/libnorn/norn_session_udp.c \
+	src/libnorn/norn_endpoint_cache.c
 
 libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 
