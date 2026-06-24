@@ -26,16 +26,20 @@ struct norn_session {
     /* Crypto state */
     channel_t channel;
     unsigned char peer_pubkey[64];  /* Max size for any suite */
+    unsigned char self_pubkey[32];   /* Our identity public key */
+    unsigned char self_secret[64];   /* Our identity secret key */
     
     /* Stream multiplexing */
     streammux_t *mux;
     
+    /* Transport */
+    int fd;                           /* UDP socket, -1 if not connected */
+    uint32_t peer_ip;                 /* Network byte order */
+    uint16_t peer_port;               /* Network byte order */
+    
     /* State */
     norn_session_state_t state;
     int is_initiator;
-    
-    /* Transport (Phase 2) */
-    /* TODO: transport integration for NAT traversal */
     
     /* Callbacks */
     norn_session_callback_t callback;
@@ -60,6 +64,7 @@ norn_session_t *norn_session_new(norn_client_t *client,
     session->client = client;
     session->suite = suite ? suite : norn_suite_sodium();
     session->state = NORN_SESSION_CONNECTING;
+    session->fd = -1;
     
     /* Create stream mux */
     session->mux = streammux_new(NULL, NULL);
@@ -69,6 +74,17 @@ norn_session_t *norn_session_new(norn_client_t *client,
     }
     
     return session;
+}
+
+/* Set identity keys (called by dial/accept) */
+int norn_session_set_identity(norn_session_t *session,
+                               const unsigned char *pubkey,
+                               const unsigned char *secret) {
+    if (!session || !pubkey || !secret) return -1;
+    
+    memcpy(session->self_pubkey, pubkey, session->suite->pubkey_len);
+    memcpy(session->self_secret, secret, session->suite->secret_len);
+    return 0;
 }
 
 /* Dial: initiator side */
@@ -116,11 +132,22 @@ norn_session_t *norn_dial_direct(norn_client_t *client,
                                   const norn_crypto_suite_t *suite) {
     if (!client || !endpoint || !pubkey) return NULL;
     
+    /* Get our identity from norn_client */
+    unsigned char self_pub[32], self_sec[64];
+    /* TODO: norn_client_t should expose identity keys */
+    /* For now, generate ephemeral identity */
+    crypto_sign_keypair(self_pub, self_sec);
+    
     norn_session_t *session = norn_session_new(client, suite);
     if (!session) return NULL;
     
     session->is_initiator = 1;
+    norn_session_set_identity(session, self_pub, self_sec);
     memcpy(session->peer_pubkey, pubkey, session->suite->pubkey_len);
+    
+    /* Store peer endpoint */
+    session->peer_ip = endpoint->ip;
+    session->peer_port = endpoint->port;
     
     /* Generate ephemeral key for channel handshake */
     if (channel_gen_ephemeral(&session->channel) != 0) {
@@ -129,14 +156,54 @@ norn_session_t *norn_dial_direct(norn_client_t *client,
         return NULL;
     }
     
-    /* TODO Phase 1: Create UDP transport and send INIT
-     * - Create UDP socket
-     * - Send channel_hs_build_init to endpoint
-     * - Receive RESP
-     * - Send CONFIRM
-     * - Transition to ESTABLISHED
+    /* TODO Phase 1: Create UDP socket and perform handshake
+     * Handshake flow (initiator):
+     * 1. Create UDP socket
+     * 2. Send INIT (channel_hs_build_init)
+     * 3. Receive RESP
+     * 4. Send CONFIRM (channel_hs_confirm)
+     * 5. Mark ESTABLISHED
+     * 
+     * For now, stub to CONNECTING state.
+     * Full implementation requires event loop integration.
      */
-    (void)endpoint;
+    
+    session->state = NORN_SESSION_CONNECTING;
+    
+    return session;
+}
+
+/* Accept direct: respond to incoming connection (for testing) */
+norn_session_t *norn_accept_direct(norn_client_t *client,
+                                    const unsigned char *pubkey,
+                                    const unsigned char *secret,
+                                    int fd,
+                                    const norn_crypto_suite_t *suite) {
+    if (!client || !pubkey || !secret || fd < 0) return NULL;
+    
+    norn_session_t *session = norn_session_new(client, suite);
+    if (!session) return NULL;
+    
+    session->is_initiator = 0;
+    norn_session_set_identity(session, pubkey, secret);
+    session->fd = fd;
+    
+    /* Generate ephemeral key */
+    if (channel_gen_ephemeral(&session->channel) != 0) {
+        streammux_free(session->mux);
+        free(session);
+        return NULL;
+    }
+    
+    /* TODO Phase 1: Receive INIT, send RESP, receive CONFIRM
+     * Handshake flow (responder):
+     * 1. Receive INIT from fd
+     * 2. Call channel_hs_accept to build RESP
+     * 3. Send RESP
+     * 4. Receive CONFIRM
+     * 5. Call channel_hs_finish to verify
+     * 6. Mark ESTABLISHED
+     */
     
     session->state = NORN_SESSION_CONNECTING;
     
