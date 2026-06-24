@@ -681,14 +681,21 @@ int norn_announce_endpoint_async(norn_client_t *client,
     suite = suite ? suite : norn_suite_sodium();
     suite->nodeid_from_pubkey(target, endpoint->pubkey);
     
-    /* Store in DHT (async) */
-    /* TODO: This needs to be async with callback */
-    /* For now, use sync version */
+    /* Sign the value */
+    unsigned char sig[64];
+    suite->sign(sig, value, value_len, secret);
+    
+    /* Get current sequence number (TODO: should track per-key) */
+    uint32_t seq = 1;
+    
+    /* Store in DHT via mainline */
+    /* TODO: Convert to async with callback when DHT put is complete */
     (void)callback;
     (void)user_data;
-    (void)value_len;
+    (void)sig;
+    (void)seq;
     
-    return -1; /* Not implemented yet */
+    return -1; /* Not implemented - needs mainline async put */
 }
 
 int norn_resolve_endpoint_async(norn_client_t *client,
@@ -697,19 +704,21 @@ int norn_resolve_endpoint_async(norn_client_t *client,
                                 void *callback,
                                 void *user_data) {
     if (!client || !pubkey) return -1;
+    if (!callback) return -1;
     
     /* Compute target from pubkey */
     unsigned char target[20];
     suite = suite ? suite : norn_suite_sodium();
     suite->nodeid_from_pubkey(target, pubkey);
     
-    /* Query DHT (async) */
-    /* TODO: This needs to be async with callback */
-    /* For now, use sync version */
+    /* Store resolve request in transaction queue */
+    /* TODO: Implement transaction-based async resolve */
+    /* For now, return not implemented */
+    (void)target;
     (void)callback;
     (void)user_data;
     
-    return -1; /* Not implemented yet */
+    return -1; /* Not implemented - needs transaction system */
 }
 
 /* === Stream Multiplexing (FEAT-018, stub) === */
