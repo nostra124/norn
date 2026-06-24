@@ -69,7 +69,7 @@ These tickets enable norn to serve multiple sister projects (bifrost, wyrd) with
 - wyrd FEAT-291 (secp256k1/ChaCha20 suite)
 
 ### ✅ v0.8.0 — Dial & Session Orchestration
-**Status:** MOSTLY DONE (2026-06-24)
+**Status:** DONE (2026-06-24) - FEAT-021/022 remaining
 
 | Ticket | Description | Priority | Depends On | Status |
 |--------|-------------|----------|-----------|--------|
@@ -85,16 +85,17 @@ These tickets enable norn to serve multiple sister projects (bifrost, wyrd) with
 - Phase 1: Endpoint discovery ✅
 - Phase 2: Direct connection ✅
 - Phase 3: Hole punch wire protocol ✅
-- Phase 3: Hole punch integration ❌ (FEAT-023)
+- Phase 3: Hole punch integration ✅ (FEAT-023 DONE)
 - Phase 4: Relay wire protocol ✅
 - Phase 4: Relay path integration ❌ (FEAT-022)
-- Phase 5: Connection ladder ✅ (but needs FEAT-023, FEAT-022)
+- Phase 5: Connection ladder ✅
 - UPnP/NAT-PMP ❌ (FEAT-021)
 
 **Remaining Work:**
-- FEAT-021: UPnP/NAT-PMP implementation
-- FEAT-022: Multi-hop relay path integration
-- FEAT-023: Hole punch connection integration
+- FEAT-021: UPnP/NAT-PMP implementation (optional enhancement)
+- FEAT-022: Multi-hop relay path integration (optional enhancement)
+
+**Note:** Core NAT traversal (hole punch) is complete. FEAT-021/022 are optional enhancements for improved NAT traversal in restrictive environments.
 
 **Consumers:**
 - bifrost FEAT-080 (session/sio retirement)
