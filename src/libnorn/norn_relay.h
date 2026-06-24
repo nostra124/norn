@@ -9,8 +9,15 @@
  * - Static paths advertised in endpoint records
  * - Performance-first (minimal overhead)
  * - Trusted relay nodes (friend nodes)
- * - Single-hop typical (direct forwarding)
+ * - Multi-hop support (stable path, not rebuilt)
  * - End-to-end encryption (relay cannot read payload)
+ * 
+ * Multi-Relay Example:
+ *   Initiator → Relay1 → Relay2 → Target
+ *   - Path discovered dynamically via DHT
+ *   - Path stable for session lifetime
+ *   - Each relay knows previous/next hop (not anonymous)
+ *   - Single encryption (end-to-end), not layered
  */
 
 #ifndef NORN_RELAY_H
@@ -24,6 +31,7 @@
 #define NORN_RELAY_FORWARD_LEN (1 + NORN_RELAY_SESSION_ID_LEN)
 #define NORN_RELAY_ACCEPT_LEN (1 + NORN_RELAY_SESSION_ID_LEN + 32 + 64)
 #define NORN_RELAY_MAX_PAYLOAD 1400
+#define NORN_RELAY_MAX_HOPS 4  /* Maximum relays in path */
 
 #define NORN_MSG_RELAY_CREATE  0x20
 #define NORN_MSG_RELAY_FORWARD 0x21
@@ -34,6 +42,7 @@
  * @brief Relay create request.
  *
  * Sent to relay to request forwarding to target.
+ * For multi-hop, each relay in path forwards to next.
  */
 typedef struct {
     uint8_t msg_type;                    /* NORN_MSG_RELAY_CREATE */
@@ -45,12 +54,13 @@ typedef struct {
 /**
  * @brief Relay forward message.
  *
- * Sent through relay to target. Payload is encrypted end-to-end.
+ * Sent through relay chain to target. Payload is encrypted end-to-end.
+ * Each relay forwards to next hop (not decrypted).
  */
 typedef struct {
     uint8_t msg_type;                   /* NORN_MSG_RELAY_FORWARD */
     uint8_t session_id[NORN_RELAY_SESSION_ID_LEN];
-    uint16_t payload_len;                /* Payload length */
+    uint8_t payload_len;                /* Payload length (uint16_t) */
     uint8_t payload[NORN_RELAY_MAX_PAYLOAD]; /* Encrypted for target */
 } norn_relay_forward_t;
 
@@ -58,6 +68,7 @@ typedef struct {
  * @brief Relay accept message.
  *
  * Sent by target to accept relay connection.
+ * Forwards back through relay chain to initiator.
  */
 typedef struct {
     uint8_t msg_type;                   /* NORN_MSG_RELAY_ACCEPT */
@@ -70,12 +81,24 @@ typedef struct {
  * @brief Relay hint (stored in endpoint payload).
  *
  * Advertises relay nodes that can forward traffic.
+ * Multiple hints allow multi-hop paths.
  */
 typedef struct {
     uint8_t relay_pubkey[32];            /* Relay's public key */
     uint32_t relay_ip;                   /* Relay's IP (network byte order) */
     uint16_t relay_port;                 /* Relay's port */
 } norn_relay_hint_t;
+
+/**
+ * @brief Relay path (sequence of relays).
+ *
+ * Discovered dynamically, stable for session.
+ */
+typedef struct {
+    norn_relay_hint_t hops[NORN_RELAY_MAX_HOPS];
+    int hop_count;
+    uint8_t session_id[NORN_RELAY_SESSION_ID_LEN];
+} norn_relay_path_t;
 
 /**
  * @brief Active relay session (stored in relay state).
@@ -179,5 +202,39 @@ norn_relay_session_t *norn_relay_find_session(norn_relay_t *relay,
  * @brief Close relay session.
  */
 int norn_relay_close_session(norn_relay_t *relay, const uint8_t *session_id);
+
+/**
+ * @brief Discover relay path to target.
+ *
+ * Finds a sequence of relay nodes to reach target.
+ * Path is discovered dynamically but remains stable for session.
+ *
+ * @param client Norn client
+ * @param target_pubkey Final destination
+ * @param path Output path (filled with relay hints)
+ * @return 0 on success, -1 on error
+ */
+int norn_relay_discover_path(norn_client_t *client,
+                              const uint8_t *target_pubkey,
+                              norn_relay_path_t *path);
+
+/**
+ * @brief Connect via multi-hop relay path.
+ *
+ * Establishes connection through sequence of relay nodes.
+ * Path is stable for session lifetime.
+ *
+ * @param client Norn client
+ * @param target_pubkey Final destination
+ * @param path Relay path (discovered or configured)
+ * @param callback Session callback
+ * @param user_data User data
+ * @return 0 on success, -1 on error
+ */
+int norn_relay_connect_path_async(norn_client_t *client,
+                                   const uint8_t *target_pubkey,
+                                   const norn_relay_path_t *path,
+                                   norn_session_callback_t callback,
+                                   void *user_data);
 
 #endif /* NORN_RELAY_H */
