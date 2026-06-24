@@ -17,12 +17,14 @@
 /* Message types */
 #define NORN_MSG_HOLEPUNCH_REQ    0x10
 #define NORN_MSG_HOLEPUNCH_RESP   0x11
+#define NORN_MSG_PROBE            0x12
 #define NORN_MSG_RELAY_CREATE     0x20
 #define NORN_MSG_RELAY_EXTEND     0x21
 
 /* Hole punch message sizes */
 #define NORN_HOLEPUNCH_REQ_LEN    (1 + 32 + 32 + 4 + 2 + 64)  /* 135 bytes */
 #define NORN_HOLEPUNCH_RESP_LEN   (1 + 32 + 4 + 2 + 32 + 64)   /* 135 bytes */
+#define NORN_PROBE_LEN            (1 + 32)                     /* 33 bytes */
 
 /**
  * @brief Hole punch request message.
@@ -51,6 +53,17 @@ typedef struct {
     uint8_t peer_ephemeral_pubkey[32]; /* Peer's ephemeral key */
     uint8_t signature[64];          /* Signed by rendezvous */
 } norn_holepunch_resp_t;
+
+/**
+ * @brief Hole punch probe message.
+ *
+ * Sent by both peers simultaneously to punch hole in NAT.
+ * Contains ephemeral pubkey to identify the session.
+ */
+typedef struct {
+    uint8_t msg_type;              /* NORN_MSG_PROBE */
+    uint8_t ephemeral_pubkey[32];   /* Our ephemeral key for this session */
+} norn_probe_t;
 
 /**
  * @brief Encode hole punch request.
@@ -93,7 +106,26 @@ int norn_encode_holepunch_resp(const norn_holepunch_resp_t *resp,
  * @return 0 on success, -1 on error
  */
 int norn_decode_holepunch_resp(norn_holepunch_resp_t *out,
-                                const uint8_t *in,
-                                size_t len);
+                                 const uint8_t *in,
+                                 size_t len);
+
+/**
+ * @brief Encode probe message.
+ *
+ * @param probe Probe structure
+ * @param out Output buffer (must be NORN_PROBE_LEN bytes)
+ * @return 0 on success, -1 on error
+ */
+int norn_encode_probe(const norn_probe_t *probe, uint8_t *out);
+
+/**
+ * @brief Decode probe message.
+ *
+ * @param out Output structure
+ * @param in Input buffer
+ * @param len Buffer length
+ * @return 0 on success, -1 on error
+ */
+int norn_decode_probe(norn_probe_t *out, const uint8_t *in, size_t len);
 
 #endif /* NORN_NAT_H */

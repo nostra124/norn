@@ -350,6 +350,30 @@ static void dispatch_response(norn_client_t *client,
             return;
         }
         
+        /* FEAT-023: Probe detection */
+        if (data[0] == NORN_MSG_PROBE && len >= NORN_PROBE_LEN) {
+            norn_probe_t probe;
+            if (norn_decode_probe(&probe, data, len) == 0) {
+                /* Check if this matches a pending hole punch */
+                for (int i = 0; i < client->holepunch_pending_count; i++) {
+                    if (client->holepunch_pending[i].active &&
+                        memcmp(client->holepunch_pending[i].ephemeral_pubkey,
+                               probe.ephemeral_pubkey, 32) == 0) {
+                        /* FEAT-023 TODO: Probe received from peer!
+                         * This is where we should:
+                         * 1. Create session with from_ip/from_port
+                         * 2. Use ephemeral keys for encryption
+                         * 3. Invoke callback with NORN_SESSION_ESTABLISHED
+                         * 
+                         * For now, just log it - needs session creation implementation
+                         */
+                        break;
+                    }
+                }
+            }
+            return;
+        }
+        
         /* Relay messages (0x20-0x2F) */
         if (data[0] >= NORN_MSG_RELAY_CREATE && data[0] <= NORN_MSG_RELAY_CLOSE) {
             if (data[0] == NORN_MSG_RELAY_CREATE && len >= NORN_RELAY_CREATE_LEN) {
