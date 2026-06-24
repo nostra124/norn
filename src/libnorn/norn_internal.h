@@ -14,6 +14,7 @@
 #include "norn_endpoint_cache.h"
 #include "norn_nat.h"
 #include "norn_rendezvous.h"
+#include "norn_relay.h"
 #include "net.h"
 #include "mainline.h"
 #include "norn_transaction.h"
@@ -55,6 +56,9 @@ struct norn_client {
     int rendezvous_enabled;           /* 1 if acting as rendezvous */
     void *rendezvous_callback;         /* Callback for coordination */
     void *rendezvous_user_data;       /* User data for callback */
+    
+    /* Relay service (FEAT-017) */
+    norn_relay_t relay;               /* Relay forwarding state */
 };
 
 #endif /* NORN_INTERNAL_H */
