@@ -823,3 +823,97 @@ int norn_stream_open_async(norn_session_t *session,
     /* TODO FEAT-018: Implement stream multiplexing */
     return -1;
 }
+
+/* === NAT Traversal (FEAT-017, stub) === */
+
+int norn_hole_punch_async(norn_client_t *client,
+                          const unsigned char *target_pubkey,
+                          const unsigned char *rendezvous_pubkey,
+                          norn_session_callback_t callback,
+                          void *user_data) {
+    if (!client || !target_pubkey || !rendezvous_pubkey) return -1;
+    if (!callback) return -1;
+    
+    /* TODO FEAT-017 Phase 3: Implement hole punching
+     * 
+     * Algorithm:
+     * 1. Send HolePunchRequest to rendezvous via DHT
+     * 2. Rendezvous coordinates with target
+     * 3. Both sides send simultaneous UDP probes
+     * 4. NAT creates mapping, connection established
+     * 
+     * Wire protocol (see FEAT-017-NAT.md):
+     * - HolePunchRequest (msg_type = 0x10)
+     * - HolePunchResponse (msg_type = 0x11)
+     */
+    
+    (void)callback;
+    (void)user_data;
+    return -1;
+}
+
+int norn_rendezvous_enable(norn_client_t *client,
+                          void *callback,
+                          void *user_data) {
+    if (!client) return -1;
+    if (!client->initialized) return -1;
+    
+    /* TODO FEAT-017 Phase 3: Implement rendezvous
+     * 
+     * When acting as rendezvous:
+     * 1. Listen for HolePunchRequest messages
+     * 2. Match pairs of peers wanting to connect
+     * 3. Send HolePunchResponse to both with peer's external address
+     * 4. Both peers send probes simultaneously
+     */
+    
+    (void)callback;
+    (void)user_data;
+    return -1;
+}
+
+int norn_relay_connect_async(norn_client_t *client,
+                             const unsigned char *target_pubkey,
+                             const unsigned char *relay_pubkey,
+                             norn_session_callback_t callback,
+                             void *user_data) {
+    if (!client || !target_pubkey || !relay_pubkey) return -1;
+    if (!callback) return -1;
+    
+    /* TODO FEAT-017 Phase 4: Implement relay connection
+     * 
+     * Algorithm:
+     * 1. Create onion-routed circuit through relay
+     * 2. Each hop adds layer of encryption
+     * 3. Relay forwards without seeing payload
+     * 4. End-to-end encryption between initiator and target
+     * 
+     * Wire protocol (see FEAT-017-NAT.md):
+     * - RelayCreate (msg_type = 0x20)
+     * - RelayExtend (msg_type = 0x21)
+     */
+    
+    (void)callback;
+    (void)user_data;
+    return -1;
+}
+
+int norn_relay_enable(norn_client_t *client,
+                      void *callback,
+                      void *user_data) {
+    if (!client) return -1;
+    if (!client->initialized) return -1;
+    
+    /* TODO FEAT-017 Phase 4: Implement relay service
+     * 
+     * When acting as relay:
+     * 1. Listen for RelayCreate messages
+     * 2. Create circuit ID
+     * 3. Forward traffic between circuit endpoints
+     * 4. Cannot see encrypted payload
+     */
+    
+    (void)callback;
+    (void)user_data;
+    return -1;
+}
