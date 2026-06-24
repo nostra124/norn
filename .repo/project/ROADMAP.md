@@ -48,21 +48,21 @@
 
 ## Planned Milestones
 
-### 🔄 v0.7.0 — Multi-Consumer Foundation
-**Status:** PLANNED
+### ✅ v0.7.0 — Multi-Consumer Foundation
+**Status:** DONE (2026-06-24)
 
 These tickets enable norn to serve multiple sister projects (bifrost, wyrd) with different crypto/identity requirements.
 
-| Ticket | Description | Priority | Depends On |
-|--------|-------------|----------|------------|
-| FEAT-013 | Pluggable crypto suite vtable | high | — |
-| FEAT-014 | Parameterise Kademlia ID width | high | FEAT-013 |
-| FEAT-015 | De-application-ise idexch | high | FEAT-013 |
+| Ticket | Description | Priority | Depends On | Status |
+|--------|-------------|----------|-----------|--------|
+| FEAT-013 | Pluggable crypto suite vtable | high | — | done |
+| FEAT-014 | Parameterise Kademlia ID width | high | FEAT-013 | done |
+| FEAT-015 | De-application-ise idexch | high | FEAT-013 | done |
 
 **Key Changes:**
 - `norn_crypto_suite_t` vtable for pluggable crypto (Ed25519, secp256k1, etc.)
 - Generic Kademlia routing (20-byte, 32-byte, or custom ID widths)
-- Application-agnostic identity exchange
+- Application-agnostic identity exchange (`norn_idexch`)
 
 **Consumers:**
 - bifrost FEAT-079 (sodium suite)
@@ -146,8 +146,8 @@ v0.10.0 (Private Overlay)         │
 
 | Metric | Value |
 |--------|-------|
-| Completed Milestones | 5 (v0.2.0–v0.6.0) |
-| Planned Milestones | 4 (v0.7.0–v0.10.0) |
-| Completed Tickets | 12 |
-| Planned Tickets | 8 |
+| Completed Milestones | 6 (v0.2.0–v0.7.0) |
+| Planned Milestones | 3 (v0.8.0–v0.10.0) |
+| Completed Tickets | 15 |
+| Planned Tickets | 5 |
 | Version | 0.6.0 |
