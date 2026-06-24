@@ -2,17 +2,17 @@
 
 Enable norn to serve multiple projects (bifrost, wyrd) with different crypto/identity requirements.
 
-## Status (2026-06-23)
+## Status (2026-06-24)
 
-**PLANNED** — Foundation for pluggable crypto and multi-identity support
+**COMPLETE** — All foundation features implemented and tested
 
 ## Tickets
 
 | ID | Title | Priority | Depends On | Status |
 |----|-------|----------|------------|--------|
-| FEAT-013 | Pluggable crypto suite vtable | high | — | open |
-| FEAT-014 | Parameterise Kademlia ID width | high | FEAT-013 | open |
-| FEAT-015 | De-application-ise idexch | high | FEAT-013 | open |
+| FEAT-013 | Pluggable crypto suite vtable | high | — | done |
+| FEAT-014 | Parameterise Kademlia ID width | high | FEAT-013 | done |
+| FEAT-015 | De-application-ise idexch | high | FEAT-013 | done |
 
 ## Overview
 
