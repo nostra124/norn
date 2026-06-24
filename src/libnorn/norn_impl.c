@@ -3,6 +3,8 @@
 #include "norn.h"
 #include "norn_internal.h"
 #include "norn_transaction.h"
+#include "norn_rendezvous.h"
+#include "norn_nat.h"
 #include "mainline.h"
 #include "bep44.h"
 #include "crypto.h"
@@ -76,6 +78,7 @@ norn_client_t *norn_new(const unsigned char *self_pub,
     client->initialized = 1;
     client->listen_fd = -1;
     norn_endpoint_cache_init(&client->endpoint_cache);
+    norn_rendezvous_init(&client->rv);
     return client;
 }
 
@@ -94,6 +97,9 @@ void norn_free(norn_client_t *client) {
         }
     }
     free(client->sessions);
+    
+    /* Cleanup rendezvous service */
+    norn_rendezvous_cleanup(&client->rv);
     
     mainline_cleanup(&client->ml);
     net_cleanup(&client->net);
@@ -299,6 +305,32 @@ int norn_decode_mutable(const unsigned char *buf, size_t len,
 static void dispatch_response(norn_client_t *client,
                               const uint8_t *data, size_t len,
                               uint32_t from_ip, uint16_t from_port) {
+    if (len < 1) return;
+    
+    if (data[0] == NORN_MSG_HOLEPUNCH_REQ || data[0] == NORN_MSG_HOLEPUNCH_RESP) {
+        norn_holepunch_req_t req;
+        norn_holepunch_resp_t resp;
+        
+        if (data[0] == NORN_MSG_HOLEPUNCH_REQ && len >= NORN_HOLEPUNCH_REQ_LEN) {
+            if (norn_decode_holepunch_req(&req, data, len) == 0) {
+                norn_holepunch_resp_t resp_out;
+                int result = norn_rendezvous_handle_req(&client->rv, &req, from_ip, from_port, client, &resp_out);
+                if (result == 1) {
+                    uint8_t resp_buf[NORN_HOLEPUNCH_RESP_LEN];
+                    if (norn_encode_holepunch_resp(&resp_out, resp_buf) == 0) {
+                        net_send(&client->net, resp_buf, NORN_HOLEPUNCH_RESP_LEN, from_ip, from_port);
+                    }
+                }
+            }
+        } else if (data[0] == NORN_MSG_HOLEPUNCH_RESP && len >= NORN_HOLEPUNCH_RESP_LEN) {
+            if (norn_decode_holepunch_resp(&resp, data, len) == 0) {
+                /* TODO FEAT-017: Handle hole punch response callback */
+                (void)resp;
+            }
+        }
+        return;
+    }
+    
     /* Process through mainline state machine */
     mainline_process_packet(&client->ml, data, len, from_ip, from_port);
     

@@ -13,9 +13,13 @@
 #include "norn_session.h"
 #include "norn_endpoint_cache.h"
 #include "norn_nat.h"
+#include "norn_rendezvous.h"
 #include "net.h"
 #include "mainline.h"
 #include "norn_transaction.h"
+
+/* Forward declarations */
+typedef struct norn_session norn_session_t;
 
 /* Internal client state (defined in norn_impl.c) */
 struct norn_client {
@@ -47,6 +51,7 @@ struct norn_client {
     int have_external_addr;           /* 1 if external IP/port are valid */
     
     /* Rendezvous service (FEAT-017) */
+    norn_rendezvous_t rv;             /* Rendezvous coordination state */
     int rendezvous_enabled;           /* 1 if acting as rendezvous */
     void *rendezvous_callback;         /* Callback for coordination */
     void *rendezvous_user_data;       /* User data for callback */
