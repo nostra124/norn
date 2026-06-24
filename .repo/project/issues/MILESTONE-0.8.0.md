@@ -2,15 +2,15 @@
 
 Connect by public key, not IP address.
 
-## Status (2026-06-23)
+## Status (2026-06-24)
 
-**PLANNED** — Depends on v0.7.0 (FEAT-013, FEAT-015)
+**IN PROGRESS** — FEAT-016 API stub complete, full implementation pending
 
 ## Tickets
 
 | ID | Title | Priority | Depends On | Status |
 |----|-------|----------|------------|--------|
-| FEAT-016 | norn_dial(pubkey) → session | high | FEAT-013, FEAT-015 | open |
+| FEAT-016 | norn_dial(pubkey) → session | high | FEAT-013, FEAT-015 | in_progress |
 | FEAT-017 | Harmonised NAT traversal | high | FEAT-013, FEAT-016 | open |
 
 ## Overview
