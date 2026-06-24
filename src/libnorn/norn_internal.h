@@ -12,6 +12,7 @@
 #include "norn.h"
 #include "norn_session.h"
 #include "norn_endpoint_cache.h"
+#include "norn_nat.h"
 #include "net.h"
 #include "mainline.h"
 #include "norn_transaction.h"
@@ -39,6 +40,16 @@ struct norn_client {
     
     /* Endpoint cache (FEAT-017) */
     norn_endpoint_cache_t endpoint_cache;
+    
+    /* External IP discovery (FEAT-017) */
+    uint32_t external_ip;             /* Discovered external IP */
+    uint16_t external_port;           /* Discovered external port */
+    int have_external_addr;           /* 1 if external IP/port are valid */
+    
+    /* Rendezvous service (FEAT-017) */
+    int rendezvous_enabled;           /* 1 if acting as rendezvous */
+    void *rendezvous_callback;         /* Callback for coordination */
+    void *rendezvous_user_data;       /* User data for callback */
 };
 
 #endif /* NORN_INTERNAL_H */
