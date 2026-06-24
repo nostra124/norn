@@ -22,6 +22,9 @@
 /* Forward declarations */
 typedef struct norn_session norn_session_t;
 
+/* Dial context forward declaration (defined in norn_session.c) */
+struct dial_context;
+
 /* Internal client state (defined in norn_impl.c) */
 struct norn_client {
     net_t net;
@@ -64,7 +67,7 @@ struct norn_client {
     struct {
         uint8_t ephemeral_pubkey[32];
         norn_holepunch_callback_t callback;
-        void *user_data;
+        void *user_data;  /* dial_context_t* from norn_session.c */
         uint64_t timestamp;
         int active;
     } holepunch_pending[8];
