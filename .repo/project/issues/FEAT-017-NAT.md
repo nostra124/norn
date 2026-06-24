@@ -132,6 +132,17 @@ int norn_relay_enable(norn_client_t *client,
                       void *user_data);
 ```
 
+### External IP Discovery
+
+For hole punching, we need to know our external IP. Options:
+
+1. **DHT-based discovery**: When querying DHT, responses include our external IP
+2. **Rendezvous-provided**: HolePunchResponse includes peer's view of our IP
+3. **Application-configured**: App sets `norn_endpoint_t.ip`
+4. **Cache from previous**: Store external IP from successful connections
+
+**Implementation**: We'll use DHT responses and cache the result.
+
 ## Wire Protocol
 
 ### Hole Punch Request (via DHT)
