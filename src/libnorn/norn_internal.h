@@ -59,6 +59,16 @@ struct norn_client {
     
     /* Relay service (FEAT-017) */
     norn_relay_t relay;               /* Relay forwarding state */
+    
+    /* Hole punch pending requests (FEAT-023) */
+    struct {
+        uint8_t ephemeral_pubkey[32];
+        norn_holepunch_callback_t callback;
+        void *user_data;
+        uint64_t timestamp;
+        int active;
+    } holepunch_pending[8];
+    int holepunch_pending_count;
 };
 
 #endif /* NORN_INTERNAL_H */

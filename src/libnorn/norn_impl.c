@@ -331,8 +331,20 @@ static void dispatch_response(norn_client_t *client,
                 }
             } else if (data[0] == NORN_MSG_HOLEPUNCH_RESP && len >= NORN_HOLEPUNCH_RESP_LEN) {
                 if (norn_decode_holepunch_resp(&resp, data, len) == 0) {
-                    /* TODO FEAT-017: Handle hole punch response callback */
-                    (void)resp;
+                    /* FEAT-023: Handle hole punch response callback */
+                    for (int i = 0; i < client->holepunch_pending_count; i++) {
+                        if (client->holepunch_pending[i].active &&
+                            memcmp(client->holepunch_pending[i].ephemeral_pubkey, 
+                                   resp.peer_ephemeral_pubkey, 32) == 0) {
+                            /* Found matching pending request */
+                            if (client->holepunch_pending[i].callback) {
+                                client->holepunch_pending[i].callback(client, &resp,
+                                                                       client->holepunch_pending[i].user_data);
+                            }
+                            client->holepunch_pending[i].active = 0;
+                            break;
+                        }
+                    }
                 }
             }
             return;
