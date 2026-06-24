@@ -45,12 +45,23 @@ typedef enum {
 } norn_session_state_t;
 
 /**
+ * @brief Endpoint capabilities (flags)
+ */
+typedef enum {
+    NORN_EP_CAP_DIRECT      = 0x01,  /**< Can accept direct connections */
+    NORN_EP_CAP_RENDEZVOUS  = 0x02,  /**< Can act as rendezvous for hole punch */
+    NORN_EP_CAP_RELAY       = 0x04,  /**< Can act as relay */
+    NORN_EP_CAP_DHT         = 0x08,  /**< Participates in DHT */
+} norn_ep_caps_t;
+
+/**
  * @brief Endpoint record (stored in DHT)
  */
 typedef struct {
     unsigned char pubkey[32];       /**< Ed25519 or secp256k1 public key */
     uint32_t ip;                     /**< Public IP (network byte order) */
     uint16_t port;                   /**< Public port (network byte order) */
+    uint16_t caps;                   /**< Capabilities (norn_ep_caps_t flags) */
     unsigned char payload[1024];     /**< Application-specific data */
     size_t payload_len;              /**< Actual payload length */
 } norn_endpoint_t;
@@ -81,6 +92,15 @@ typedef void (*norn_session_callback_t)(norn_session_t *session,
  * @param user_data User-provided pointer from norn_listen_async
  */
 typedef void (*norn_accept_callback_t)(norn_session_t *session, void *user_data);
+
+/**
+ * @brief Callback for endpoint resolution
+ *
+ * @param endpoint Resolved endpoint (or NULL on error)
+ * @param user_data User-provided pointer from norn_resolve_endpoint_async
+ */
+typedef void (*norn_resolve_callback_t)(const norn_endpoint_t *endpoint,
+                                        void *user_data);
 
 /* === Async Session API (Primary) === */
 

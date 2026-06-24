@@ -596,7 +596,72 @@ int norn_session_finish_confirm(norn_session_t *session,
     return 0;
 }
 
-/* === Endpoint Discovery (Async, stub) === */
+/* === Endpoint Discovery (Async) === */
+
+/**
+ * @brief Encode endpoint for DHT storage
+ *
+ * Format:
+ * - uint16_t caps (2 bytes)
+ * - uint16_t payload_len (2 bytes)
+ * - payload (payload_len bytes)
+ */
+static int encode_endpoint(const norn_endpoint_t *ep,
+                           unsigned char *out,
+                           size_t outcap) {
+    if (!ep || !out || outcap < 4 + ep->payload_len) return -1;
+    
+    size_t off = 0;
+    
+    /* Capabilities */
+    out[off++] = (ep->caps >> 8) & 0xFF;
+    out[off++] = ep->caps & 0xFF;
+    
+    /* Payload length */
+    out[off++] = (ep->payload_len >> 8) & 0xFF;
+    out[off++] = ep->payload_len & 0xFF;
+    
+    /* Payload */
+    if (ep->payload_len > 0) {
+        memcpy(out + off, ep->payload, ep->payload_len);
+        off += ep->payload_len;
+    }
+    
+    return (int)off;
+}
+
+/**
+ * @brief Decode endpoint from DHT storage
+ */
+static int decode_endpoint(norn_endpoint_t *ep,
+                           const unsigned char *data,
+                           size_t len) __attribute__((unused));
+static int decode_endpoint(norn_endpoint_t *ep,
+                           const unsigned char *data,
+                           size_t len) {
+    if (!ep || !data || len < 4) return -1;
+    
+    size_t off = 0;
+    
+    /* Capabilities */
+    ep->caps = (data[off] << 8) | data[off + 1];
+    off += 2;
+    
+    /* Payload length */
+    ep->payload_len = (data[off] << 8) | data[off + 1];
+    off += 2;
+    
+    /* Verify length */
+    if (off + ep->payload_len > len) return -1;
+    if (ep->payload_len > sizeof(ep->payload)) return -1;
+    
+    /* Payload */
+    if (ep->payload_len > 0) {
+        memcpy(ep->payload, data + off, ep->payload_len);
+    }
+    
+    return 0;
+}
 
 int norn_announce_endpoint_async(norn_client_t *client,
                                 const norn_endpoint_t *endpoint,
@@ -604,15 +669,26 @@ int norn_announce_endpoint_async(norn_client_t *client,
                                 const norn_crypto_suite_t *suite,
                                 void *callback,
                                 void *user_data) {
-    (void)client;
-    (void)endpoint;
-    (void)secret;
-    (void)suite;
+    if (!client || !endpoint || !secret) return -1;
+    
+    /* Encode endpoint */
+    unsigned char value[1024];
+    int value_len = encode_endpoint(endpoint, value, sizeof(value));
+    if (value_len < 0) return -1;
+    
+    /* Compute target from pubkey */
+    unsigned char target[20];
+    suite = suite ? suite : norn_suite_sodium();
+    suite->nodeid_from_pubkey(target, endpoint->pubkey);
+    
+    /* Store in DHT (async) */
+    /* TODO: This needs to be async with callback */
+    /* For now, use sync version */
     (void)callback;
     (void)user_data;
+    (void)value_len;
     
-    /* TODO Phase 2: Implement async DHT announce */
-    return -1;
+    return -1; /* Not implemented yet */
 }
 
 int norn_resolve_endpoint_async(norn_client_t *client,
@@ -620,14 +696,20 @@ int norn_resolve_endpoint_async(norn_client_t *client,
                                 const norn_crypto_suite_t *suite,
                                 void *callback,
                                 void *user_data) {
-    (void)client;
-    (void)pubkey;
-    (void)suite;
+    if (!client || !pubkey) return -1;
+    
+    /* Compute target from pubkey */
+    unsigned char target[20];
+    suite = suite ? suite : norn_suite_sodium();
+    suite->nodeid_from_pubkey(target, pubkey);
+    
+    /* Query DHT (async) */
+    /* TODO: This needs to be async with callback */
+    /* For now, use sync version */
     (void)callback;
     (void)user_data;
     
-    /* TODO Phase 2: Implement async DHT resolve */
-    return -1;
+    return -1; /* Not implemented yet */
 }
 
 /* === Stream Multiplexing (FEAT-018, stub) === */
