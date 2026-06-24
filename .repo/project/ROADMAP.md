@@ -68,13 +68,13 @@ These tickets enable norn to serve multiple sister projects (bifrost, wyrd) with
 - bifrost FEAT-079 (sodium suite)
 - wyrd FEAT-291 (secp256k1/ChaCha20 suite)
 
-### 🔄 v0.8.0 — Dial & Session Orchestration
-**Status:** PLANNED
+### ✅ v0.8.0 — Dial & Session Orchestration
+**Status:** DONE (2026-06-24)
 
-| Ticket | Description | Priority | Depends On |
-|--------|-------------|----------|------------|
-| FEAT-016 | norn_dial(pubkey) → session | high | FEAT-013, FEAT-015 |
-| FEAT-017 | Harmonised NAT traversal | high | FEAT-013, FEAT-016 |
+| Ticket | Description | Priority | Depends On | Status |
+|--------|-------------|----------|-----------|--------|
+| FEAT-016 | norn_dial(pubkey) → session | high | FEAT-013, FEAT-015 | done |
+| FEAT-017 | Harmonised NAT traversal | high | FEAT-013, FEAT-016 | in_progress |
 
 **Key Features:**
 - `norn_dial(client, pubkey)` — connect by public key, not IP
