@@ -150,6 +150,72 @@ norn_session_t *norn_accept_direct(norn_client_t *client,
                                     int fd,
                                     const norn_crypto_suite_t *suite);
 
+/* === Handshake message processing === */
+
+/**
+ * @brief Build INIT message (initiator)
+ *
+ * Generates ephemeral key and builds the first handshake message.
+ *
+ * @param session Session handle (must be initiator)
+ * @param out Output buffer for INIT message
+ * @param outcap Capacity of output buffer
+ * @return Bytes written, or -1 on error
+ *
+ * @note Use CHANNEL_INIT_LEN for buffer size
+ */
+int norn_session_build_init(norn_session_t *session,
+                             unsigned char *out, size_t outcap);
+
+/**
+ * @brief Handle INIT and build RESP (responder)
+ *
+ * Processes incoming INIT and produces RESP message.
+ *
+ * @param session Session handle (must be responder)
+ * @param init_msg Received INIT message
+ * @param init_len Length of INIT message
+ * @param out Output buffer for RESP message
+ * @param outcap Capacity of output buffer
+ * @return Bytes written, or -1 on error
+ *
+ * @note Use CHANNEL_RESP_LEN for buffer size
+ */
+int norn_session_accept_init(norn_session_t *session,
+                              const unsigned char *init_msg, size_t init_len,
+                              unsigned char *out, size_t outcap);
+
+/**
+ * @brief Handle RESP and build CONFIRM (initiator)
+ *
+ * Processes incoming RESP, derives session keys, and produces CONFIRM message.
+ *
+ * @param session Session handle (must be initiator)
+ * @param resp_msg Received RESP message
+ * @param resp_len Length of RESP message
+ * @param out Output buffer for CONFIRM message
+ * @param outcap Capacity of output buffer
+ * @return Bytes written, or -1 on error
+ *
+ * @note Use CHANNEL_CONFIRM_LEN for buffer size
+ */
+int norn_session_confirm_resp(norn_session_t *session,
+                               const unsigned char *resp_msg, size_t resp_len,
+                               unsigned char *out, size_t outcap);
+
+/**
+ * @brief Handle CONFIRM and complete handshake (responder)
+ *
+ * Processes incoming CONFIRM, verifies signature, and establishes session.
+ *
+ * @param session Session handle (must be responder)
+ * @param confirm_msg Received CONFIRM message
+ * @param confirm_len Length of CONFIRM message
+ * @return 0 on success (session established), -1 on error
+ */
+int norn_session_finish_confirm(norn_session_t *session,
+                                 const unsigned char *confirm_msg, size_t confirm_len);
+
 /**
  * @brief Listen for inbound connections
  *

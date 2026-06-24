@@ -210,6 +210,88 @@ norn_session_t *norn_accept_direct(norn_client_t *client,
     return session;
 }
 
+/* === Handshake message processing === */
+
+int norn_session_build_init(norn_session_t *session,
+                             unsigned char *out, size_t outcap) {
+    if (!session || !out) return -1;
+    if (!session->is_initiator) return -1;
+    if (session->state != NORN_SESSION_CONNECTING) return -1;
+    
+    /* Build INIT message using channel handshake */
+    int len = channel_hs_build_init(&session->channel, session->self_pubkey,
+                                     out, outcap);
+    return len;
+}
+
+int norn_session_accept_init(norn_session_t *session,
+                              const unsigned char *init_msg, size_t init_len,
+                              unsigned char *out, size_t outcap) {
+    if (!session || !init_msg || !out) return -1;
+    if (session->is_initiator) return -1;
+    if (session->state != NORN_SESSION_CONNECTING) return -1;
+    
+    /* Process INIT and build RESP */
+    unsigned char peer_pubkey[32];
+    int len = channel_hs_accept(&session->channel,
+                                session->self_pubkey, session->self_secret,
+                                init_msg, init_len,
+                                peer_pubkey,
+                                out, outcap);
+    
+    if (len < 0) return -1;
+    
+    /* Store peer identity */
+    memcpy(session->peer_pubkey, peer_pubkey, 32);
+    
+    return len;
+}
+
+int norn_session_confirm_resp(norn_session_t *session,
+                               const unsigned char *resp_msg, size_t resp_len,
+                               unsigned char *out, size_t outcap) {
+    if (!session || !resp_msg || !out) return -1;
+    if (!session->is_initiator) return -1;
+    if (session->state != NORN_SESSION_CONNECTING) return -1;
+    
+    /* Process RESP and build CONFIRM */
+    unsigned char peer_pubkey[32];
+    int len = channel_hs_confirm(&session->channel,
+                                  session->self_pubkey, session->self_secret,
+                                  resp_msg, resp_len,
+                                  peer_pubkey,
+                                  out, outcap);
+    
+    if (len < 0) return -1;
+    
+    /* Store peer identity */
+    memcpy(session->peer_pubkey, peer_pubkey, 32);
+    
+    /* Mark session as established */
+    session->state = NORN_SESSION_ESTABLISHED;
+    
+    return len;
+}
+
+int norn_session_finish_confirm(norn_session_t *session,
+                                 const unsigned char *confirm_msg, size_t confirm_len) {
+    if (!session || !confirm_msg) return -1;
+    if (session->is_initiator) return -1;
+    if (session->state != NORN_SESSION_CONNECTING) return -1;
+    
+    /* Verify CONFIRM */
+    int ret = channel_hs_finish(&session->channel,
+                                 session->peer_pubkey,
+                                 confirm_msg, confirm_len);
+    
+    if (ret != 0) return -1;
+    
+    /* Mark session as established */
+    session->state = NORN_SESSION_ESTABLISHED;
+    
+    return 0;
+}
+
 /* Listen for inbound */
 int norn_listen(norn_client_t *client,
                 uint16_t port,
