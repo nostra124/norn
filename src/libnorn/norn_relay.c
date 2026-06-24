@@ -96,6 +96,7 @@ int norn_decode_relay_forward(norn_relay_forward_t *out, const uint8_t *in, size
     
     if (len < off + out->payload_len) return -1;
     if (out->payload_len > NORN_RELAY_MAX_PAYLOAD) return -1;
+    if (out->payload_len == 0) return -1;  /* Empty payload not allowed */
     
     memcpy(out->payload, in + off, out->payload_len);
     
