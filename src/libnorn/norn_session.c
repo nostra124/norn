@@ -61,6 +61,77 @@ int norn_session_set_identity(norn_session_t *session,
 
 /* === Async Dial API === */
 
+/**
+ * Internal state machine for dial process.
+ */
+typedef enum {
+    DIAL_RESOLVING,      /* Resolving endpoint from DHT */
+    DIAL_CONNECTING,     /* Attempting direct connection */
+    DIAL_HOLEPUNCH,      /* Attempting hole punch (Phase 3) */
+    DIAL_RELAY,          /* Attempting relay (Phase 4) */
+    DIAL_ESTABLISHED,    /* Session established */
+    DIAL_FAILED          /* All attempts failed */
+} dial_state_t;
+
+/**
+ * Internal dial context (tracks state across async operations).
+ */
+typedef struct {
+    norn_client_t *client;
+    unsigned char peer_pubkey[64];
+    const norn_crypto_suite_t *suite;
+    norn_session_callback_t callback;
+    void *user_data;
+    dial_state_t state;
+    norn_session_t *session;
+    uint32_t resolve_txn_id;  /* DHT transaction ID */
+} dial_context_t;
+
+/**
+ * Callback for endpoint resolution.
+ */
+static void on_endpoint_resolved(const norn_endpoint_t *endpoint, void *user_data) {
+    dial_context_t *ctx = (dial_context_t *)user_data;
+    if (!ctx) return;
+    
+    if (!endpoint) {
+        /* Resolution failed - try hole punch or relay */
+        ctx->state = DIAL_FAILED;
+        if (ctx->callback) {
+            ctx->callback(NULL, NORN_SESSION_CLOSED, ctx->user_data);
+        }
+        free(ctx);
+        return;
+    }
+    
+    /* Check if endpoint has public IP (direct connection possible) */
+    if (endpoint->ip != 0 && (endpoint->caps & NORN_EP_CAP_DIRECT)) {
+        /* Try direct connection */
+        norn_direct_endpoint_t direct_ep = {
+            .ip = endpoint->ip,
+            .port = endpoint->port
+        };
+        
+        int ret = norn_dial_direct_async(ctx->client, &direct_ep,
+                                         ctx->peer_pubkey, ctx->suite,
+                                         ctx->callback, ctx->user_data);
+        if (ret == 0) {
+            ctx->state = DIAL_CONNECTING;
+            /* Direct dial started - context will be freed by session */
+            free(ctx);
+            return;
+        }
+    }
+    
+    /* Direct not available - fall back to hole punch (Phase 3) */
+    /* TODO: Implement hole punch */
+    ctx->state = DIAL_FAILED;
+    if (ctx->callback) {
+        ctx->callback(NULL, NORN_SESSION_CLOSED, ctx->user_data);
+    }
+    free(ctx);
+}
+
 int norn_dial_async(norn_client_t *client,
                     const unsigned char *pubkey,
                     const norn_crypto_suite_t *suite,
@@ -68,36 +139,37 @@ int norn_dial_async(norn_client_t *client,
                     void *user_data) {
     if (!client || !pubkey) return -1;
     
-    /* TODO Phase 2: Resolve endpoint via DHT */
-    /* TODO Phase 2: NAT traversal */
+    suite = suite ? suite : norn_suite_sodium();
     
-    /* Phase 1: Stub - invoke callback immediately */
-    norn_session_t *session = norn_session_new(client, suite);
-    if (!session) return -1;
-    
-    session->is_initiator = 1;
-    memcpy(session->peer_pubkey, pubkey, session->suite->pubkey_len);
-    session->callback = callback;
-    session->user_data = user_data;
-    
-    /* Generate ephemeral key */
-    if (channel_gen_ephemeral(&session->channel) != 0) {
-        streammux_free(session->mux);
-        free(session);
-        return -1;
+    /* Check endpoint cache first */
+    const norn_endpoint_t *cached = norn_endpoint_cache_lookup(&client->endpoint_cache, pubkey);
+    if (cached) {
+        /* Endpoint cached - try direct connection */
+        if (cached->ip != 0 && (cached->caps & NORN_EP_CAP_DIRECT)) {
+            norn_direct_endpoint_t direct_ep = {
+                .ip = cached->ip,
+                .port = cached->port
+            };
+            return norn_dial_direct_async(client, &direct_ep, pubkey, suite, callback, user_data);
+        }
     }
     
-    /* Register with client for event processing */
-    if (norn_client_add_session(client, session) != 0) {
-        streammux_free(session->mux);
-        free(session);
-        return -1;
-    }
+    /* Create dial context to track state */
+    dial_context_t *ctx = calloc(1, sizeof(*ctx));
+    if (!ctx) return -1;
     
-    /* Stub: Immediately invoke callback */
-    session->state = NORN_SESSION_ESTABLISHED;
-    if (callback) {
-        callback(session, NORN_SESSION_ESTABLISHED, user_data);
+    ctx->client = client;
+    memcpy(ctx->peer_pubkey, pubkey, suite->pubkey_len);
+    ctx->suite = suite;
+    ctx->callback = callback;
+    ctx->user_data = user_data;
+    ctx->state = DIAL_RESOLVING;
+    
+    /* Resolve endpoint from DHT */
+    int ret = norn_resolve_endpoint_async(client, pubkey, suite, on_endpoint_resolved, ctx);
+    if (ret != 0) {
+        free(ctx);
+        return -1;
     }
     
     return 0;
