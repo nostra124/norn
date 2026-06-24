@@ -85,11 +85,54 @@ typedef struct {
     dial_state_t state;
     norn_session_t *session;
     uint32_t resolve_txn_id;  /* DHT transaction ID */
+    unsigned char ephemeral_pub[32];  /* FEAT-023: Ephemeral key for hole punch */
+    unsigned char ephemeral_sec[32];  /* FEAT-023: Ephemeral secret */
+    uint8_t rendezvous_pubkey[32];    /* FEAT-023: Rendezvous peer pubkey */
 } dial_context_t;
 
 /**
  * Callback for endpoint resolution.
  */
+
+/**
+ * FEAT-023: Hole punch response callback.
+ */
+static void on_holepunch_response(norn_client_t *client,
+                                   const norn_holepunch_resp_t *resp,
+                                   void *user_data) {
+    dial_context_t *ctx = (dial_context_t *)user_data;
+    if (!ctx || !resp) {
+        if (ctx) {
+            ctx->state = DIAL_FAILED;
+            if (ctx->callback) {
+                ctx->callback(NULL, NORN_SESSION_CLOSED, ctx->user_data);
+            }
+            free(ctx);
+        }
+        return;
+    }
+    
+    /* FEAT-023: Send simultaneous probes */
+    if (resp->peer_external_ip != 0 && resp->peer_external_port != 0) {
+        norn_send_probes(client, resp->peer_external_ip, resp->peer_external_port, 3, 100);
+        
+        /* FEAT-023 TODO: Wait for probe response, then establish session
+         * This requires:
+         * 1. Detect incoming probe from peer IP/port
+         * 2. Perform session handshake using ephemeral keys
+         * 3. Transition to NORN_SESSION_ESTABLISHED
+         * 
+         * For now, mark as failed (needs probe detection implementation)
+         */
+    }
+    
+    ctx->state = DIAL_FAILED;
+    if (ctx->callback) {
+        ctx->callback(NULL, NORN_SESSION_CLOSED, ctx->user_data);
+    }
+    free(ctx);
+}
+
 static void on_endpoint_resolved(const norn_endpoint_t *endpoint, void *user_data) {
     dial_context_t *ctx = (dial_context_t *)user_data;
     if (!ctx) return;
@@ -128,19 +171,25 @@ static void on_endpoint_resolved(const norn_endpoint_t *endpoint, void *user_dat
         /* Endpoint can act as rendezvous/introducer for hole punch */
         ctx->state = DIAL_HOLEPUNCH;
         
-        /* FEAT-023: Hole punch integration - wire up the connection
-         * For now, we have the wire protocol complete but the full
-         * integration requires:
-         * 1. Generate ephemeral key for this session
-         * 2. Send HolePunchRequest via rendezvous
-         * 3. Handle HolePunchResponse callback
-         * 4. Send simultaneous probes
-         * 5. Establish session
-         *
-         * This is tracked in .repo/project/issues/FEAT-023-HOLEPUNCH-INTEGRATION.md
-         */
+        /* FEAT-023: Generate ephemeral key for this session */
+        crypto_box_keypair(ctx->ephemeral_pub, ctx->ephemeral_sec);
         
-        /* For now, fall through to relay if available */
+        /* Store rendezvous pubkey (endpoint itself is the rendezvous) */
+        memcpy(ctx->rendezvous_pubkey, endpoint->pubkey, 32);
+        
+        /* Send hole punch request */
+        int ret = norn_send_holepunch_req_async(ctx->client,
+                                                 ctx->peer_pubkey,
+                                                 ctx->rendezvous_pubkey,
+                                                 ctx->ephemeral_pub,
+                                                 on_holepunch_response,
+                                                 ctx);
+        if (ret == 0) {
+            /* Request sent successfully - waiting for response */
+            return;
+        }
+        
+        /* Hole punch failed - fall through to relay */
     }
     
     /* Hole punch not available or failed - fall back to relay (Phase 4) */
