@@ -130,6 +130,27 @@ norn_session_t *norn_dial_direct(norn_client_t *client,
                                   const norn_crypto_suite_t *suite);
 
 /**
+ * @brief Accept a direct connection (for testing)
+ *
+ * Accepts an incoming connection on a pre-bound socket.
+ * Useful for testing and private network scenarios.
+ *
+ * @param client Client handle
+ * @param pubkey Our public key (for channel handshake)
+ * @param secret Our secret key (for signing)
+ * @param fd Pre-bound UDP socket
+ * @param suite Crypto suite (NULL for default)
+ * @return Session handle, or NULL on error
+ *
+ * @note Phase 1: Direct connection only
+ */
+norn_session_t *norn_accept_direct(norn_client_t *client,
+                                    const unsigned char *pubkey,
+                                    const unsigned char *secret,
+                                    int fd,
+                                    const norn_crypto_suite_t *suite);
+
+/**
  * @brief Listen for inbound connections
  *
  * Advertises this client's endpoint via DHT and begins accepting connections.
