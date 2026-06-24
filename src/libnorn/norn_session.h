@@ -216,6 +216,69 @@ int norn_session_confirm_resp(norn_session_t *session,
 int norn_session_finish_confirm(norn_session_t *session,
                                  const unsigned char *confirm_msg, size_t confirm_len);
 
+/* === Blocking handshake (for testing) === */
+
+/**
+ * @brief Perform complete initiator handshake (blocking)
+ *
+ * Sends INIT, waits for RESP, sends CONFIRM.
+ * Blocks until handshake completes or times out.
+ *
+ * @param session Session handle (must be initiator with fd set)
+ * @param self_pub Our public key
+ * @param self_secret Our secret key
+ * @param timeout_ms Timeout in milliseconds
+ * @return 0 on success (session established), -1 on error
+ */
+int norn_session_handshake_initiator(norn_session_t *session,
+                                      const unsigned char *self_pub,
+                                      const unsigned char *self_secret,
+                                      int timeout_ms);
+
+/**
+ * @brief Perform complete responder handshake (blocking)
+ *
+ * Waits for INIT, sends RESP, waits for CONFIRM.
+ * Blocks until handshake completes or times out.
+ *
+ * @param session Session handle (must be responder with fd set)
+ * @param self_pub Our public key
+ * @param self_secret Our secret key
+ * @param timeout_ms Timeout in milliseconds
+ * @return 0 on success (session established), -1 on error
+ */
+int norn_session_handshake_responder(norn_session_t *session,
+                                      const unsigned char *self_pub,
+                                      const unsigned char *self_secret,
+                                      int timeout_ms);
+
+/* === UDP utilities (for testing) === */
+
+/**
+ * @brief Create a bound UDP socket for listening
+ *
+ * @param port Port to bind (0 for auto-assign, network byte order)
+ * @return Socket fd, or -1 on error
+ */
+int norn_udp_listen(uint16_t port);
+
+/**
+ * @brief Get local port of bound socket
+ *
+ * @param fd Socket fd
+ * @return Port (network byte order), or 0 on error
+ */
+uint16_t norn_udp_get_port(int fd);
+
+/**
+ * @brief Create UDP socket connected to a peer
+ *
+ * @param ip Peer IP (network byte order)
+ * @param port Peer port (network byte order)
+ * @return Socket fd, or -1 on error
+ */
+int norn_udp_connect(uint32_t ip, uint16_t port);
+
 /**
  * @brief Listen for inbound connections
  *

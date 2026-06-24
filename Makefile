@@ -181,7 +181,8 @@ am_libnorn_la_OBJECTS = src/libnorn/libnorn_la-norn.lo \
 	src/libnorn/libnorn_la-norn_suite_sodium.lo \
 	src/libnorn/libnorn_la-norn_kad.lo \
 	src/libnorn/libnorn_la-norn_idexch.lo \
-	src/libnorn/libnorn_la-norn_session.lo
+	src/libnorn/libnorn_la-norn_session.lo \
+	src/libnorn/libnorn_la-norn_session_udp.lo
 libnorn_la_OBJECTS = $(am_libnorn_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -441,6 +442,7 @@ am__depfiles_remade = src/$(DEPDIR)/norn-norn.Po \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-norn_session_udp.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn_suite_sodium.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-recstore.Plo \
@@ -931,7 +933,8 @@ libnorn_la_SOURCES = \
 	src/libnorn/norn_suite_sodium.c \
 	src/libnorn/norn_kad.c \
 	src/libnorn/norn_idexch.c \
-	src/libnorn/norn_session.c
+	src/libnorn/norn_session.c \
+	src/libnorn/norn_session_udp.c
 
 libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 \
 	-I$(top_srcdir)/src/libnorn $(am__append_1)
@@ -1282,6 +1285,9 @@ src/libnorn/libnorn_la-norn_idexch.lo: src/libnorn/$(am__dirstamp) \
 	src/libnorn/$(DEPDIR)/$(am__dirstamp)
 src/libnorn/libnorn_la-norn_session.lo: src/libnorn/$(am__dirstamp) \
 	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-norn_session_udp.lo:  \
+	src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
 
 libnorn.la: $(libnorn_la_OBJECTS) $(libnorn_la_DEPENDENCIES) $(EXTRA_libnorn_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(libnorn_la_LINK) -rpath $(libdir) $(libnorn_la_OBJECTS) $(libnorn_la_LIBADD) $(LIBS)
@@ -1510,6 +1516,7 @@ include src/libnorn/$(DEPDIR)/libnorn_la-norn_idexch.Plo # am--include-marker
 include src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo # am--include-marker
 include src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Plo # am--include-marker
 include src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Plo # am--include-marker
+include src/libnorn/$(DEPDIR)/libnorn_la-norn_session_udp.Plo # am--include-marker
 include src/libnorn/$(DEPDIR)/libnorn_la-norn_suite_sodium.Plo # am--include-marker
 include src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Plo # am--include-marker
 include src/libnorn/$(DEPDIR)/libnorn_la-recstore.Plo # am--include-marker
@@ -1755,6 +1762,13 @@ src/libnorn/libnorn_la-norn_session.lo: src/libnorn/norn_session.c
 #	$(AM_V_CC)source='src/libnorn/norn_session.c' object='src/libnorn/libnorn_la-norn_session.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-norn_session.lo `test -f 'src/libnorn/norn_session.c' || echo '$(srcdir)/'`src/libnorn/norn_session.c
+
+src/libnorn/libnorn_la-norn_session_udp.lo: src/libnorn/norn_session_udp.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-norn_session_udp.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-norn_session_udp.Tpo -c -o src/libnorn/libnorn_la-norn_session_udp.lo `test -f 'src/libnorn/norn_session_udp.c' || echo '$(srcdir)/'`src/libnorn/norn_session_udp.c
+	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-norn_session_udp.Tpo src/libnorn/$(DEPDIR)/libnorn_la-norn_session_udp.Plo
+#	$(AM_V_CC)source='src/libnorn/norn_session_udp.c' object='src/libnorn/libnorn_la-norn_session_udp.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-norn_session_udp.lo `test -f 'src/libnorn/norn_session_udp.c' || echo '$(srcdir)/'`src/libnorn/norn_session_udp.c
 
 src/norn-norn.o: src/norn.c
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(norn_CFLAGS) $(CFLAGS) -MT src/norn-norn.o -MD -MP -MF src/$(DEPDIR)/norn-norn.Tpo -c -o src/norn-norn.o `test -f 'src/norn.c' || echo '$(srcdir)/'`src/norn.c
@@ -2989,6 +3003,7 @@ distclean: distclean-am
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_session_udp.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_suite_sodium.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-recstore.Plo
@@ -3093,6 +3108,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_session_udp.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_suite_sodium.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-recstore.Plo
