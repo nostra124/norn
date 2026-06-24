@@ -11,8 +11,12 @@
 #include "norn_suite.h"
 #include "channel.h"
 #include "streammux.h"
+#include "transport.h"
+#include "transport_udp.h"
+#include "net.h"
 #include <stdlib.h>
 #include <string.h>
+#include <sodium.h>
 
 /* Internal session state */
 struct norn_session {
@@ -101,6 +105,40 @@ norn_session_t *norn_dial(norn_client_t *client,
     if (callback) {
         callback(session, NORN_SESSION_ESTABLISHED, user_data);
     }
+    
+    return session;
+}
+
+/* Dial direct: connect to known endpoint (for testing) */
+norn_session_t *norn_dial_direct(norn_client_t *client,
+                                  const norn_direct_endpoint_t *endpoint,
+                                  const unsigned char *pubkey,
+                                  const norn_crypto_suite_t *suite) {
+    if (!client || !endpoint || !pubkey) return NULL;
+    
+    norn_session_t *session = norn_session_new(client, suite);
+    if (!session) return NULL;
+    
+    session->is_initiator = 1;
+    memcpy(session->peer_pubkey, pubkey, session->suite->pubkey_len);
+    
+    /* Generate ephemeral key for channel handshake */
+    if (channel_gen_ephemeral(&session->channel) != 0) {
+        streammux_free(session->mux);
+        free(session);
+        return NULL;
+    }
+    
+    /* TODO Phase 1: Create UDP transport and send INIT
+     * - Create UDP socket
+     * - Send channel_hs_build_init to endpoint
+     * - Receive RESP
+     * - Send CONFIRM
+     * - Transition to ESTABLISHED
+     */
+    (void)endpoint;
+    
+    session->state = NORN_SESSION_CONNECTING;
     
     return session;
 }
