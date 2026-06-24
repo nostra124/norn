@@ -124,7 +124,14 @@ static void on_endpoint_resolved(const norn_endpoint_t *endpoint, void *user_dat
     }
     
     /* Direct not available - fall back to hole punch (Phase 3) */
-    /* TODO: Implement hole punch */
+    if (endpoint->caps & NORN_EP_CAP_RENDEZVOUS) {
+        /* TODO FEAT-017 Phase 3: Implement hole punch via rendezvous
+         * ctx->state = DIAL_HOLEPUNCH;
+         * norn_send_holepunch_req_async(...);
+         */
+    }
+    
+    /* Hole punch not available - fall back to relay (Phase 4) */
     ctx->state = DIAL_FAILED;
     if (ctx->callback) {
         ctx->callback(NULL, NORN_SESSION_CLOSED, ctx->user_data);
