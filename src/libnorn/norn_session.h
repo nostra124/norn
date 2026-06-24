@@ -48,6 +48,14 @@ typedef struct norn_endpoint {
 } norn_endpoint_t;
 
 /**
+ * @brief Direct connection endpoint (for testing without DHT)
+ */
+typedef struct {
+    uint32_t ip;                     /**< IPv4 address (network byte order) */
+    uint16_t port;                   /**< UDP port (network byte order) */
+} norn_direct_endpoint_t;
+
+/**
  * @brief Session state
  */
 typedef enum {
@@ -101,6 +109,25 @@ norn_session_t *norn_dial(norn_client_t *client,
                           const norn_crypto_suite_t *suite,
                           norn_session_callback_t callback,
                           void *user_data);
+
+/**
+ * @brief Dial a peer by direct endpoint (for testing without DHT)
+ *
+ * Connects directly to a known IP:port without DHT resolution.
+ * Useful for testing and private network scenarios.
+ *
+ * @param client Client handle
+ * @param endpoint Direct endpoint (IP + port)
+ * @param pubkey Peer's public key (for channel handshake)
+ * @param suite Crypto suite (NULL for default)
+ * @return Session handle, or NULL on error
+ *
+ * @note Phase 1: Direct connection only
+ */
+norn_session_t *norn_dial_direct(norn_client_t *client,
+                                  const norn_direct_endpoint_t *endpoint,
+                                  const unsigned char *pubkey,
+                                  const norn_crypto_suite_t *suite);
 
 /**
  * @brief Listen for inbound connections

@@ -5,7 +5,7 @@ includedir=${prefix}/include
 
 Name: norn
 Description: Mainline DHT client library
-Version: 0.1.0
+Version: 0.6.0
 Requires: libsodium
 Libs: -L${libdir} -lnorn
 Cflags: -I${includedir}

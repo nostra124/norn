@@ -105,9 +105,11 @@ check_PROGRAMS = test_norn$(EXEEXT) test_bep44$(EXEEXT) \
 	test_stream_random$(EXEEXT) test_streammux$(EXEEXT) \
 	test_streammux_random$(EXEEXT) test_transport$(EXEEXT) \
 	test_transport_udp$(EXEEXT) test_transport_tcp$(EXEEXT) \
-	test_idexch$(EXEEXT) test_attr$(EXEEXT)
-am__append_1 = $(COV_FLAGS)
-am__append_2 = $(COV_FLAGS)
+	test_idexch$(EXEEXT) test_attr$(EXEEXT) test_net$(EXEEXT) \
+	test_suite$(EXEEXT) test_norn_kad$(EXEEXT) \
+	test_norn_idexch$(EXEEXT) test_norn_session$(EXEEXT)
+#am__append_1 = $(COV_FLAGS)
+#am__append_2 = $(COV_FLAGS)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
@@ -125,7 +127,8 @@ CONFIG_HEADER = config.h
 CONFIG_CLEAN_FILES = norn.pc
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libdir)" \
-	"$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(includedir)"
+	"$(DESTDIR)$(man1dir)" "$(DESTDIR)$(pkgconfigdir)" \
+	"$(DESTDIR)$(includedir)"
 PROGRAMS = $(bin_PROGRAMS)
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
@@ -174,7 +177,11 @@ am_libnorn_la_OBJECTS = src/libnorn/libnorn_la-norn.lo \
 	src/libnorn/libnorn_la-transport_udp.lo \
 	src/libnorn/libnorn_la-transport_tcp.lo \
 	src/libnorn/libnorn_la-idexch.lo \
-	src/libnorn/libnorn_la-attr.lo
+	src/libnorn/libnorn_la-attr.lo \
+	src/libnorn/libnorn_la-norn_suite_sodium.lo \
+	src/libnorn/libnorn_la-norn_kad.lo \
+	src/libnorn/libnorn_la-norn_idexch.lo \
+	src/libnorn/libnorn_la-norn_session.lo
 libnorn_la_OBJECTS = $(am_libnorn_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -261,6 +268,12 @@ test_mainline_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
 test_mainline_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_mainline_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_test_net_OBJECTS = tests/test_net-test_net.$(OBJEXT)
+test_net_OBJECTS = $(am_test_net_OBJECTS)
+test_net_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_net_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_net_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_test_norn_OBJECTS = tests/test_norn-test_norn.$(OBJEXT)
 test_norn_OBJECTS = $(am_test_norn_OBJECTS)
 test_norn_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
@@ -274,6 +287,29 @@ test_norn_async_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
 test_norn_async_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
 	$(test_norn_async_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
+	-o $@
+am_test_norn_idexch_OBJECTS =  \
+	tests/test_norn_idexch-test_norn_idexch.$(OBJEXT)
+test_norn_idexch_OBJECTS = $(am_test_norn_idexch_OBJECTS)
+test_norn_idexch_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_norn_idexch_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_norn_idexch_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
+	-o $@
+am_test_norn_kad_OBJECTS =  \
+	tests/test_norn_kad-test_norn_kad.$(OBJEXT)
+test_norn_kad_OBJECTS = $(am_test_norn_kad_OBJECTS)
+test_norn_kad_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_norn_kad_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_norn_kad_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_test_norn_session_OBJECTS =  \
+	tests/test_norn_session-test_norn_session.$(OBJEXT)
+test_norn_session_OBJECTS = $(am_test_norn_session_OBJECTS)
+test_norn_session_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_norn_session_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_norn_session_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
 	-o $@
 am_test_recstore_OBJECTS =  \
 	tests/test_recstore-test_recstore.$(OBJEXT)
@@ -344,6 +380,12 @@ test_streammux_random_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
 	$(test_streammux_random_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
+am_test_suite_OBJECTS = tests/test_suite-test_suite.$(OBJEXT)
+test_suite_OBJECTS = $(am_test_suite_OBJECTS)
+test_suite_DEPENDENCIES = libnorn.la $(am__DEPENDENCIES_1)
+test_suite_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_suite_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_test_transport_OBJECTS =  \
 	tests/test_transport-test_transport.$(OBJEXT)
 test_transport_OBJECTS = $(am_test_transport_OBJECTS)
@@ -395,7 +437,11 @@ am__depfiles_remade = src/$(DEPDIR)/norn-norn.Po \
 	src/libnorn/$(DEPDIR)/libnorn_la-log.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-net.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-norn_idexch.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Plo \
+	src/libnorn/$(DEPDIR)/libnorn_la-norn_suite_sodium.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-recstore.Plo \
 	src/libnorn/$(DEPDIR)/libnorn_la-replaycache.Plo \
@@ -416,8 +462,12 @@ am__depfiles_remade = src/$(DEPDIR)/norn-norn.Po \
 	tests/$(DEPDIR)/test_kademlia-test_kademlia.Po \
 	tests/$(DEPDIR)/test_log-test_log.Po \
 	tests/$(DEPDIR)/test_mainline-test_mainline.Po \
+	tests/$(DEPDIR)/test_net-test_net.Po \
 	tests/$(DEPDIR)/test_norn-test_norn.Po \
 	tests/$(DEPDIR)/test_norn_async-test_norn_async.Po \
+	tests/$(DEPDIR)/test_norn_idexch-test_norn_idexch.Po \
+	tests/$(DEPDIR)/test_norn_kad-test_norn_kad.Po \
+	tests/$(DEPDIR)/test_norn_session-test_norn_session.Po \
 	tests/$(DEPDIR)/test_recstore-test_recstore.Po \
 	tests/$(DEPDIR)/test_replaycache-test_replaycache.Po \
 	tests/$(DEPDIR)/test_stream-test_stream.Po \
@@ -427,6 +477,7 @@ am__depfiles_remade = src/$(DEPDIR)/norn-norn.Po \
 	tests/$(DEPDIR)/test_stream_recovery-test_stream_recovery.Po \
 	tests/$(DEPDIR)/test_streammux-test_streammux.Po \
 	tests/$(DEPDIR)/test_streammux_random-test_streammux_random.Po \
+	tests/$(DEPDIR)/test_suite-test_suite.Po \
 	tests/$(DEPDIR)/test_transport-test_transport.Po \
 	tests/$(DEPDIR)/test_transport_tcp-test_transport_tcp.Po \
 	tests/$(DEPDIR)/test_transport_udp-test_transport_udp.Po
@@ -455,32 +506,40 @@ SOURCES = $(libnorn_la_SOURCES) $(norn_SOURCES) $(test_attr_SOURCES) \
 	$(test_crypto_SOURCES) $(test_dhtstore_SOURCES) \
 	$(test_idexch_SOURCES) $(test_kademlia_SOURCES) \
 	$(test_log_SOURCES) $(test_mainline_SOURCES) \
-	$(test_norn_SOURCES) $(test_norn_async_SOURCES) \
+	$(test_net_SOURCES) $(test_norn_SOURCES) \
+	$(test_norn_async_SOURCES) $(test_norn_idexch_SOURCES) \
+	$(test_norn_kad_SOURCES) $(test_norn_session_SOURCES) \
 	$(test_recstore_SOURCES) $(test_replaycache_SOURCES) \
 	$(test_stream_SOURCES) $(test_stream_cc_SOURCES) \
 	$(test_stream_edges_SOURCES) $(test_stream_random_SOURCES) \
 	$(test_stream_recovery_SOURCES) $(test_streammux_SOURCES) \
-	$(test_streammux_random_SOURCES) $(test_transport_SOURCES) \
-	$(test_transport_tcp_SOURCES) $(test_transport_udp_SOURCES)
+	$(test_streammux_random_SOURCES) $(test_suite_SOURCES) \
+	$(test_transport_SOURCES) $(test_transport_tcp_SOURCES) \
+	$(test_transport_udp_SOURCES)
 DIST_SOURCES = $(libnorn_la_SOURCES) $(norn_SOURCES) \
 	$(test_attr_SOURCES) $(test_bencode_SOURCES) \
 	$(test_bep44_SOURCES) $(test_channel_SOURCES) \
 	$(test_channel_edges_SOURCES) $(test_crypto_SOURCES) \
 	$(test_dhtstore_SOURCES) $(test_idexch_SOURCES) \
 	$(test_kademlia_SOURCES) $(test_log_SOURCES) \
-	$(test_mainline_SOURCES) $(test_norn_SOURCES) \
-	$(test_norn_async_SOURCES) $(test_recstore_SOURCES) \
+	$(test_mainline_SOURCES) $(test_net_SOURCES) \
+	$(test_norn_SOURCES) $(test_norn_async_SOURCES) \
+	$(test_norn_idexch_SOURCES) $(test_norn_kad_SOURCES) \
+	$(test_norn_session_SOURCES) $(test_recstore_SOURCES) \
 	$(test_replaycache_SOURCES) $(test_stream_SOURCES) \
 	$(test_stream_cc_SOURCES) $(test_stream_edges_SOURCES) \
 	$(test_stream_random_SOURCES) $(test_stream_recovery_SOURCES) \
 	$(test_streammux_SOURCES) $(test_streammux_random_SOURCES) \
-	$(test_transport_SOURCES) $(test_transport_tcp_SOURCES) \
-	$(test_transport_udp_SOURCES)
+	$(test_suite_SOURCES) $(test_transport_SOURCES) \
+	$(test_transport_tcp_SOURCES) $(test_transport_udp_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
+man1dir = $(mandir)/man1
+NROFF = nroff
+MANS = $(man_MANS)
 DATA = $(pkgconfig_DATA)
 HEADERS = $(include_HEADERS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP) \
@@ -729,7 +788,7 @@ AUTOMAKE = ${SHELL} '/Users/rene/Projekte/norn/build-aux/missing' automake-1.18
 AWK = gawk
 CC = gcc -std=gnu23
 CCDEPMODE = depmode=gcc3
-CFLAGS = -O0 -g --coverage -O0
+CFLAGS = -g -O2
 CPPFLAGS = 
 CSCOPE = cscope
 CTAGS = ctags
@@ -774,10 +833,10 @@ OTOOL64 = :
 PACKAGE = norn
 PACKAGE_BUGREPORT = noreply@example.com
 PACKAGE_NAME = norn
-PACKAGE_STRING = norn 0.1.0
+PACKAGE_STRING = norn 0.6.0
 PACKAGE_TARNAME = norn
 PACKAGE_URL = 
-PACKAGE_VERSION = 0.1.0
+PACKAGE_VERSION = 0.6.0
 PATH_SEPARATOR = :
 PKG_CONFIG = /opt/homebrew/bin/pkg-config
 PKG_CONFIG_LIBDIR = 
@@ -789,7 +848,7 @@ SHELL = /bin/sh
 SODIUM_CFLAGS = 
 SODIUM_LIBS = -L/opt/local/lib -lsodium
 STRIP = strip
-VERSION = 0.1.0
+VERSION = 0.6.0
 abs_builddir = /Users/rene/Projekte/norn
 abs_srcdir = /Users/rene/Projekte/norn
 abs_top_builddir = /Users/rene/Projekte/norn
@@ -868,97 +927,167 @@ libnorn_la_SOURCES = \
 	src/libnorn/transport_udp.c \
 	src/libnorn/transport_tcp.c \
 	src/libnorn/idexch.c \
-	src/libnorn/attr.c
+	src/libnorn/attr.c \
+	src/libnorn/norn_suite_sodium.c \
+	src/libnorn/norn_kad.c \
+	src/libnorn/norn_idexch.c \
+	src/libnorn/norn_session.c
 
-libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -O2 \
+libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 \
 	-I$(top_srcdir)/src/libnorn $(am__append_1)
-include_HEADERS = src/libnorn/norn.h
+include_HEADERS = src/libnorn/norn.h \
+                   src/libnorn/mainline.h \
+                   src/libnorn/norn_transaction.h \
+                   src/libnorn/norn_suite.h \
+                   src/libnorn/norn_kad.h \
+                   src/libnorn/norn_idexch.h \
+                   src/libnorn/norn_session.h \
+                   src/libnorn/crypto.h \
+                   src/libnorn/bep44.h \
+                   src/libnorn/bencode.h \
+                   src/libnorn/dhtstore.h \
+                   src/libnorn/recstore.h \
+                   src/libnorn/kademlia.h \
+                   src/libnorn/log.h \
+                   src/libnorn/channel.h \
+                   src/libnorn/replaycache.h \
+                   src/libnorn/stream.h \
+                   src/libnorn/streammux.h \
+                   src/libnorn/transport.h \
+                   src/libnorn/transport_udp.h \
+                   src/libnorn/transport_tcp.h \
+                   src/libnorn/idexch.h \
+                   src/libnorn/attr.h \
+                   src/libnorn/sha1.h \
+                   src/libnorn/net.h
+
 norn_SOURCES = src/norn.c
-norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -O2 \
+norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 \
 	-I$(top_srcdir)/src/libnorn $(am__append_2)
 norn_LDADD = libnorn.la $(SODIUM_LIBS)
 test_norn_SOURCES = tests/test_norn.c
-test_norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_norn_LDADD = libnorn.la $(SODIUM_LIBS)
 test_bep44_SOURCES = tests/test_bep44.c
-test_bep44_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_bep44_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_bep44_LDADD = libnorn.la $(SODIUM_LIBS)
 test_dhtstore_SOURCES = tests/test_dhtstore.c
-test_dhtstore_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_dhtstore_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_dhtstore_LDADD = libnorn.la $(SODIUM_LIBS)
 test_bencode_SOURCES = tests/test_bencode.c
-test_bencode_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_bencode_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_bencode_LDADD = libnorn.la $(SODIUM_LIBS)
 test_crypto_SOURCES = tests/test_crypto.c
-test_crypto_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_crypto_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_crypto_LDADD = libnorn.la $(SODIUM_LIBS)
 test_log_SOURCES = tests/test_log.c
-test_log_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_log_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_log_LDADD = libnorn.la $(SODIUM_LIBS)
 test_kademlia_SOURCES = tests/test_kademlia.c
-test_kademlia_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_kademlia_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_kademlia_LDADD = libnorn.la $(SODIUM_LIBS)
 test_recstore_SOURCES = tests/test_recstore.c
-test_recstore_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_recstore_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_recstore_LDADD = libnorn.la $(SODIUM_LIBS)
 test_norn_async_SOURCES = tests/test_norn_async.c
-test_norn_async_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_norn_async_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_norn_async_LDADD = libnorn.la $(SODIUM_LIBS)
 test_mainline_SOURCES = tests/test_mainline.c
-test_mainline_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_mainline_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_mainline_LDADD = libnorn.la $(SODIUM_LIBS)
 test_channel_SOURCES = tests/test_channel.c
-test_channel_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_channel_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_channel_LDADD = libnorn.la $(SODIUM_LIBS)
 test_channel_edges_SOURCES = tests/test_channel_edges.c
-test_channel_edges_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_channel_edges_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_channel_edges_LDADD = libnorn.la $(SODIUM_LIBS)
 test_replaycache_SOURCES = tests/test_replaycache.c
-test_replaycache_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_replaycache_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_replaycache_LDADD = libnorn.la $(SODIUM_LIBS)
 test_stream_SOURCES = tests/test_stream.c
-test_stream_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_stream_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_stream_LDADD = libnorn.la $(SODIUM_LIBS)
 test_stream_edges_SOURCES = tests/test_stream_edges.c
-test_stream_edges_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_stream_edges_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_stream_edges_LDADD = libnorn.la $(SODIUM_LIBS)
 test_stream_recovery_SOURCES = tests/test_stream_recovery.c
-test_stream_recovery_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_stream_recovery_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_stream_recovery_LDADD = libnorn.la $(SODIUM_LIBS)
 test_stream_cc_SOURCES = tests/test_stream_cc.c
-test_stream_cc_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_stream_cc_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_stream_cc_LDADD = libnorn.la $(SODIUM_LIBS)
 test_stream_random_SOURCES = tests/test_stream_random.c
-test_stream_random_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_stream_random_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_stream_random_LDADD = libnorn.la $(SODIUM_LIBS)
 test_streammux_SOURCES = tests/test_streammux.c
-test_streammux_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_streammux_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_streammux_LDADD = libnorn.la $(SODIUM_LIBS)
 test_streammux_random_SOURCES = tests/test_streammux_random.c
-test_streammux_random_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_streammux_random_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_streammux_random_LDADD = libnorn.la $(SODIUM_LIBS)
 test_transport_SOURCES = tests/test_transport.c
-test_transport_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_transport_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_transport_LDADD = libnorn.la $(SODIUM_LIBS)
 test_transport_udp_SOURCES = tests/test_transport_udp.c
-test_transport_udp_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_transport_udp_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_transport_udp_LDADD = libnorn.la $(SODIUM_LIBS)
 test_transport_tcp_SOURCES = tests/test_transport_tcp.c
-test_transport_tcp_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_transport_tcp_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_transport_tcp_LDADD = libnorn.la $(SODIUM_LIBS)
 test_idexch_SOURCES = tests/test_idexch.c
-test_idexch_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_idexch_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_idexch_LDADD = libnorn.la $(SODIUM_LIBS)
 test_attr_SOURCES = tests/test_attr.c
-test_attr_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -std=c99 -I$(top_srcdir)/src/libnorn
+test_attr_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
 test_attr_LDADD = libnorn.la $(SODIUM_LIBS)
+test_net_SOURCES = tests/test_net.c
+test_net_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
+test_net_LDADD = libnorn.la $(SODIUM_LIBS)
+test_suite_SOURCES = tests/test_suite.c
+test_suite_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
+test_suite_LDADD = libnorn.la $(SODIUM_LIBS)
+test_norn_kad_SOURCES = tests/test_norn_kad.c
+test_norn_kad_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
+test_norn_kad_LDADD = libnorn.la $(SODIUM_LIBS)
+test_norn_idexch_SOURCES = tests/test_norn_idexch.c
+test_norn_idexch_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
+test_norn_idexch_LDADD = libnorn.la $(SODIUM_LIBS)
+test_norn_session_SOURCES = tests/test_norn_session.c
+test_norn_session_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=c99 -I$(top_srcdir)/src/libnorn
+test_norn_session_LDADD = libnorn.la $(SODIUM_LIBS)
 TESTS = $(check_PROGRAMS)
 
 # Coverage support
-COV_FLAGS = -fprofile-arcs -ftest-coverage
+#COV_FLAGS = -fprofile-arcs -ftest-coverage
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = norn.pc
-EXTRA_DIST = README.md LICENSE docs AGENTS.md tests/sit tests/pit
+man_MANS = man/norn.1
+EXTRA_DIST = README.md LICENSE docs AGENTS.md tests/sit tests/pit \
+             .clang-format .clang-tidy cppcheck.supp codecov.yml \
+             contrib/coverage.sh tests/coverage-tracked.txt \
+             man/norn.1 VERSION \
+             src/libnorn/mainline.h \
+             src/libnorn/norn_transaction.h \
+             src/libnorn/norn_suite.h \
+             src/libnorn/crypto.h \
+             src/libnorn/bep44.h \
+             src/libnorn/bencode.h \
+             src/libnorn/dhtstore.h \
+             src/libnorn/recstore.h \
+             src/libnorn/kademlia.h \
+             src/libnorn/log.h \
+             src/libnorn/channel.h \
+             src/libnorn/replaycache.h \
+             src/libnorn/stream.h \
+             src/libnorn/streammux.h \
+             src/libnorn/transport.h \
+             src/libnorn/transport_udp.h \
+             src/libnorn/transport_tcp.h \
+             src/libnorn/idexch.h \
+             src/libnorn/attr.h \
+             src/libnorn/sha1.h \
+             src/libnorn/net.h
+
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -1144,6 +1273,15 @@ src/libnorn/libnorn_la-idexch.lo: src/libnorn/$(am__dirstamp) \
 	src/libnorn/$(DEPDIR)/$(am__dirstamp)
 src/libnorn/libnorn_la-attr.lo: src/libnorn/$(am__dirstamp) \
 	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-norn_suite_sodium.lo:  \
+	src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-norn_kad.lo: src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-norn_idexch.lo: src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
+src/libnorn/libnorn_la-norn_session.lo: src/libnorn/$(am__dirstamp) \
+	src/libnorn/$(DEPDIR)/$(am__dirstamp)
 
 libnorn.la: $(libnorn_la_OBJECTS) $(libnorn_la_DEPENDENCIES) $(EXTRA_libnorn_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(libnorn_la_LINK) -rpath $(libdir) $(libnorn_la_OBJECTS) $(libnorn_la_LIBADD) $(LIBS)
@@ -1231,6 +1369,12 @@ tests/test_mainline-test_mainline.$(OBJEXT): tests/$(am__dirstamp) \
 test_mainline$(EXEEXT): $(test_mainline_OBJECTS) $(test_mainline_DEPENDENCIES) $(EXTRA_test_mainline_DEPENDENCIES) 
 	@rm -f test_mainline$(EXEEXT)
 	$(AM_V_CCLD)$(test_mainline_LINK) $(test_mainline_OBJECTS) $(test_mainline_LDADD) $(LIBS)
+tests/test_net-test_net.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_net$(EXEEXT): $(test_net_OBJECTS) $(test_net_DEPENDENCIES) $(EXTRA_test_net_DEPENDENCIES) 
+	@rm -f test_net$(EXEEXT)
+	$(AM_V_CCLD)$(test_net_LINK) $(test_net_OBJECTS) $(test_net_LDADD) $(LIBS)
 tests/test_norn-test_norn.$(OBJEXT): tests/$(am__dirstamp) \
 	tests/$(DEPDIR)/$(am__dirstamp)
 
@@ -1243,6 +1387,24 @@ tests/test_norn_async-test_norn_async.$(OBJEXT):  \
 test_norn_async$(EXEEXT): $(test_norn_async_OBJECTS) $(test_norn_async_DEPENDENCIES) $(EXTRA_test_norn_async_DEPENDENCIES) 
 	@rm -f test_norn_async$(EXEEXT)
 	$(AM_V_CCLD)$(test_norn_async_LINK) $(test_norn_async_OBJECTS) $(test_norn_async_LDADD) $(LIBS)
+tests/test_norn_idexch-test_norn_idexch.$(OBJEXT):  \
+	tests/$(am__dirstamp) tests/$(DEPDIR)/$(am__dirstamp)
+
+test_norn_idexch$(EXEEXT): $(test_norn_idexch_OBJECTS) $(test_norn_idexch_DEPENDENCIES) $(EXTRA_test_norn_idexch_DEPENDENCIES) 
+	@rm -f test_norn_idexch$(EXEEXT)
+	$(AM_V_CCLD)$(test_norn_idexch_LINK) $(test_norn_idexch_OBJECTS) $(test_norn_idexch_LDADD) $(LIBS)
+tests/test_norn_kad-test_norn_kad.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_norn_kad$(EXEEXT): $(test_norn_kad_OBJECTS) $(test_norn_kad_DEPENDENCIES) $(EXTRA_test_norn_kad_DEPENDENCIES) 
+	@rm -f test_norn_kad$(EXEEXT)
+	$(AM_V_CCLD)$(test_norn_kad_LINK) $(test_norn_kad_OBJECTS) $(test_norn_kad_LDADD) $(LIBS)
+tests/test_norn_session-test_norn_session.$(OBJEXT):  \
+	tests/$(am__dirstamp) tests/$(DEPDIR)/$(am__dirstamp)
+
+test_norn_session$(EXEEXT): $(test_norn_session_OBJECTS) $(test_norn_session_DEPENDENCIES) $(EXTRA_test_norn_session_DEPENDENCIES) 
+	@rm -f test_norn_session$(EXEEXT)
+	$(AM_V_CCLD)$(test_norn_session_LINK) $(test_norn_session_OBJECTS) $(test_norn_session_LDADD) $(LIBS)
 tests/test_recstore-test_recstore.$(OBJEXT): tests/$(am__dirstamp) \
 	tests/$(DEPDIR)/$(am__dirstamp)
 
@@ -1297,6 +1459,12 @@ tests/test_streammux_random-test_streammux_random.$(OBJEXT):  \
 test_streammux_random$(EXEEXT): $(test_streammux_random_OBJECTS) $(test_streammux_random_DEPENDENCIES) $(EXTRA_test_streammux_random_DEPENDENCIES) 
 	@rm -f test_streammux_random$(EXEEXT)
 	$(AM_V_CCLD)$(test_streammux_random_LINK) $(test_streammux_random_OBJECTS) $(test_streammux_random_LDADD) $(LIBS)
+tests/test_suite-test_suite.$(OBJEXT): tests/$(am__dirstamp) \
+	tests/$(DEPDIR)/$(am__dirstamp)
+
+test_suite$(EXEEXT): $(test_suite_OBJECTS) $(test_suite_DEPENDENCIES) $(EXTRA_test_suite_DEPENDENCIES) 
+	@rm -f test_suite$(EXEEXT)
+	$(AM_V_CCLD)$(test_suite_LINK) $(test_suite_OBJECTS) $(test_suite_LDADD) $(LIBS)
 tests/test_transport-test_transport.$(OBJEXT): tests/$(am__dirstamp) \
 	tests/$(DEPDIR)/$(am__dirstamp)
 
@@ -1338,7 +1506,11 @@ include src/libnorn/$(DEPDIR)/libnorn_la-kademlia.Plo # am--include-marker
 include src/libnorn/$(DEPDIR)/libnorn_la-log.Plo # am--include-marker
 include src/libnorn/$(DEPDIR)/libnorn_la-net.Plo # am--include-marker
 include src/libnorn/$(DEPDIR)/libnorn_la-norn.Plo # am--include-marker
+include src/libnorn/$(DEPDIR)/libnorn_la-norn_idexch.Plo # am--include-marker
 include src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo # am--include-marker
+include src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Plo # am--include-marker
+include src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Plo # am--include-marker
+include src/libnorn/$(DEPDIR)/libnorn_la-norn_suite_sodium.Plo # am--include-marker
 include src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Plo # am--include-marker
 include src/libnorn/$(DEPDIR)/libnorn_la-recstore.Plo # am--include-marker
 include src/libnorn/$(DEPDIR)/libnorn_la-replaycache.Plo # am--include-marker
@@ -1359,8 +1531,12 @@ include tests/$(DEPDIR)/test_idexch-test_idexch.Po # am--include-marker
 include tests/$(DEPDIR)/test_kademlia-test_kademlia.Po # am--include-marker
 include tests/$(DEPDIR)/test_log-test_log.Po # am--include-marker
 include tests/$(DEPDIR)/test_mainline-test_mainline.Po # am--include-marker
+include tests/$(DEPDIR)/test_net-test_net.Po # am--include-marker
 include tests/$(DEPDIR)/test_norn-test_norn.Po # am--include-marker
 include tests/$(DEPDIR)/test_norn_async-test_norn_async.Po # am--include-marker
+include tests/$(DEPDIR)/test_norn_idexch-test_norn_idexch.Po # am--include-marker
+include tests/$(DEPDIR)/test_norn_kad-test_norn_kad.Po # am--include-marker
+include tests/$(DEPDIR)/test_norn_session-test_norn_session.Po # am--include-marker
 include tests/$(DEPDIR)/test_recstore-test_recstore.Po # am--include-marker
 include tests/$(DEPDIR)/test_replaycache-test_replaycache.Po # am--include-marker
 include tests/$(DEPDIR)/test_stream-test_stream.Po # am--include-marker
@@ -1370,6 +1546,7 @@ include tests/$(DEPDIR)/test_stream_random-test_stream_random.Po # am--include-m
 include tests/$(DEPDIR)/test_stream_recovery-test_stream_recovery.Po # am--include-marker
 include tests/$(DEPDIR)/test_streammux-test_streammux.Po # am--include-marker
 include tests/$(DEPDIR)/test_streammux_random-test_streammux_random.Po # am--include-marker
+include tests/$(DEPDIR)/test_suite-test_suite.Po # am--include-marker
 include tests/$(DEPDIR)/test_transport-test_transport.Po # am--include-marker
 include tests/$(DEPDIR)/test_transport_tcp-test_transport_tcp.Po # am--include-marker
 include tests/$(DEPDIR)/test_transport_udp-test_transport_udp.Po # am--include-marker
@@ -1551,6 +1728,34 @@ src/libnorn/libnorn_la-attr.lo: src/libnorn/attr.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-attr.lo `test -f 'src/libnorn/attr.c' || echo '$(srcdir)/'`src/libnorn/attr.c
 
+src/libnorn/libnorn_la-norn_suite_sodium.lo: src/libnorn/norn_suite_sodium.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-norn_suite_sodium.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-norn_suite_sodium.Tpo -c -o src/libnorn/libnorn_la-norn_suite_sodium.lo `test -f 'src/libnorn/norn_suite_sodium.c' || echo '$(srcdir)/'`src/libnorn/norn_suite_sodium.c
+	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-norn_suite_sodium.Tpo src/libnorn/$(DEPDIR)/libnorn_la-norn_suite_sodium.Plo
+#	$(AM_V_CC)source='src/libnorn/norn_suite_sodium.c' object='src/libnorn/libnorn_la-norn_suite_sodium.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-norn_suite_sodium.lo `test -f 'src/libnorn/norn_suite_sodium.c' || echo '$(srcdir)/'`src/libnorn/norn_suite_sodium.c
+
+src/libnorn/libnorn_la-norn_kad.lo: src/libnorn/norn_kad.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-norn_kad.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Tpo -c -o src/libnorn/libnorn_la-norn_kad.lo `test -f 'src/libnorn/norn_kad.c' || echo '$(srcdir)/'`src/libnorn/norn_kad.c
+	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Tpo src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Plo
+#	$(AM_V_CC)source='src/libnorn/norn_kad.c' object='src/libnorn/libnorn_la-norn_kad.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-norn_kad.lo `test -f 'src/libnorn/norn_kad.c' || echo '$(srcdir)/'`src/libnorn/norn_kad.c
+
+src/libnorn/libnorn_la-norn_idexch.lo: src/libnorn/norn_idexch.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-norn_idexch.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-norn_idexch.Tpo -c -o src/libnorn/libnorn_la-norn_idexch.lo `test -f 'src/libnorn/norn_idexch.c' || echo '$(srcdir)/'`src/libnorn/norn_idexch.c
+	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-norn_idexch.Tpo src/libnorn/$(DEPDIR)/libnorn_la-norn_idexch.Plo
+#	$(AM_V_CC)source='src/libnorn/norn_idexch.c' object='src/libnorn/libnorn_la-norn_idexch.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-norn_idexch.lo `test -f 'src/libnorn/norn_idexch.c' || echo '$(srcdir)/'`src/libnorn/norn_idexch.c
+
+src/libnorn/libnorn_la-norn_session.lo: src/libnorn/norn_session.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -MT src/libnorn/libnorn_la-norn_session.lo -MD -MP -MF src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Tpo -c -o src/libnorn/libnorn_la-norn_session.lo `test -f 'src/libnorn/norn_session.c' || echo '$(srcdir)/'`src/libnorn/norn_session.c
+	$(AM_V_at)$(am__mv) src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Tpo src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Plo
+#	$(AM_V_CC)source='src/libnorn/norn_session.c' object='src/libnorn/libnorn_la-norn_session.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libnorn_la_CFLAGS) $(CFLAGS) -c -o src/libnorn/libnorn_la-norn_session.lo `test -f 'src/libnorn/norn_session.c' || echo '$(srcdir)/'`src/libnorn/norn_session.c
+
 src/norn-norn.o: src/norn.c
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(norn_CFLAGS) $(CFLAGS) -MT src/norn-norn.o -MD -MP -MF src/$(DEPDIR)/norn-norn.Tpo -c -o src/norn-norn.o `test -f 'src/norn.c' || echo '$(srcdir)/'`src/norn.c
 	$(AM_V_at)$(am__mv) src/$(DEPDIR)/norn-norn.Tpo src/$(DEPDIR)/norn-norn.Po
@@ -1719,6 +1924,20 @@ tests/test_mainline-test_mainline.obj: tests/test_mainline.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_mainline_CFLAGS) $(CFLAGS) -c -o tests/test_mainline-test_mainline.obj `if test -f 'tests/test_mainline.c'; then $(CYGPATH_W) 'tests/test_mainline.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_mainline.c'; fi`
 
+tests/test_net-test_net.o: tests/test_net.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_net_CFLAGS) $(CFLAGS) -MT tests/test_net-test_net.o -MD -MP -MF tests/$(DEPDIR)/test_net-test_net.Tpo -c -o tests/test_net-test_net.o `test -f 'tests/test_net.c' || echo '$(srcdir)/'`tests/test_net.c
+	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_net-test_net.Tpo tests/$(DEPDIR)/test_net-test_net.Po
+#	$(AM_V_CC)source='tests/test_net.c' object='tests/test_net-test_net.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_net_CFLAGS) $(CFLAGS) -c -o tests/test_net-test_net.o `test -f 'tests/test_net.c' || echo '$(srcdir)/'`tests/test_net.c
+
+tests/test_net-test_net.obj: tests/test_net.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_net_CFLAGS) $(CFLAGS) -MT tests/test_net-test_net.obj -MD -MP -MF tests/$(DEPDIR)/test_net-test_net.Tpo -c -o tests/test_net-test_net.obj `if test -f 'tests/test_net.c'; then $(CYGPATH_W) 'tests/test_net.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_net.c'; fi`
+	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_net-test_net.Tpo tests/$(DEPDIR)/test_net-test_net.Po
+#	$(AM_V_CC)source='tests/test_net.c' object='tests/test_net-test_net.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_net_CFLAGS) $(CFLAGS) -c -o tests/test_net-test_net.obj `if test -f 'tests/test_net.c'; then $(CYGPATH_W) 'tests/test_net.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_net.c'; fi`
+
 tests/test_norn-test_norn.o: tests/test_norn.c
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_CFLAGS) $(CFLAGS) -MT tests/test_norn-test_norn.o -MD -MP -MF tests/$(DEPDIR)/test_norn-test_norn.Tpo -c -o tests/test_norn-test_norn.o `test -f 'tests/test_norn.c' || echo '$(srcdir)/'`tests/test_norn.c
 	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_norn-test_norn.Tpo tests/$(DEPDIR)/test_norn-test_norn.Po
@@ -1746,6 +1965,48 @@ tests/test_norn_async-test_norn_async.obj: tests/test_norn_async.c
 #	$(AM_V_CC)source='tests/test_norn_async.c' object='tests/test_norn_async-test_norn_async.obj' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_async_CFLAGS) $(CFLAGS) -c -o tests/test_norn_async-test_norn_async.obj `if test -f 'tests/test_norn_async.c'; then $(CYGPATH_W) 'tests/test_norn_async.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_norn_async.c'; fi`
+
+tests/test_norn_idexch-test_norn_idexch.o: tests/test_norn_idexch.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_idexch_CFLAGS) $(CFLAGS) -MT tests/test_norn_idexch-test_norn_idexch.o -MD -MP -MF tests/$(DEPDIR)/test_norn_idexch-test_norn_idexch.Tpo -c -o tests/test_norn_idexch-test_norn_idexch.o `test -f 'tests/test_norn_idexch.c' || echo '$(srcdir)/'`tests/test_norn_idexch.c
+	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_norn_idexch-test_norn_idexch.Tpo tests/$(DEPDIR)/test_norn_idexch-test_norn_idexch.Po
+#	$(AM_V_CC)source='tests/test_norn_idexch.c' object='tests/test_norn_idexch-test_norn_idexch.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_idexch_CFLAGS) $(CFLAGS) -c -o tests/test_norn_idexch-test_norn_idexch.o `test -f 'tests/test_norn_idexch.c' || echo '$(srcdir)/'`tests/test_norn_idexch.c
+
+tests/test_norn_idexch-test_norn_idexch.obj: tests/test_norn_idexch.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_idexch_CFLAGS) $(CFLAGS) -MT tests/test_norn_idexch-test_norn_idexch.obj -MD -MP -MF tests/$(DEPDIR)/test_norn_idexch-test_norn_idexch.Tpo -c -o tests/test_norn_idexch-test_norn_idexch.obj `if test -f 'tests/test_norn_idexch.c'; then $(CYGPATH_W) 'tests/test_norn_idexch.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_norn_idexch.c'; fi`
+	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_norn_idexch-test_norn_idexch.Tpo tests/$(DEPDIR)/test_norn_idexch-test_norn_idexch.Po
+#	$(AM_V_CC)source='tests/test_norn_idexch.c' object='tests/test_norn_idexch-test_norn_idexch.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_idexch_CFLAGS) $(CFLAGS) -c -o tests/test_norn_idexch-test_norn_idexch.obj `if test -f 'tests/test_norn_idexch.c'; then $(CYGPATH_W) 'tests/test_norn_idexch.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_norn_idexch.c'; fi`
+
+tests/test_norn_kad-test_norn_kad.o: tests/test_norn_kad.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_kad_CFLAGS) $(CFLAGS) -MT tests/test_norn_kad-test_norn_kad.o -MD -MP -MF tests/$(DEPDIR)/test_norn_kad-test_norn_kad.Tpo -c -o tests/test_norn_kad-test_norn_kad.o `test -f 'tests/test_norn_kad.c' || echo '$(srcdir)/'`tests/test_norn_kad.c
+	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_norn_kad-test_norn_kad.Tpo tests/$(DEPDIR)/test_norn_kad-test_norn_kad.Po
+#	$(AM_V_CC)source='tests/test_norn_kad.c' object='tests/test_norn_kad-test_norn_kad.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_kad_CFLAGS) $(CFLAGS) -c -o tests/test_norn_kad-test_norn_kad.o `test -f 'tests/test_norn_kad.c' || echo '$(srcdir)/'`tests/test_norn_kad.c
+
+tests/test_norn_kad-test_norn_kad.obj: tests/test_norn_kad.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_kad_CFLAGS) $(CFLAGS) -MT tests/test_norn_kad-test_norn_kad.obj -MD -MP -MF tests/$(DEPDIR)/test_norn_kad-test_norn_kad.Tpo -c -o tests/test_norn_kad-test_norn_kad.obj `if test -f 'tests/test_norn_kad.c'; then $(CYGPATH_W) 'tests/test_norn_kad.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_norn_kad.c'; fi`
+	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_norn_kad-test_norn_kad.Tpo tests/$(DEPDIR)/test_norn_kad-test_norn_kad.Po
+#	$(AM_V_CC)source='tests/test_norn_kad.c' object='tests/test_norn_kad-test_norn_kad.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_kad_CFLAGS) $(CFLAGS) -c -o tests/test_norn_kad-test_norn_kad.obj `if test -f 'tests/test_norn_kad.c'; then $(CYGPATH_W) 'tests/test_norn_kad.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_norn_kad.c'; fi`
+
+tests/test_norn_session-test_norn_session.o: tests/test_norn_session.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_session_CFLAGS) $(CFLAGS) -MT tests/test_norn_session-test_norn_session.o -MD -MP -MF tests/$(DEPDIR)/test_norn_session-test_norn_session.Tpo -c -o tests/test_norn_session-test_norn_session.o `test -f 'tests/test_norn_session.c' || echo '$(srcdir)/'`tests/test_norn_session.c
+	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_norn_session-test_norn_session.Tpo tests/$(DEPDIR)/test_norn_session-test_norn_session.Po
+#	$(AM_V_CC)source='tests/test_norn_session.c' object='tests/test_norn_session-test_norn_session.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_session_CFLAGS) $(CFLAGS) -c -o tests/test_norn_session-test_norn_session.o `test -f 'tests/test_norn_session.c' || echo '$(srcdir)/'`tests/test_norn_session.c
+
+tests/test_norn_session-test_norn_session.obj: tests/test_norn_session.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_session_CFLAGS) $(CFLAGS) -MT tests/test_norn_session-test_norn_session.obj -MD -MP -MF tests/$(DEPDIR)/test_norn_session-test_norn_session.Tpo -c -o tests/test_norn_session-test_norn_session.obj `if test -f 'tests/test_norn_session.c'; then $(CYGPATH_W) 'tests/test_norn_session.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_norn_session.c'; fi`
+	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_norn_session-test_norn_session.Tpo tests/$(DEPDIR)/test_norn_session-test_norn_session.Po
+#	$(AM_V_CC)source='tests/test_norn_session.c' object='tests/test_norn_session-test_norn_session.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_norn_session_CFLAGS) $(CFLAGS) -c -o tests/test_norn_session-test_norn_session.obj `if test -f 'tests/test_norn_session.c'; then $(CYGPATH_W) 'tests/test_norn_session.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_norn_session.c'; fi`
 
 tests/test_recstore-test_recstore.o: tests/test_recstore.c
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_recstore_CFLAGS) $(CFLAGS) -MT tests/test_recstore-test_recstore.o -MD -MP -MF tests/$(DEPDIR)/test_recstore-test_recstore.Tpo -c -o tests/test_recstore-test_recstore.o `test -f 'tests/test_recstore.c' || echo '$(srcdir)/'`tests/test_recstore.c
@@ -1873,6 +2134,20 @@ tests/test_streammux_random-test_streammux_random.obj: tests/test_streammux_rand
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_streammux_random_CFLAGS) $(CFLAGS) -c -o tests/test_streammux_random-test_streammux_random.obj `if test -f 'tests/test_streammux_random.c'; then $(CYGPATH_W) 'tests/test_streammux_random.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_streammux_random.c'; fi`
 
+tests/test_suite-test_suite.o: tests/test_suite.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_suite_CFLAGS) $(CFLAGS) -MT tests/test_suite-test_suite.o -MD -MP -MF tests/$(DEPDIR)/test_suite-test_suite.Tpo -c -o tests/test_suite-test_suite.o `test -f 'tests/test_suite.c' || echo '$(srcdir)/'`tests/test_suite.c
+	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_suite-test_suite.Tpo tests/$(DEPDIR)/test_suite-test_suite.Po
+#	$(AM_V_CC)source='tests/test_suite.c' object='tests/test_suite-test_suite.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_suite_CFLAGS) $(CFLAGS) -c -o tests/test_suite-test_suite.o `test -f 'tests/test_suite.c' || echo '$(srcdir)/'`tests/test_suite.c
+
+tests/test_suite-test_suite.obj: tests/test_suite.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_suite_CFLAGS) $(CFLAGS) -MT tests/test_suite-test_suite.obj -MD -MP -MF tests/$(DEPDIR)/test_suite-test_suite.Tpo -c -o tests/test_suite-test_suite.obj `if test -f 'tests/test_suite.c'; then $(CYGPATH_W) 'tests/test_suite.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_suite.c'; fi`
+	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_suite-test_suite.Tpo tests/$(DEPDIR)/test_suite-test_suite.Po
+#	$(AM_V_CC)source='tests/test_suite.c' object='tests/test_suite-test_suite.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_suite_CFLAGS) $(CFLAGS) -c -o tests/test_suite-test_suite.obj `if test -f 'tests/test_suite.c'; then $(CYGPATH_W) 'tests/test_suite.c'; else $(CYGPATH_W) '$(srcdir)/tests/test_suite.c'; fi`
+
 tests/test_transport-test_transport.o: tests/test_transport.c
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_transport_CFLAGS) $(CFLAGS) -MT tests/test_transport-test_transport.o -MD -MP -MF tests/$(DEPDIR)/test_transport-test_transport.Tpo -c -o tests/test_transport-test_transport.o `test -f 'tests/test_transport.c' || echo '$(srcdir)/'`tests/test_transport.c
 	$(AM_V_at)$(am__mv) tests/$(DEPDIR)/test_transport-test_transport.Tpo tests/$(DEPDIR)/test_transport-test_transport.Po
@@ -1924,6 +2199,49 @@ clean-libtool:
 
 distclean-libtool:
 	-rm -f libtool config.lt
+install-man1: $(man_MANS)
+	@$(NORMAL_INSTALL)
+	@list1=''; \
+	list2='$(man_MANS)'; \
+	test -n "$(man1dir)" \
+	  && test -n "`echo $$list1$$list2`" \
+	  || exit 0; \
+	echo " $(MKDIR_P) '$(DESTDIR)$(man1dir)'"; \
+	$(MKDIR_P) "$(DESTDIR)$(man1dir)" || exit 1; \
+	{ for i in $$list1; do echo "$$i"; done;  \
+	if test -n "$$list2"; then \
+	  for i in $$list2; do echo "$$i"; done \
+	    | sed -n '/\.1[a-z]*$$/p'; \
+	fi; \
+	} | while read p; do \
+	  if test -f $$p; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; echo "$$p"; \
+	done | \
+	sed -e 'n;s,.*/,,;p;h;s,.*\.,,;s,^[^1][0-9a-z]*$$,1,;x' \
+	      -e 's,\.[0-9a-z]*$$,,;$(transform);G;s,\n,.,' | \
+	sed 'N;N;s,\n, ,g' | { \
+	list=; while read file base inst; do \
+	  if test "$$base" = "$$inst"; then list="$$list $$file"; else \
+	    echo " $(INSTALL_DATA) '$$file' '$(DESTDIR)$(man1dir)/$$inst'"; \
+	    $(INSTALL_DATA) "$$file" "$(DESTDIR)$(man1dir)/$$inst" || exit $$?; \
+	  fi; \
+	done; \
+	for i in $$list; do echo "$$i"; done | $(am__base_list) | \
+	while read files; do \
+	  test -z "$$files" || { \
+	    echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(man1dir)'"; \
+	    $(INSTALL_DATA) $$files "$(DESTDIR)$(man1dir)" || exit $$?; }; \
+	done; }
+
+uninstall-man1:
+	@$(NORMAL_UNINSTALL)
+	@list=''; test -n "$(man1dir)" || exit 0; \
+	files=`{ for i in $$list; do echo "$$i"; done; \
+	l2='$(man_MANS)'; for i in $$l2; do echo "$$i"; done | \
+	  sed -n '/\.1[a-z]*$$/p'; \
+	} | sed -e 's,.*/,,;h;s,.*\.,,;s,^[^1][0-9a-z]*$$,1,;x' \
+	      -e 's,\.[0-9a-z]*$$,,;$(transform);G;s,\n,.,'`; \
+	dir='$(DESTDIR)$(man1dir)'; $(am__uninstall_files_from_dir)
 install-pkgconfigDATA: $(pkgconfig_DATA)
 	@$(NORMAL_INSTALL)
 	@list='$(pkgconfig_DATA)'; test -n "$(pkgconfigdir)" || list=; \
@@ -2367,6 +2685,41 @@ test_attr.log: test_attr$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_net.log: test_net$(EXEEXT)
+	@p='test_net$(EXEEXT)'; \
+	b='test_net'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_suite.log: test_suite$(EXEEXT)
+	@p='test_suite$(EXEEXT)'; \
+	b='test_suite'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_norn_kad.log: test_norn_kad$(EXEEXT)
+	@p='test_norn_kad$(EXEEXT)'; \
+	b='test_norn_kad'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_norn_idexch.log: test_norn_idexch$(EXEEXT)
+	@p='test_norn_idexch$(EXEEXT)'; \
+	b='test_norn_idexch'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_norn_session.log: test_norn_session$(EXEEXT)
+	@p='test_norn_session$(EXEEXT)'; \
+	b='test_norn_session'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 .test.log:
 	@p='$<'; \
 	$(am__set_b); \
@@ -2564,14 +2917,14 @@ check-am: all-am
 	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
 	$(MAKE) $(AM_MAKEFLAGS) check-TESTS
 check: check-am
-all-am: Makefile $(PROGRAMS) $(LTLIBRARIES) $(DATA) $(HEADERS) \
+all-am: Makefile $(PROGRAMS) $(LTLIBRARIES) $(MANS) $(DATA) $(HEADERS) \
 		config.h
 install-binPROGRAMS: install-libLTLIBRARIES
 
 install-checkPROGRAMS: install-libLTLIBRARIES
 
 installdirs:
-	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libdir)" "$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(includedir)"; do \
+	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libdir)" "$(DESTDIR)$(man1dir)" "$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(includedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -2632,7 +2985,11 @@ distclean: distclean-am
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-log.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-net.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_idexch.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_suite_sodium.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-recstore.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-replaycache.Plo
@@ -2653,8 +3010,12 @@ distclean: distclean-am
 	-rm -f tests/$(DEPDIR)/test_kademlia-test_kademlia.Po
 	-rm -f tests/$(DEPDIR)/test_log-test_log.Po
 	-rm -f tests/$(DEPDIR)/test_mainline-test_mainline.Po
+	-rm -f tests/$(DEPDIR)/test_net-test_net.Po
 	-rm -f tests/$(DEPDIR)/test_norn-test_norn.Po
 	-rm -f tests/$(DEPDIR)/test_norn_async-test_norn_async.Po
+	-rm -f tests/$(DEPDIR)/test_norn_idexch-test_norn_idexch.Po
+	-rm -f tests/$(DEPDIR)/test_norn_kad-test_norn_kad.Po
+	-rm -f tests/$(DEPDIR)/test_norn_session-test_norn_session.Po
 	-rm -f tests/$(DEPDIR)/test_recstore-test_recstore.Po
 	-rm -f tests/$(DEPDIR)/test_replaycache-test_replaycache.Po
 	-rm -f tests/$(DEPDIR)/test_stream-test_stream.Po
@@ -2664,6 +3025,7 @@ distclean: distclean-am
 	-rm -f tests/$(DEPDIR)/test_stream_recovery-test_stream_recovery.Po
 	-rm -f tests/$(DEPDIR)/test_streammux-test_streammux.Po
 	-rm -f tests/$(DEPDIR)/test_streammux_random-test_streammux_random.Po
+	-rm -f tests/$(DEPDIR)/test_suite-test_suite.Po
 	-rm -f tests/$(DEPDIR)/test_transport-test_transport.Po
 	-rm -f tests/$(DEPDIR)/test_transport_tcp-test_transport_tcp.Po
 	-rm -f tests/$(DEPDIR)/test_transport_udp-test_transport_udp.Po
@@ -2683,7 +3045,8 @@ info: info-am
 
 info-am:
 
-install-data-am: install-includeHEADERS install-pkgconfigDATA
+install-data-am: install-includeHEADERS install-man \
+	install-pkgconfigDATA
 
 install-dvi: install-dvi-am
 
@@ -2699,7 +3062,7 @@ install-info: install-info-am
 
 install-info-am:
 
-install-man:
+install-man: install-man1
 
 install-pdf: install-pdf-am
 
@@ -2726,7 +3089,11 @@ maintainer-clean: maintainer-clean-am
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-log.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-net.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_idexch.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_impl.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_kad.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_session.Plo
+	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_suite_sodium.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-norn_transaction.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-recstore.Plo
 	-rm -f src/libnorn/$(DEPDIR)/libnorn_la-replaycache.Plo
@@ -2747,8 +3114,12 @@ maintainer-clean: maintainer-clean-am
 	-rm -f tests/$(DEPDIR)/test_kademlia-test_kademlia.Po
 	-rm -f tests/$(DEPDIR)/test_log-test_log.Po
 	-rm -f tests/$(DEPDIR)/test_mainline-test_mainline.Po
+	-rm -f tests/$(DEPDIR)/test_net-test_net.Po
 	-rm -f tests/$(DEPDIR)/test_norn-test_norn.Po
 	-rm -f tests/$(DEPDIR)/test_norn_async-test_norn_async.Po
+	-rm -f tests/$(DEPDIR)/test_norn_idexch-test_norn_idexch.Po
+	-rm -f tests/$(DEPDIR)/test_norn_kad-test_norn_kad.Po
+	-rm -f tests/$(DEPDIR)/test_norn_session-test_norn_session.Po
 	-rm -f tests/$(DEPDIR)/test_recstore-test_recstore.Po
 	-rm -f tests/$(DEPDIR)/test_replaycache-test_replaycache.Po
 	-rm -f tests/$(DEPDIR)/test_stream-test_stream.Po
@@ -2758,6 +3129,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f tests/$(DEPDIR)/test_stream_recovery-test_stream_recovery.Po
 	-rm -f tests/$(DEPDIR)/test_streammux-test_streammux.Po
 	-rm -f tests/$(DEPDIR)/test_streammux_random-test_streammux_random.Po
+	-rm -f tests/$(DEPDIR)/test_suite-test_suite.Po
 	-rm -f tests/$(DEPDIR)/test_transport-test_transport.Po
 	-rm -f tests/$(DEPDIR)/test_transport_tcp-test_transport_tcp.Po
 	-rm -f tests/$(DEPDIR)/test_transport_udp-test_transport_udp.Po
@@ -2778,7 +3150,9 @@ ps: ps-am
 ps-am:
 
 uninstall-am: uninstall-binPROGRAMS uninstall-includeHEADERS \
-	uninstall-libLTLIBRARIES uninstall-pkgconfigDATA
+	uninstall-libLTLIBRARIES uninstall-man uninstall-pkgconfigDATA
+
+uninstall-man: uninstall-man1
 
 .MAKE: all check-am install-am install-strip
 
@@ -2795,14 +3169,15 @@ uninstall-am: uninstall-binPROGRAMS uninstall-includeHEADERS \
 	install-data-am install-dvi install-dvi-am install-exec \
 	install-exec-am install-html install-html-am \
 	install-includeHEADERS install-info install-info-am \
-	install-libLTLIBRARIES install-man install-pdf install-pdf-am \
-	install-pkgconfigDATA install-ps install-ps-am install-strip \
-	installcheck installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-compile \
-	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	recheck tags tags-am uninstall uninstall-am \
-	uninstall-binPROGRAMS uninstall-includeHEADERS \
-	uninstall-libLTLIBRARIES uninstall-pkgconfigDATA
+	install-libLTLIBRARIES install-man install-man1 install-pdf \
+	install-pdf-am install-pkgconfigDATA install-ps install-ps-am \
+	install-strip installcheck installcheck-am installdirs \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
+	pdf pdf-am ps ps-am recheck tags tags-am uninstall \
+	uninstall-am uninstall-binPROGRAMS uninstall-includeHEADERS \
+	uninstall-libLTLIBRARIES uninstall-man uninstall-man1 \
+	uninstall-pkgconfigDATA
 
 .PRECIOUS: Makefile
 
@@ -2833,6 +3208,49 @@ check-pit:
 
 # All tests (unit + SIT + PIT)
 check-all: check check-sit check-pit
+
+# Static analysis targets
+check-cppcheck:
+	@if command -v cppcheck >/dev/null 2>&1; then \
+		cppcheck --quiet --enable=all --error-exitcode=1 \
+			--suppressions-list=$(top_srcdir)/cppcheck.supp \
+			--suppress=checkersReport \
+			--inline-suppr \
+			src/libnorn/*.c src/norn.c; \
+	else \
+		echo "ERROR: cppcheck not installed. Install cppcheck or skip this check."; \
+		exit 1; \
+	fi
+
+check-tidy: all
+	@if command -v clang-tidy >/dev/null 2>&1; then \
+		clang-tidy src/libnorn/*.c src/norn.c -- $(CFLAGS) -I$(top_srcdir)/src/libnorn; \
+	else \
+		echo "WARNING: clang-tidy not installed. Skipping."; \
+	fi
+
+check-format:
+	@if command -v clang-format >/dev/null 2>&1; then \
+		FAILED=0; \
+		for f in src/libnorn/*.c src/libnorn/*.h src/norn.c; do \
+			clang-format --dry-run --Werror $$f 2>/dev/null || FAILED=1; \
+		done; \
+		if [ $$FAILED -eq 1 ]; then \
+			echo "Code not formatted. Run: make format"; \
+			exit 1; \
+		fi; \
+	else \
+		echo "WARNING: clang-format not installed. Skipping."; \
+	fi
+
+format:
+	@if command -v clang-format >/dev/null 2>&1; then \
+		clang-format -i src/libnorn/*.c src/libnorn/*.h src/norn.c; \
+		echo "Formatted source files"; \
+	else \
+		echo "ERROR: clang-format not installed. Install clang-format first."; \
+		exit 1; \
+	fi
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

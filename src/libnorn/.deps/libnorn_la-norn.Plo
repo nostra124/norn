@@ -95,8 +95,6 @@ src/libnorn/libnorn_la-norn.lo: src/libnorn/norn.c src/libnorn/mainline.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_mode_t.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/string.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_string.h \
- /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_rsize_t.h \
- /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_errno_t.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_strings.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_strings.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_string.h \
@@ -166,6 +164,8 @@ src/libnorn/libnorn_la-norn.lo: src/libnorn/norn.c src/libnorn/mainline.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_nlink_t.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_useconds_t.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_suseconds_t.h \
+ /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_rsize_t.h \
+ /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_errno_t.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_fd_def.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_fd_setsize.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_fd_set.h \
@@ -351,8 +351,6 @@ src/libnorn/recstore.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_mode_t.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/string.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_string.h:
-/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_rsize_t.h:
-/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_errno_t.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_strings.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_strings.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_string.h:
@@ -423,6 +421,8 @@ src/libnorn/recstore.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_nlink_t.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_useconds_t.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_suseconds_t.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_rsize_t.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_errno_t.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_fd_def.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_fd_setsize.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_fd_set.h:

@@ -33,6 +33,9 @@
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
 
+/* norn version string */
+#undef NORN_VERSION
+
 /* Name of package */
 #undef PACKAGE
 

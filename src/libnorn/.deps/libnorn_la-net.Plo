@@ -50,8 +50,6 @@ src/libnorn/libnorn_la-net.lo: src/libnorn/net.c src/libnorn/net.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_common.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/string.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_string.h \
- /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_rsize_t.h \
- /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_errno_t.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_strings.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_strings.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_string.h \
@@ -105,6 +103,8 @@ src/libnorn/libnorn_la-net.lo: src/libnorn/net.c src/libnorn/net.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_nlink_t.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_id_t.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_clock_t.h \
+ /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_rsize_t.h \
+ /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_errno_t.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_pthread/_pthread_attr_t.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_pthread/_pthread_cond_t.h \
  /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_pthread/_pthread_condattr_t.h \
@@ -198,8 +198,6 @@ src/libnorn/log.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_common.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/string.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_string.h:
-/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_rsize_t.h:
-/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_errno_t.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/_strings.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_strings.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/secure/_string.h:
@@ -253,6 +251,8 @@ src/libnorn/log.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_nlink_t.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_id_t.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_clock_t.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_rsize_t.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_types/_errno_t.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_pthread/_pthread_attr_t.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_pthread/_pthread_cond_t.h:
 /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk/usr/include/sys/_pthread/_pthread_condattr_t.h:
