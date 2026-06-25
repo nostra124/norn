@@ -28,6 +28,46 @@
 
 /* === Internal Session Management === */
 
+/* Stream data plane (FEAT-016/018): the streammux emits id-framed segments
+ * through this callback; we seal each as one datagram over the channel. The
+ * peer's process_packet decrypts it back into a segment and feeds its mux. */
+static int session_mux_send(void *ctx, const unsigned char *seg, size_t len) {
+    norn_session_t *s = ctx;
+    if (s->fd < 0 || s->state != NORN_SESSION_ESTABLISHED) return 1; /* retry once ready */
+    unsigned char out[2048];
+    if (len + CHANNEL_OVERHEAD > sizeof(out)) return 0; /* drop oversized (bounded MTU) */
+    int sl = channel_seal(&s->channel, seg, len, out, sizeof(out));
+    if (sl < 0) return 0;
+    ssize_t sent = send(s->fd, out, (size_t)sl, 0);
+    return sent == sl ? 0 : 1;
+}
+
+/* Grow the session's stream-wrapper array by one slot if needed. */
+static int session_streams_reserve(norn_session_t *s) {
+    if (s->stream_count < s->stream_cap) return 0;
+    int new_cap = s->stream_cap * 2;
+    norn_stream_t **g = realloc(s->streams, (size_t)new_cap * sizeof(*g));
+    if (!g) return -1;
+    s->streams = g;
+    s->stream_cap = new_cap;
+    return 0;
+}
+
+/* On the first inbound segment for a peer-initiated stream id, create a wrapper
+ * and notify the accept handler (the server side of a tunnel). */
+static void session_maybe_accept_stream(norn_session_t *s, uint16_t sid) {
+    for (int i = 0; i < s->stream_count; i++)
+        if (s->streams[i] && s->streams[i]->stream_id == sid) return;
+    if (session_streams_reserve(s) != 0) return;
+    norn_stream_t *st = calloc(1, sizeof(*st));
+    if (!st) return;
+    st->stream_id = sid;
+    st->session = s;
+    st->closed = 0;
+    s->streams[s->stream_count++] = st;
+    if (s->accept_stream_cb) s->accept_stream_cb(st, s->accept_stream_ud);
+}
+
 norn_session_t *norn_session_new(norn_client_t *client,
                                   const norn_crypto_suite_t *suite) {
     if (!client) return NULL;
@@ -41,7 +81,7 @@ norn_session_t *norn_session_new(norn_client_t *client,
     session->fd = -1;
     session->next_stream_id = 1;  /* Initiator uses odd IDs */
     
-    session->mux = streammux_new(NULL, NULL);
+    session->mux = streammux_new(session_mux_send, session);
     if (!session->mux) {
         free(session);
         return NULL;
@@ -464,11 +504,24 @@ int norn_session_process_packet(norn_session_t *session,
                                  uint32_t from_ip,
                                  uint16_t from_port) {
     if (!session || !data || len == 0) return -1;
-    if (session->state != NORN_SESSION_CONNECTING) return -1;
-    
+
     /* Verify packet is from expected peer */
     if (session->peer_ip != 0 && session->peer_ip != from_ip) return -1;
     if (session->peer_port != 0 && session->peer_port != from_port) return -1;
+
+    /* Established: a datagram is a sealed stream-mux segment. Decrypt it,
+     * surface any newly peer-initiated stream, and feed the mux. */
+    if (session->state == NORN_SESSION_ESTABLISHED) {
+        unsigned char pt[2048];
+        int pl = channel_open(&session->channel, data, len, pt, sizeof(pt));
+        if (pl < STREAMMUX_FRAME) return -1;
+        uint16_t sid = (uint16_t)(((uint16_t)pt[0] << 8) | pt[1]);
+        session_maybe_accept_stream(session, sid);
+        streammux_input(session->mux, pt, (size_t)pl, 0);
+        return 0;
+    }
+
+    if (session->state != NORN_SESSION_CONNECTING) return -1;
     
     /* Process based on handshake state */
     if (session->is_initiator) {
@@ -626,17 +679,22 @@ int norn_client_tick_sessions(norn_client_t *client) {
         
         /* Check timeouts */
         norn_session_check_timeout(session, now_ms);
-        
-        /* Process incoming packets if fd is set */
+
+        /* Drive stream-mux timers (retransmit/flush) on established sessions. */
+        if (session->state == NORN_SESSION_ESTABLISHED) {
+            streammux_tick(session->mux, now_ms);
+        }
+
+        /* Process incoming packets if fd is set. Drain all queued datagrams so a
+         * burst of stream segments is delivered in one tick. */
         if (session->fd >= 0) {
             unsigned char buf[4096];
             struct sockaddr_in from;
             socklen_t fromlen = sizeof(from);
-            
-            ssize_t len = recvfrom(session->fd, buf, sizeof(buf), MSG_DONTWAIT,
-                                   (struct sockaddr *)&from, &fromlen);
-            
-            if (len > 0) {
+
+            ssize_t len;
+            while ((len = recvfrom(session->fd, buf, sizeof(buf), MSG_DONTWAIT,
+                                   (struct sockaddr *)&from, &fromlen)) > 0) {
                 norn_session_process_packet(session, buf, len,
                                              from.sin_addr.s_addr, from.sin_port);
                 processed++;
@@ -1006,8 +1064,17 @@ norn_stream_t *norn_stream_open_async(norn_session_t *session,
     
     /* Notify callback */
     callback(stream, NORN_STREAM_READY, user_data);
-    
+
     return stream;
+}
+
+int norn_session_set_accept_stream(norn_session_t *session,
+                                   void (*cb)(norn_stream_t *stream, void *user_data),
+                                   void *user_data) {
+    if (!session) return -1;
+    session->accept_stream_cb = cb;
+    session->accept_stream_ud = user_data;
+    return 0;
 }
 
 int norn_stream_write(norn_stream_t *stream,
