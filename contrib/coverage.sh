@@ -10,6 +10,11 @@ echo "==> Building with coverage"
 make clean
 make
 
+# Drop any stale .gcda counters (e.g. from manually running the daemon) so they
+# can't mismatch the freshly built .gcno notes and abort the lcov capture. Only
+# the .gcda produced by `make check` below should feed the report.
+find . -name '*.gcda' -delete
+
 echo "==> Running tests"
 make check
 
