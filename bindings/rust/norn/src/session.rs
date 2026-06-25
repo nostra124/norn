@@ -67,10 +67,33 @@ impl Session {
         }
     }
 
+    /// Register a handler for inbound (peer-initiated) streams — the server side
+    /// of a tunnel. `cb` is invoked from `Client::tick` for each stream the peer
+    /// opens on this session.
+    ///
+    /// Note: the closure is leaked to live for the session's lifetime (sessions
+    /// are owned by the `Client`); call once per session.
+    pub fn on_inbound_stream<F>(&self, cb: F)
+    where
+        F: FnMut(Stream) + 'static,
+    {
+        let boxed: Box<Box<dyn FnMut(Stream)>> = Box::new(Box::new(cb));
+        let ud = Box::into_raw(boxed) as *mut c_void;
+        unsafe { sys::norn_session_set_accept_stream(self.raw, Some(inbound_trampoline), ud) };
+    }
+
     /// Raw handle for advanced use.
     pub fn as_ptr(&self) -> *mut sys::norn_session {
         self.raw
     }
+}
+
+unsafe extern "C" fn inbound_trampoline(stream: *mut sys::norn_stream, ud: *mut c_void) {
+    if ud.is_null() {
+        return;
+    }
+    let cb = &mut *(ud as *mut Box<dyn FnMut(Stream)>);
+    cb(Stream::from_raw(stream));
 }
 
 unsafe extern "C" fn noop_stream_cb(_s: *mut sys::norn_stream, _state: c_int, _ud: *mut c_void) {}
