@@ -41,6 +41,23 @@ a reusable utility.
 2. Bidirectional, length-correct byte transfer under load.
 3. Peer pubkey is available to the wrapped service.
 
+## Implementation Status
+
+- **Phase 1 — stream multiplexing** (`streammux`): ✅ done.
+- **Phase 2 — splice engine** (`norn_forward.{c,h}`): ✅ done. A pure,
+  transport-agnostic bidirectional byte pump (half-close/EOF, bounded
+  backpressured buffers), unit-tested to 100% line+branch coverage with
+  in-memory fakes (`tests/test_forward.c`). Shipped as a library entry so apps
+  can embed it.
+- **Phase 3 — `norn-forward` CLI**: ✅ client side (local TCP listen → dial peer
+  by pubkey → splice over a norn stream); fd-backed and norn-stream-backed
+  endpoints. Server side (accept inbound peer streams → connect a local
+  service) is pending the session layer's inbound-stream accept API
+  (FEAT-016/017 completion); the splice engine and fd IO are already shared by
+  it.
+- Acceptance criterion 3 (expose verified peer pubkey to the wrapped service)
+  lands with the server side via `norn_session_get_peer()`.
+
 ## Cross-repo
 
 Day-1 "HTTP over libnorn" answer for thunder, mimir, regin, raven. The clean
