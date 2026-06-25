@@ -106,8 +106,8 @@ These tickets enable norn to serve multiple sister projects (bifrost, wyrd) with
 
 | Ticket | Description | Priority | Depends On |
 |--------|-------------|----------|------------|
-| FEAT-018 | Stream-tunnel utility (norn-forward) | medium | FEAT-016 |
-| FEAT-019 | Language binding (Rust crate) | medium | FEAT-016 |
+| FEAT-018 | Stream-tunnel utility (norn-forward) | medium | FEAT-016 | engine + CLI client done |
+| FEAT-019 | Language binding (Rust crate) | medium | FEAT-016 | core crate done; dial/listen + axum next |
 
 **Key Features:**
 - `norn-forward` — TCP/Unix service over norn stream (ssh -L/-R equivalent)
