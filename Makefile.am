@@ -36,6 +36,10 @@ libnorn_la_SOURCES = \
 	src/libnorn/norn_relay.c
 
 libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
+# Record libsodium as a dependency of the shared library itself, so dynamic
+# consumers (e.g. the Rust binding) don't have to re-link it explicitly and it
+# survives the linker's --as-needed pruning.
+libnorn_la_LIBADD = $(SODIUM_LIBS)
 
 include_HEADERS = src/libnorn/norn.h \
                    src/libnorn/mainline.h \

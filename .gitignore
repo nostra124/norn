@@ -40,8 +40,10 @@ coverage.info
 coverage_html/
 covhtml/
 
-# Generated files
-norn
+# Generated files (the built CLI binary at the repo root, not e.g. a `norn`
+# source directory like bindings/rust/norn)
+/norn
+/norn-forward
 *.dylib
 
 # IDE/Editor
