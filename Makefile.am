@@ -49,7 +49,7 @@ libnorn_la_LIBADD = $(SODIUM_LIBS)
 # (not part of the library). Convenience lib so the daemon and its tests share
 # the same object code.
 noinst_LTLIBRARIES = libnornd.la
-libnornd_la_SOURCES = src/nornd/ipc.c src/nornd/identity.c src/nornd/dispatch.c src/nornd/client.c src/nornd/cli_cluster.c src/nornd/keydir.c
+libnornd_la_SOURCES = src/nornd/ipc.c src/nornd/identity.c src/nornd/dispatch.c src/nornd/client.c src/nornd/cli_cluster.c src/nornd/cli_keys.c src/nornd/keydir.c
 libnornd_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 
 include_HEADERS = src/libnorn/norn.h \

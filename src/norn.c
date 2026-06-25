@@ -13,6 +13,7 @@
 #include "libnorn/crypto.h"
 #include "libnorn/log.h"
 #include "nornd/cli_cluster.h"
+#include "nornd/cli_keys.h"
 
 #define DEFAULT_PORT 6881
 #define DEFAULT_TIMEOUT 5000
@@ -38,6 +39,7 @@ static void usage(FILE *out) {
     fprintf(out, "  daemon              Run as DHT daemon\n");
     fprintf(out, "  cluster <sub> ...   Talk to nornd's cluster KV store:\n");
     fprintf(out, "                        put|get|del|cas|watch|members|leader|status\n");
+    fprintf(out, "  keys <nodeid>       Resolve a peer's SSH + GPG public keys\n");
     fprintf(out, "  version             Print version\n");
     fprintf(out, "\n");
     fprintf(out, "Options:\n");
@@ -584,6 +586,8 @@ int main(int argc, char **argv) {
     } else if (strcmp(cmd, "cluster") == 0) {
         /* Hand the remaining args (subcommand onward) to the IPC client. */
         return nornd_cli_cluster(argc - optind - 1, argv + optind + 1);
+    } else if (strcmp(cmd, "keys") == 0) {
+        return nornd_cli_keys(argc - optind - 1, argv + optind + 1);
     }
     
     fprintf(stderr, "ERROR: Unknown command: %s\n", cmd);
