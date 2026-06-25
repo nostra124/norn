@@ -100,6 +100,16 @@ nornd_SOURCES = src/nornd/main.c
 nornd_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 nornd_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
+# Service packaging (FEAT-032). Installed under $(prefix) so a sandboxed
+# `make install` never collides with system paths; distro packaging relocates
+# them to /usr/lib/systemd and /Library/Launch* as appropriate.
+systemdsystemdir = $(prefix)/lib/systemd/system
+dist_systemdsystem_DATA = contrib/systemd/nornd.socket contrib/systemd/nornd.service
+systemduserdir = $(prefix)/lib/systemd/user
+dist_systemduser_DATA = contrib/systemd/user/nornd.socket contrib/systemd/user/nornd.service
+launchddir = $(prefix)/lib/launchd
+dist_launchd_DATA = contrib/launchd/io.norn.nornd.plist contrib/launchd/io.norn.nornd.user.plist
+
 check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_forward test_raft test_kvstore test_cluster test_overlay test_transport test_transport_udp test_transport_tcp test_idexch test_attr test_net test_suite test_norn_kad test_norn_idexch test_norn_session test_session_loopback test_rendezvous test_relay test_nornd_ipc test_nornd_identity test_nornd_dispatch test_nornd_client test_nornd_keydir
 
 test_norn_SOURCES = tests/test_norn.c

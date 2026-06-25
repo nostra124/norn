@@ -106,6 +106,35 @@ static const char *default_socket(char *buf, size_t cap) {
     return buf;
 }
 
+/* systemd/launchd socket activation: if a listening fd was passed in, use it
+ * instead of binding our own. Returns the fd (SD_LISTEN_FDS_START) or -1. */
+static int activated_fd(void) {
+    const char *nfds = getenv("LISTEN_FDS");
+    const char *lpid = getenv("LISTEN_PID");
+    if (!nfds || !lpid) return -1;
+    if (atol(lpid) != (long)getpid()) return -1;
+    if (atol(nfds) < 1) return -1;
+    return 3; /* SD_LISTEN_FDS_START */
+}
+
+/* Minimal sd_notify(READY=1) for Type=notify, without linking libsystemd. */
+static void notify_ready(void) {
+    const char *path = getenv("NOTIFY_SOCKET");
+    if (!path || !path[0]) return;
+    int fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+    if (fd < 0) return;
+    struct sockaddr_un sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sun_family = AF_UNIX;
+    if (strlen(path) < sizeof(sa.sun_path)) {
+        strcpy(sa.sun_path, path);
+        if (sa.sun_path[0] == '@') sa.sun_path[0] = '\0'; /* abstract socket */
+        static const char msg[] = "READY=1";
+        sendto(fd, msg, sizeof(msg) - 1, 0, (struct sockaddr *)&sa, sizeof(sa));
+    }
+    close(fd);
+}
+
 static int listen_unix(const char *path) {
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) return -1;
@@ -164,10 +193,15 @@ int main(int argc, char **argv) {
             sockpath = argv[++i];
         else if (strcmp(argv[i], "--class") == 0 && i + 1 < argc)
             cls = parse_class(argv[++i]);
+        else if (strcmp(argv[i], "--data-dir") == 0 && i + 1 < argc)
+            ++i; /* accepted for the service units; state dir is reserved */
+        else if (strcmp(argv[i], "--foreground") == 0)
+            ; /* we never daemonize; accepted for Type=notify units */
         else {
             fprintf(stderr,
                     "usage: nornd [--identity PATH] [--socket PATH] "
-                    "[--class server|workstation|laptop|mobile]\n");
+                    "[--class server|workstation|laptop|mobile]\n"
+                    "             [--data-dir PATH] [--foreground]\n");
             return 2;
         }
     }
@@ -202,7 +236,13 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    int lfd = listen_unix(sockpath);
+    int activated = 0;
+    int lfd = activated_fd();
+    if (lfd >= 0) {
+        activated = 1; /* fd handed over by systemd/launchd; don't unlink it */
+    } else {
+        lfd = listen_unix(sockpath);
+    }
     if (lfd < 0) {
         fprintf(stderr, "nornd: cannot listen on %s: %s\n", sockpath,
                 strerror(errno));
@@ -237,7 +277,9 @@ int main(int argc, char **argv) {
     }
     int ssh_published = 0;
 
-    fprintf(stderr, "nornd: serving %s (identity %s)\n", sockpath, idpath);
+    fprintf(stderr, "nornd: serving %s (identity %s)\n",
+            activated ? "socket-activated fd" : sockpath, idpath);
+    notify_ready();
 
     int clients[MAX_CLIENTS];
     int nclients = 0;
@@ -299,7 +341,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "nornd: shutting down\n");
     for (int i = 0; i < nclients; i++) close(clients[i]);
     close(lfd);
-    unlink(sockpath);
+    if (!activated) unlink(sockpath); /* systemd owns an activated socket */
     norn_cluster_free(cl);
     norn_free(client);
     return 0;
