@@ -116,6 +116,10 @@ int norn_cluster_is_leader(const norn_cluster_t *cl);
 const unsigned char *norn_cluster_leader(const norn_cluster_t *cl);
 /** Number of members (voters + learners). */
 int norn_cluster_member_count(const norn_cluster_t *cl);
+/** Copy up to `max` member pubkeys into `out`; returns the number written, or
+ *  -1 on bad arguments. */
+int norn_cluster_members(const norn_cluster_t *cl,
+                         unsigned char out[][NORN_CLUSTER_PUBKEY], int max);
 /** 1 if `pubkey` is a voting member. */
 int norn_cluster_is_voter(const norn_cluster_t *cl,
                           const unsigned char pubkey[NORN_CLUSTER_PUBKEY]);

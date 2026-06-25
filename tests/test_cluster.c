@@ -351,6 +351,14 @@ static void test_null_paths(void) {
     assert(norn_cluster_is_voter(cl, NULL) == 0);
     assert(norn_cluster_leader(cl) == NULL); /* no leader yet */
     norn_cluster_input(cl, pub, NULL, 0);    /* NULL data */
+    /* member enumeration */
+    unsigned char list[4][PK];
+    assert(norn_cluster_members(NULL, list, 4) == -1);
+    assert(norn_cluster_members(cl, NULL, 4) == -1);
+    assert(norn_cluster_members(cl, list, -1) == -1);
+    assert(norn_cluster_members(cl, list, 4) == 1);     /* n_members < max */
+    assert(memcmp(list[0], pub, PK) == 0);
+    assert(norn_cluster_members(cl, list, 0) == 0);     /* max clamps to 0 */
     norn_cluster_free(cl);
 }
 
