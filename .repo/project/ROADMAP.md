@@ -171,6 +171,7 @@ SSH/GPG key directory.
 | FEAT-029 | `nornd` daemon — node + cluster host + unix-socket IPC server | medium | FEAT-027, FEAT-028, FEAT-025 |
 | FEAT-030 | `norn` CLI refactor — thin IPC client, namespaced verbs | medium | FEAT-027, FEAT-029 |
 | FEAT-031 | Fleet key directory — publish/resolve SSH + GPG pubkeys | medium | FEAT-029, FEAT-028 |
+| FEAT-033 | Node-served KV — direct, streamed content (`node`/`peer`) | medium | FEAT-029, FEAT-018 |
 | FEAT-032 | Packaging — nornd as user + system daemon (systemd + launchd) | medium | FEAT-029 |
 
 **Key Features:**
@@ -216,6 +217,7 @@ v0.12.0 (nornd + norn IPC CLI)    │   (application layer on libnorn)
 ├── FEAT-029: nornd daemon ───────┤
 ├── FEAT-030: norn CLI client ────┤
 ├── FEAT-031: fleet key directory ┤
+├── FEAT-033: node-served KV ──────┤
 └── FEAT-032: packaging (svc units)┘
 ```
 
@@ -228,5 +230,5 @@ v0.12.0 (nornd + norn IPC CLI)    │   (application layer on libnorn)
 | Completed Milestones | 10 (v0.2.0–v0.11.0) |
 | Planned Milestones | 1 (v0.12.0) |
 | Completed Tickets | 26 |
-| Planned Tickets | 6 |
+| Planned Tickets | 7 |
 | Version | 0.9.0-dev |

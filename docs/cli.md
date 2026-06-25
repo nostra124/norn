@@ -55,6 +55,20 @@ session fds), draining `norn_tick` + `norn_cluster_tick`.
 
 ---
 
+## Three key-value surfaces
+
+norn exposes three distinct stores; pick by who owns the data and how consistent
+it must be:
+
+| Surface | CLI | Transport | Consistency | For |
+|---------|-----|-----------|-------------|-----|
+| **Cluster KV** | `norn cluster …` | Raft over norn streams | replicated, consensus | shared fleet state — **incl. the SSH/GPG key directory** |
+| **Node-served KV** | `norn node …` (own), `norn peer get/cat` | direct dial → stream req/resp | per-node authoritative (no replication) | a node's own data, served on demand |
+| **DHT (BEP-44)** | `norn bep44 …` | public mainline DHT | public, eventually-consistent | small public records |
+
+The fleet's **SSH + GPG public keys are shared in the cluster store**, where
+membership is controlled — **not** over the public BEP-44 DHT.
+
 ## `norn` — the client
 
 ```
@@ -83,6 +97,31 @@ norn cluster join   <pubkey@host:port>   Join/bootstrap a cluster      (admin)
 norn cluster promote <pubkey>            Learner → voter               (admin)
 norn cluster remove  <pubkey>            Remove a member               (admin)
 ```
+
+### Node-served KV (this node's own store)
+
+Each node serves its own key-values **directly** on request — no replication, no
+DHT. Values are **streamed** over a norn stream, so they can be large (a node is
+a pubkey-addressed content server: `node put` a 1 GB file and peers stream it).
+
+```
+norn node set  <key> <value|->     Set a mutable served value (updatable)
+norn node put  <value|-|@file>     Store an immutable served value → prints its content hash
+norn node list [<prefix>]          List keys this node serves
+norn node del  <key>               Remove a served key
+```
+
+### Peer fetch (another node's served store)
+
+```
+norn peer get  <nodeid> <key>      Fetch a peer's mutable served value (streams to stdout)
+norn peer cat  <nodeid> <hash>     Fetch a peer's immutable served value by content hash
+```
+
+nornd dials `<nodeid>`, opens a stream, sends the request, and streams the reply
+back — so large objects never buffer in full. Typical pattern: publish a blob
+with `node put` (get its hash), advertise `hash → nodeid` as a small value in
+the **cluster** store, then peers `peer cat <nodeid> <hash>` to stream it.
 
 ### Fleet key directory
 
@@ -139,12 +178,14 @@ norn version      Print version
 | Cluster KV key | 64 B | design (tunable) |
 | Cluster KV value | 256 B → raise for keys | design (tunable; must fit a raft entry) |
 | Raft log entry | 512 B | must be ≥ a full KV command |
+| **Node-served KV value** | **effectively unbounded (streamed from disk)** | a node is a pubkey-addressed content server |
 | IPC frame | ~1 MB cap | design (bounds the daemon) |
-| norn stream | effectively unbounded | reliable stream — for bulk/files |
+| norn stream | effectively unbounded | reliable stream — the transport bulk rides |
 
-**Rule of thumb:** ≤1 KB records → BEP-44 or the cluster KV; public keys → the
-cluster KV (chunked if large); files/blobs → **streams** (`norn-forward`), with
-only a hash/pointer kept in the KV.
+**Rule of thumb:** ≤1 KB consensus records → cluster KV; small public records →
+BEP-44; **keys → cluster KV** (chunked if large); **files/blobs → node-served
+KV** (`node put` / `peer cat`, streamed), with only a small `hash → nodeid`
+pointer kept in the cluster store.
 
 **GPG keys.** An armored GPG public key (~1–4 KB) exceeds every inline limit
 above. The key directory therefore (a) raises the cluster value cap modestly to
