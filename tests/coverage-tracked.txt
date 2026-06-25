@@ -22,6 +22,7 @@ src/libnorn/streammux.c
 src/libnorn/norn_forward.c
 src/libnorn/norn_raft.c
 src/libnorn/norn_kvstore.c
+src/libnorn/norn_cluster.c
 src/libnorn/transport.c
 src/libnorn/transport_udp.c
 src/libnorn/transport_tcp.c
