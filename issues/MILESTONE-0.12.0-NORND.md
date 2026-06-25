@@ -48,6 +48,7 @@ DHT/overlay client).
 | FEAT-029 | `nornd` daemon — node + cluster host + unix-socket IPC server | [ ] planned |
 | FEAT-030 | `norn` CLI refactor — thin IPC client, namespaced verbs | [ ] planned |
 | FEAT-031 | Fleet key directory — publish/resolve SSH + GPG pubkeys | [ ] planned |
+| FEAT-033 | Node-served KV — direct, streamed, pubkey-addressed content (`node`/`peer`) | [ ] planned |
 | FEAT-032 | Packaging — nornd as a user + system daemon (systemd + launchd, socket-activated) | [ ] planned |
 
 ## Suggested order
