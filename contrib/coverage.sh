@@ -18,33 +18,50 @@ lcov --rc branch_coverage=1 --capture --directory . --output-file coverage.info 
     lcov --rc lcov_branch_coverage=1 --capture --directory . --output-file coverage.info
 
 echo "==> Checking coverage for tracked sources"
+# Parse the raw .info records directly. lcov 2.0's `--list` table renders
+# bogus percentages with some gcov builds (functions >100%, branches blanked),
+# but the underlying SF/LF/LH/BRF/BRH records are accurate. The gate reads
+# those: a source passes when every instrumented line and branch is hit
+# (LH==LF and BRH==BRF), after LCOV_EXCL markers have removed untestable paths.
 FAILED=0
 while read -r src; do
     [ -z "$src" ] && continue
     [ "${src:0:1}" = "#" ] && continue
-    
-    LINE=$(lcov --list coverage.info 2>/dev/null | grep "$src" | head -1)
-    if [ -z "$LINE" ]; then
+
+    RESULT=$(awk -v target="$src" '
+        function endswith(s, suf) {
+            return length(s) >= length(suf) &&
+                   substr(s, length(s) - length(suf) + 1) == suf
+        }
+        /^SF:/ { cur = endswith(substr($0, 4), target)
+                 if (cur) { lf=lh=brf=brh=0 } }
+        cur && /^LF:/  { lf  = substr($0, 4) }
+        cur && /^LH:/  { lh  = substr($0, 4) }
+        cur && /^BRF:/ { brf = substr($0, 5) }
+        cur && /^BRH:/ { brh = substr($0, 5) }
+        cur && /^end_of_record/ { print lf, lh, brf, brh; cur=0 }
+    ' coverage.info | head -1)
+
+    if [ -z "$RESULT" ]; then
         echo "FAIL: $src - Not found in coverage report"
         FAILED=1
         continue
     fi
-    
-    LINE_PCT=$(echo "$LINE" | awk -F'|' '{split($2,a,"%"); split(a[1],b," "); for(i in b) if(b[i] ~ /[0-9]/) {print b[i]; break}}')
-    BRANCH_PCT=$(echo "$LINE" | awk -F'|' '{split($3,a,"%"); split(a[1],b," "); for(i in b) if(b[i] ~ /[0-9]/) {print b[i]; break}}')
-    
-    if [ -z "$LINE_PCT" ]; then
-        LINE_PCT=0
+
+    set -- $RESULT
+    LF=$1; LH=$2; BRF=$3; BRH=$4
+
+    if [ "$LF" = "0" ]; then
+        echo "FAIL: $src - No instrumented lines"
+        FAILED=1
+        continue
     fi
-    if [ -z "$BRANCH_PCT" ]; then
-        BRANCH_PCT=0
-    fi
-    
-    if [ "$LINE_PCT" != "100" ] || [ "$BRANCH_PCT" != "100" ]; then
-        echo "FAIL: $src - Lines: ${LINE_PCT}%, Branches: ${BRANCH_PCT}%"
+
+    if [ "$LH" != "$LF" ] || [ "$BRH" != "$BRF" ]; then
+        echo "FAIL: $src - Lines: ${LH}/${LF}, Branches: ${BRH}/${BRF}"
         FAILED=1
     else
-        echo "PASS: $src - Lines: ${LINE_PCT}%, Branches: ${BRANCH_PCT}%"
+        echo "PASS: $src - Lines: ${LH}/${LF}, Branches: ${BRH}/${BRF}"
     fi
 done < "$TRACKED"
 

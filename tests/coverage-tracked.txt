@@ -29,3 +29,4 @@ src/libnorn/transport_udp.c
 src/libnorn/transport_tcp.c
 src/libnorn/idexch.c
 src/libnorn/attr.c
+src/nornd/ipc.c
