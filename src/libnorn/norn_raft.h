@@ -38,8 +38,9 @@
 #define RAFT_MAX_NODES 16
 /** Max in-memory log entries (bounded; compaction is a later increment). */
 #define RAFT_MAX_LOG 512
-/** Max bytes of application data per log entry. */
-#define RAFT_ENTRY_MAX 256
+/** Max bytes of application data per log entry. Must be >= a full KV command
+ *  (key + value + framing) so norn_cluster can propose any KV op. */
+#define RAFT_ENTRY_MAX 512
 /** Max entries shipped in one AppendEntries. */
 #define RAFT_MAX_BATCH 8
 /** Reserved "no node" id. Real members use id >= 1. */
