@@ -49,7 +49,7 @@ libnorn_la_LIBADD = $(SODIUM_LIBS)
 # (not part of the library). Convenience lib so the daemon and its tests share
 # the same object code.
 noinst_LTLIBRARIES = libnornd.la
-libnornd_la_SOURCES = src/nornd/ipc.c
+libnornd_la_SOURCES = src/nornd/ipc.c src/nornd/identity.c
 libnornd_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 
 include_HEADERS = src/libnorn/norn.h \
@@ -96,7 +96,7 @@ norn_forward_SOURCES = src/norn_forward_main.c
 norn_forward_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 norn_forward_LDADD = libnorn.la $(SODIUM_LIBS)
 
-check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_forward test_raft test_kvstore test_cluster test_overlay test_transport test_transport_udp test_transport_tcp test_idexch test_attr test_net test_suite test_norn_kad test_norn_idexch test_norn_session test_session_loopback test_rendezvous test_relay test_nornd_ipc
+check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_forward test_raft test_kvstore test_cluster test_overlay test_transport test_transport_udp test_transport_tcp test_idexch test_attr test_net test_suite test_norn_kad test_norn_idexch test_norn_session test_session_loopback test_rendezvous test_relay test_nornd_ipc test_nornd_identity
 
 test_norn_SOURCES = tests/test_norn.c
 test_norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
@@ -254,12 +254,17 @@ test_nornd_ipc_SOURCES = tests/test_nornd_ipc.c
 test_nornd_ipc_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 test_nornd_ipc_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
+test_nornd_identity_SOURCES = tests/test_nornd_identity.c
+test_nornd_identity_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
+test_nornd_identity_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
+
 TESTS = $(check_PROGRAMS)
 
 # Coverage support
 if ENABLE_COVERAGE
 COV_FLAGS = -fprofile-arcs -ftest-coverage
 libnorn_la_CFLAGS += $(COV_FLAGS)
+libnornd_la_CFLAGS += $(COV_FLAGS)
 norn_CFLAGS += $(COV_FLAGS)
 endif
 
