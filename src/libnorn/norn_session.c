@@ -39,9 +39,19 @@ norn_session_t *norn_session_new(norn_client_t *client,
     session->suite = suite ? suite : norn_suite_sodium();
     session->state = NORN_SESSION_CONNECTING;
     session->fd = -1;
+    session->next_stream_id = 1;  /* Initiator uses odd IDs */
     
     session->mux = streammux_new(NULL, NULL);
     if (!session->mux) {
+        free(session);
+        return NULL;
+    }
+    
+    /* Initialize stream tracking */
+    session->stream_cap = 16;
+    session->streams = calloc(session->stream_cap, sizeof(*session->streams));
+    if (!session->streams) {
+        streammux_free(session->mux);
         free(session);
         return NULL;
     }
@@ -713,6 +723,16 @@ void norn_session_free(norn_session_t *session) {
         close(session->fd);
     }
     
+    /* Free all streams */
+    if (session->streams) {
+        for (int i = 0; i < session->stream_count; i++) {
+            if (session->streams[i]) {
+                free(session->streams[i]);
+            }
+        }
+        free(session->streams);
+    }
+    
     if (session->mux) {
         streammux_free(session->mux);
     }
@@ -943,15 +963,115 @@ int norn_resolve_endpoint_async(norn_client_t *client,
 
 /* === Stream Multiplexing (FEAT-018, stub) === */
 
-int norn_stream_open_async(norn_session_t *session,
-                           void *callback,
-                           void *user_data) {
-    (void)session;
-    (void)callback;
-    (void)user_data;
+norn_stream_t *norn_stream_open_async(norn_session_t *session,
+                                      norn_stream_callback_t callback,
+                                      void *user_data) {
+    if (!session || !callback) return NULL;
+    if (session->state != NORN_SESSION_ESTABLISHED) return NULL;
     
-    /* TODO FEAT-018: Implement stream multiplexing */
-    return -1;
+    /* Allocate stream */
+    norn_stream_t *stream = calloc(1, sizeof(*stream));
+    if (!stream) return NULL;
+    
+    /* Assign stream ID (odd for initiator, even for responder) */
+    stream->stream_id = session->next_stream_id;
+    stream->session = session;
+    stream->callback = callback;
+    stream->user_data = user_data;
+    stream->closed = 0;
+    
+    session->next_stream_id += 2;  /* Odd/even pattern */
+    
+    /* Open stream in mux */
+    if (streammux_open(session->mux, stream->stream_id) != 0) {
+        free(stream);
+        return NULL;
+    }
+    
+    /* Add to session's stream list */
+    if (session->stream_count >= session->stream_cap) {
+        /* Grow array */
+        int new_cap = session->stream_cap * 2;
+        norn_stream_t **new_streams = realloc(session->streams,
+                                               new_cap * sizeof(*new_streams));
+        if (!new_streams) {
+            free(stream);
+            return NULL;
+        }
+        session->streams = new_streams;
+        session->stream_cap = new_cap;
+    }
+    
+    session->streams[session->stream_count++] = stream;
+    
+    /* Notify callback */
+    callback(stream, NORN_STREAM_READY, user_data);
+    
+    return stream;
+}
+
+int norn_stream_write(norn_stream_t *stream,
+                      const unsigned char *data,
+                      size_t len) {
+    if (!stream || !data || len == 0) return -1;
+    if (stream->closed) return -1;
+    
+    uint32_t now_ms = 0;  /* TODO: Get actual time */
+    
+    return streammux_write(stream->session->mux, stream->stream_id,
+                          data, len, now_ms);
+}
+
+int norn_stream_read(norn_stream_t *stream,
+                     unsigned char *buf,
+                     size_t cap) {
+    if (!stream || !buf || cap == 0) return -1;
+    
+    return streammux_read(stream->session->mux, stream->stream_id,
+                         buf, cap);
+}
+
+size_t norn_stream_readable(const norn_stream_t *stream) {
+    if (!stream) return 0;
+    
+    return streammux_readable(stream->session->mux, stream->stream_id);
+}
+
+int norn_stream_close(norn_stream_t *stream) {
+    if (!stream) return -1;
+    if (stream->closed) return -1;
+    
+    uint32_t now_ms = 0;  /* TODO: Get actual time */
+    
+    streammux_finish(stream->session->mux, stream->stream_id, now_ms);
+    stream->closed = 1;
+    
+    /* Notify callback */
+    if (stream->callback) {
+        stream->callback(stream, NORN_STREAM_CLOSED, stream->user_data);
+    }
+    
+    return 0;
+}
+
+int norn_stream_reset(norn_stream_t *stream) {
+    if (!stream) return -1;
+    if (stream->closed) return -1;
+    
+    stream->closed = 1;
+    
+    /* Notify callback */
+    if (stream->callback) {
+        stream->callback(stream, NORN_STREAM_RESET, stream->user_data);
+    }
+    
+    return 0;
+}
+
+int norn_stream_peer_closed(const norn_stream_t *stream) {
+    if (!stream) return 0;
+    
+    return streammux_peer_finished(stream->session->mux, stream->stream_id);
 }
 
 /* === NAT Traversal (FEAT-017, stub) === */

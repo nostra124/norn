@@ -41,8 +41,8 @@ static void test_session_lifecycle(void) {
 static void test_stream_lifecycle(void) {
     printf("  test_stream_lifecycle: ");
     
-    /* NULL-safe stream operations - FEAT-018 (not implemented yet) */
-    assert(norn_stream_open_async(NULL, NULL, NULL) == -1);
+    /* NULL-safe stream operations - FEAT-018 */
+    assert(norn_stream_open_async(NULL, NULL, NULL) == NULL);
     
     printf("OK (stub)\n");
 }

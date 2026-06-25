@@ -35,6 +35,10 @@ struct norn_session {
     
     /* Stream multiplexing */
     streammux_t *mux;
+    norn_stream_t **streams;           /* Array of open streams */
+    int stream_count;
+    int stream_cap;
+    uint16_t next_stream_id;           /* Next stream ID to assign */
     
     /* Transport */
     int fd;                           /* UDP socket, -1 if not connected */
@@ -62,6 +66,8 @@ struct norn_stream {
     norn_session_t *session;
     uint16_t stream_id;
     int closed;
+    norn_stream_callback_t callback;
+    void *user_data;
 };
 
 /* Internal helper - set identity keys */
