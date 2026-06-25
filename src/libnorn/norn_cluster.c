@@ -392,6 +392,15 @@ const unsigned char *norn_cluster_leader(const norn_cluster_t *cl) {
 
 int norn_cluster_member_count(const norn_cluster_t *cl) { return cl ? cl->n_members : -1; }
 
+int norn_cluster_members(const norn_cluster_t *cl,
+                         unsigned char out[][NORN_CLUSTER_PUBKEY], int max) {
+    if (!cl || !out || max < 0) return -1;
+    int n = cl->n_members < max ? cl->n_members : max;
+    for (int i = 0; i < n; i++)
+        memcpy(out[i], cl->members[i].pubkey, NORN_CLUSTER_PUBKEY);
+    return n;
+}
+
 int norn_cluster_is_voter(const norn_cluster_t *cl, const unsigned char pubkey[NORN_CLUSTER_PUBKEY]) {
     if (!cl || !pubkey) return 0;
     cmember_t *m = by_pubkey((norn_cluster_t *)cl, pubkey);
