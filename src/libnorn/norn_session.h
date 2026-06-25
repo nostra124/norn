@@ -34,6 +34,15 @@ typedef struct norn_session norn_session_t;
 typedef struct norn_stream norn_stream_t;
 
 /**
+ * @brief Stream state
+ */
+typedef enum {
+    NORN_STREAM_READY,      /**< Stream is ready for I/O */
+    NORN_STREAM_CLOSED,     /**< Stream closed locally */
+    NORN_STREAM_RESET,      /**< Stream reset by peer */
+} norn_stream_state_t;
+
+/**
  * @brief Session state
  */
 typedef enum {
@@ -101,6 +110,17 @@ typedef void (*norn_accept_callback_t)(norn_session_t *session, void *user_data)
  */
 typedef void (*norn_resolve_callback_t)(const norn_endpoint_t *endpoint,
                                         void *user_data);
+
+/**
+ * @brief Callback for stream events
+ *
+ * @param stream Stream handle
+ * @param state New stream state
+ * @param user_data User-provided pointer from norn_stream_open_async
+ */
+typedef void (*norn_stream_callback_t)(norn_stream_t *stream,
+                                       norn_stream_state_t state,
+                                       void *user_data);
 
 /* === Async Session API (Primary) === */
 
@@ -309,23 +329,86 @@ const norn_crypto_suite_t *norn_session_get_suite(const norn_session_t *session)
  */
 int norn_session_get_fd(const norn_session_t *session);
 
-/* === Stream Multiplexing (Future) === */
+/* === Stream Multiplexing (FEAT-018) === */
 
 /**
  * @brief Open a logical stream (async)
  *
  * Creates a new reliable, ordered byte stream over the session.
+ * The stream callback receives NORN_STREAM_READY when the stream
+ * is ready for I/O.
  *
- * @param session Session handle
+ * @param session Session handle (must be ESTABLISHED)
  * @param callback Stream event callback
  * @param user_data User data
- * @return 0 on success, -1 on error
+ * @return Stream handle on success, NULL on error
  *
- * @note FEAT-018: Stream multiplexing not yet implemented
+ * @note Multiple streams can be opened over a single session
+ * @note Streams are full-duplex and independent
  */
-int norn_stream_open_async(norn_session_t *session,
-                           void *callback,
-                           void *user_data);
+norn_stream_t *norn_stream_open_async(norn_session_t *session,
+                                      norn_stream_callback_t callback,
+                                      void *user_data);
+
+/**
+ * @brief Write data to stream
+ *
+ * @param stream Stream handle
+ * @param data Data to write
+ * @param len Data length
+ * @return Bytes written, or -1 on error
+ */
+int norn_stream_write(norn_stream_t *stream,
+                      const unsigned char *data,
+                      size_t len);
+
+/**
+ * @brief Read data from stream
+ *
+ * @param stream Stream handle
+ * @param buf Buffer to read into
+ * @param cap Buffer capacity
+ * @return Bytes read, or -1 on error
+ */
+int norn_stream_read(norn_stream_t *stream,
+                     unsigned char *buf,
+                     size_t cap);
+
+/**
+ * @brief Get readable bytes available
+ *
+ * @param stream Stream handle
+ * @return Bytes available to read
+ */
+size_t norn_stream_readable(const norn_stream_t *stream);
+
+/**
+ * @brief Close stream gracefully
+ *
+ * Sends FIN to peer, allowing them to finish reading.
+ *
+ * @param stream Stream handle
+ * @return 0 on success, -1 on error
+ */
+int norn_stream_close(norn_stream_t *stream);
+
+/**
+ * @brief Reset stream immediately
+ *
+ * Sends RST to peer, discarding all pending data.
+ *
+ * @param stream Stream handle
+ * @return 0 on success, -1 on error
+ */
+int norn_stream_reset(norn_stream_t *stream);
+
+/**
+ * @brief Check if peer has closed their side
+ *
+ * @param stream Stream handle
+ * @return 1 if peer sent FIN, 0 otherwise
+ */
+int norn_stream_peer_closed(const norn_stream_t *stream);
 
 /* === Blocking API (Deprecated, testing only) === */
 
