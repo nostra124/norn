@@ -23,9 +23,11 @@ use std::ptr;
 use norn_sys as sys;
 
 mod pump;
+mod session;
 mod stream;
 
 pub use pump::{Endpoint, Io, Pump, PumpStatus};
+pub use session::{Session, SessionState};
 pub use stream::Stream;
 
 /// Public-key length in bytes (Ed25519).
@@ -66,6 +68,8 @@ impl Keypair {
 /// A norn node. Drive it with [`Client::tick`] from your event loop.
 pub struct Client {
     raw: *mut sys::norn_client,
+    // Owns the boxed dial/listen closures so they outlive the async callbacks.
+    callbacks: Vec<Box<dyn std::any::Any>>,
 }
 
 impl Client {
@@ -92,7 +96,67 @@ impl Client {
         if raw.is_null() {
             return Err(Error::Init);
         }
-        Ok(Client { raw })
+        Ok(Client {
+            raw,
+            callbacks: Vec::new(),
+        })
+    }
+
+    /// Dial a peer at a known endpoint, identified by its public key (async).
+    /// `cb` is invoked from [`Client::tick`] on each session state change.
+    ///
+    /// (Endpoint dialing; DHT-resolved `dial(pubkey)` arrives with the session
+    /// resolve path.)
+    pub fn dial_direct<F>(
+        &mut self,
+        ip: u32,
+        port: u16,
+        pubkey: &[u8; PUBKEY_BYTES],
+        cb: F,
+    ) -> Result<(), Error>
+    where
+        F: FnMut(&Session, SessionState) + 'static,
+    {
+        let ud = session::store_dial_cb(&mut self.callbacks, cb);
+        let ep = sys::norn_direct_endpoint_t { ip, port };
+        let rc = unsafe {
+            sys::norn_dial_direct_async(
+                self.raw,
+                &ep,
+                pubkey.as_ptr(),
+                std::ptr::null(),
+                session::dial_trampoline,
+                ud,
+            )
+        };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Op)
+        }
+    }
+
+    /// Listen for inbound sessions (async). `cb` is invoked from
+    /// [`Client::tick`] for each accepted session.
+    pub fn listen<F>(&mut self, port: u16, cb: F) -> Result<(), Error>
+    where
+        F: FnMut(Session) + 'static,
+    {
+        let ud = session::store_accept_cb(&mut self.callbacks, cb);
+        let rc = unsafe {
+            sys::norn_listen_async(
+                self.raw,
+                port,
+                std::ptr::null(),
+                session::accept_trampoline,
+                ud,
+            )
+        };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Op)
+        }
     }
 
     /// This node's 20-byte DHT id.
@@ -181,5 +245,28 @@ mod tests {
         // fd is a real, open socket.
         assert!(client.fd() >= 0);
         // dropped here → norn_free
+    }
+
+    #[test]
+    fn dial_and_listen_register() {
+        // Exercises the dial/listen API surface and callback ownership: register
+        // both, tick (no peer ⇒ no callbacks fire), and drop cleanly.
+        let kp = Keypair::generate().expect("keygen");
+        let mut client = Client::new(&kp).expect("client");
+        client
+            .listen(0, |sess| {
+                let _ = sess.state();
+            })
+            .expect("listen");
+        let peer = [7u8; PUBKEY_BYTES];
+        client
+            .dial_direct(0x7f000001, 9999, &peer, |sess, state| {
+                let _ = (sess.state(), state);
+            })
+            .expect("dial");
+        for _ in 0..3 {
+            client.tick();
+        }
+        assert_eq!(client.callbacks.len(), 2);
     }
 }
