@@ -107,16 +107,15 @@ These tickets enable norn to serve multiple sister projects (bifrost, wyrd) with
 | Ticket | Description | Priority | Depends On |
 |--------|-------------|----------|------------|
 | FEAT-018 | Stream-tunnel utility (norn-forward) | medium | FEAT-016 |
-| FEAT-019 | Language bindings (Rust, Python) | medium | FEAT-016 |
+| FEAT-019 | Language binding (Rust crate) | medium | FEAT-016 |
 
 **Key Features:**
 - `norn-forward` — TCP/Unix service over norn stream (ssh -L/-R equivalent)
 - Rust crate with tokio AsyncRead/AsyncWrite
-- Python cffi binding
+- (Python binding dropped — not needed for the foreseeable future)
 
 **Consumers:**
 - thunder, mimir, regin, dvalin (Rust)
-- raven (Python)
 
 ### 🔄 v0.10.0 — Private Overlay
 **Status:** PLANNED
@@ -133,6 +132,29 @@ These tickets enable norn to serve multiple sister projects (bifrost, wyrd) with
 **Consumers:**
 - regin → dvalin → raven agent fleet
 - wyrd private packs/clans
+
+### 🔄 v0.11.0 — Clustered Key-Value Store (class-aware Raft)
+**Status:** DESIGN MERGED (PR #2) — see `issues/MILESTONE-0.11.0-CLUSTER-KV.md`
+
+"etcd over libnorn": a replicated KV store shared across a cluster of nodes,
+addressed by public key, that tolerates mostly-offline edge members.
+
+| Ticket | Description | Priority | Depends On |
+|--------|-------------|----------|------------|
+| FEAT-024 | Pure Raft consensus core (`norn_raft`) — PreVote, learners, candidacy hook | medium | — |
+| FEAT-025 | Cluster ↔ session glue (`norn_cluster`) — Raft RPC over norn streams | medium | FEAT-024, FEAT-016, FEAT-017 |
+| FEAT-026 | Replicated KV state machine (`norn_kvstore`) + class-aware membership API | medium | FEAT-024, FEAT-025 |
+
+**Key Features:**
+- Heterogeneous membership: servers are voting members (quorum over servers
+  only), phones/laptops/workstations are learners with a full replica
+- Leadership restricted to proven-uptime servers via a candidacy-eligibility
+  predicate + PreVote — no change to Raft's safety core
+- Learner-first joins; single-server membership changes
+- KV ops: put/get/cas/del/watch; linearizable ReadIndex reads; snapshots
+
+**Consumers:**
+- regin (agent registry), thunder (shared config), dvalin/raven (state)
 
 ---
 
@@ -154,6 +176,11 @@ v0.9.0 (Tunnel & Bindings)        │
                                   │
 v0.10.0 (Private Overlay)         │
 └── FEAT-020: Private bootstrap ──┘
+                                  │
+v0.11.0 (Clustered KV Store)      │
+├── FEAT-024: Raft core ──────────┤
+├── FEAT-025: Cluster/session glue┤
+└── FEAT-026: KV + class membership┘
 ```
 
 ---
@@ -162,8 +189,8 @@ v0.10.0 (Private Overlay)         │
 
 | Metric | Value |
 |--------|-------|
-| Completed Milestones | 6 (v0.2.0–v0.7.0) |
-| Planned Milestones | 3 (v0.8.0–v0.10.0) |
-| Completed Tickets | 15 |
-| Planned Tickets | 5 |
-| Version | 0.6.0 |
+| Completed Milestones | 7 (v0.2.0–v0.8.0) |
+| Planned Milestones | 3 (v0.9.0–v0.11.0) |
+| Completed Tickets | 17 |
+| Planned Tickets | 8 |
+| Version | 0.9.0-dev |
