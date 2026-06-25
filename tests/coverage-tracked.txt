@@ -20,6 +20,7 @@ src/libnorn/replaycache.c
 src/libnorn/stream.c
 src/libnorn/streammux.c
 src/libnorn/norn_forward.c
+src/libnorn/norn_raft.c
 src/libnorn/transport.c
 src/libnorn/transport_udp.c
 src/libnorn/transport_tcp.c
