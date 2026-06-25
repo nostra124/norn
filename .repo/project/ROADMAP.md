@@ -157,22 +157,34 @@ addressed by public key, that tolerates mostly-offline edge members.
 - regin (agent registry), thunder (shared config), dvalin/raven (state)
 
 ### 🔄 v0.12.0 — nornd Daemon + norn IPC CLI
-**Status:** PLANNED — see `issues/MILESTONE-0.12.0-NORND.md` and `docs/nornd.md`
+**Status:** IN PROGRESS — daemon + CLI work end-to-end; see
+`issues/MILESTONE-0.12.0-NORND.md` and `docs/nornd.md`
 
 The reference node daemon (`nornd`, an application on libnorn) hosting the
 cluster KV store, with `norn` refactored into a thin IPC client. Identity comes
 from the user's **SSH key** (file or ssh-agent); the cluster doubles as a fleet
 SSH/GPG key directory.
 
-| Ticket | Description | Priority | Depends On |
-|--------|-------------|----------|------------|
-| FEAT-027 | IPC protocol codec — length-prefixed bencode request/response | medium | — |
-| FEAT-028 | SSH-key identity — OpenSSH ed25519 file + ssh-agent signer | medium | FEAT-013 |
-| FEAT-029 | `nornd` daemon — node + cluster host + unix-socket IPC server | medium | FEAT-027, FEAT-028, FEAT-025 |
-| FEAT-030 | `norn` CLI refactor — thin IPC client, namespaced verbs | medium | FEAT-027, FEAT-029 |
-| FEAT-031 | Fleet key directory — publish/resolve SSH + GPG pubkeys | medium | FEAT-029, FEAT-028 |
-| FEAT-033 | Node-served KV — direct, streamed content (`node`/`peer`) | medium | FEAT-029, FEAT-018 |
-| FEAT-032 | Packaging — nornd as user + system daemon (systemd + launchd) | medium | FEAT-029 |
+| Ticket | Description | Priority | Depends On | Status |
+|--------|-------------|----------|------------|--------|
+| FEAT-027 | IPC protocol codec — length-prefixed bencode request/response | medium | — | ✅ done |
+| FEAT-028 | SSH-key identity — OpenSSH ed25519 file + ssh-agent signer | medium | FEAT-013 | ✅ file parser done; ssh-agent signer pending |
+| FEAT-029 | `nornd` daemon — node + cluster host + unix-socket IPC server | medium | FEAT-027, FEAT-028, FEAT-025 | ✅ single-node done; multi-node peer transport pending |
+| FEAT-030 | `norn` CLI refactor — thin IPC client, namespaced verbs | medium | FEAT-027, FEAT-029 | ✅ `cluster`/`keys` done; `watch` stream + `bep44` namespacing pending |
+| FEAT-031 | Fleet key directory — publish/resolve SSH + GPG pubkeys | medium | FEAT-029, FEAT-028 | ✅ publish/resolve + GPG chunking done; `authorized-keys` enumeration pending |
+| FEAT-033 | Node-served KV — direct, streamed content (`node`/`peer`) | medium | FEAT-029, FEAT-018 | 🔄 stream protocol codec done; file store + dial transport pending |
+| FEAT-032 | Packaging — nornd as user + system daemon (systemd + launchd) | medium | FEAT-029 | ✅ units + socket activation + install done |
+
+**Delivered this milestone.** All pure cores ship at 100% line+branch
+coverage: IPC codec, SSH identity parser, request dispatcher, cluster member
+enumerator, fleet key directory (with GPG chunk/manifest/verify), CLI client
+helpers, and the node-served stream protocol. A single-node `nornd` elects
+itself and serves `norn cluster {put,get,del,cas,members,leader,status}` and
+`norn keys <id>` end-to-end over the Unix socket; systemd/launchd units install
+and socket-activate. Remaining integration (network-bound, not unit-testable in
+CI): multi-node cluster frame transport over norn sessions, the `watch` event
+stream, `authorized-keys` enumeration (needs a KV prefix-scan), the file-backed
+served store + peer dial transport, and the ssh-agent signer.
 
 **Key Features:**
 - `norn cluster {put,get,del,cas,watch,members,leader,status}` over a Unix
