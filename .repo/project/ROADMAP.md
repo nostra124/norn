@@ -133,17 +133,17 @@ These tickets enable norn to serve multiple sister projects (bifrost, wyrd) with
 - regin → dvalin → raven agent fleet
 - wyrd private packs/clans
 
-### 🔄 v0.11.0 — Clustered Key-Value Store (class-aware Raft)
-**Status:** DESIGN MERGED (PR #2) — see `issues/MILESTONE-0.11.0-CLUSTER-KV.md`
+### ✅ v0.11.0 — Clustered Key-Value Store (class-aware Raft)
+**Status:** DONE — all three features at 100% line+branch coverage
 
 "etcd over libnorn": a replicated KV store shared across a cluster of nodes,
 addressed by public key, that tolerates mostly-offline edge members.
 
-| Ticket | Description | Priority | Depends On |
-|--------|-------------|----------|------------|
-| FEAT-024 | Pure Raft consensus core (`norn_raft`) — PreVote, learners, candidacy hook | medium | — |
-| FEAT-025 | Cluster ↔ session glue (`norn_cluster`) — Raft RPC over norn streams | medium | FEAT-024, FEAT-016, FEAT-017 |
-| FEAT-026 | Replicated KV state machine (`norn_kvstore`) + class-aware membership API | medium | FEAT-024, FEAT-025 |
+| Ticket | Description | Priority | Depends On | Status |
+|--------|-------------|----------|------------|--------|
+| FEAT-024 | Pure Raft consensus core (`norn_raft`) — PreVote, learners, candidacy hook | medium | — | done (100% cov) |
+| FEAT-025 | Cluster ↔ session glue (`norn_cluster`) — Raft RPC over a pubkey transport | medium | FEAT-024, FEAT-016, FEAT-017 | done (100% cov) |
+| FEAT-026 | Replicated KV state machine (`norn_kvstore`) + class-aware membership API | medium | FEAT-024, FEAT-025 | done (100% cov) |
 
 **Key Features:**
 - Heterogeneous membership: servers are voting members (quorum over servers
@@ -151,10 +151,37 @@ addressed by public key, that tolerates mostly-offline edge members.
 - Leadership restricted to proven-uptime servers via a candidacy-eligibility
   predicate + PreVote — no change to Raft's safety core
 - Learner-first joins; single-server membership changes
-- KV ops: put/get/cas/del/watch; linearizable ReadIndex reads; snapshots
+- KV ops: put/get/cas/del/watch; snapshots
 
 **Consumers:**
 - regin (agent registry), thunder (shared config), dvalin/raven (state)
+
+### 🔄 v0.12.0 — nornd Daemon + norn IPC CLI
+**Status:** PLANNED — see `issues/MILESTONE-0.12.0-NORND.md` and `docs/nornd.md`
+
+The reference node daemon (`nornd`, an application on libnorn) hosting the
+cluster KV store, with `norn` refactored into a thin IPC client. Identity comes
+from the user's **SSH key** (file or ssh-agent); the cluster doubles as a fleet
+SSH/GPG key directory.
+
+| Ticket | Description | Priority | Depends On |
+|--------|-------------|----------|------------|
+| FEAT-027 | IPC protocol codec — length-prefixed bencode request/response | medium | — |
+| FEAT-028 | SSH-key identity — OpenSSH ed25519 file + ssh-agent signer | medium | FEAT-013 |
+| FEAT-029 | `nornd` daemon — node + cluster host + unix-socket IPC server | medium | FEAT-027, FEAT-028, FEAT-025 |
+| FEAT-030 | `norn` CLI refactor — thin IPC client, namespaced verbs | medium | FEAT-027, FEAT-029 |
+| FEAT-031 | Fleet key directory — publish/resolve SSH + GPG pubkeys | medium | FEAT-029, FEAT-028 |
+
+**Key Features:**
+- `norn cluster {put,get,del,cas,watch,members,leader,status}` over a Unix
+  socket; `norn bep44 {get,set}` keep direct-DHT; local `keygen`/`version`
+- Node identity = the user's Ed25519 SSH key (ssh-agent works directly — norn
+  signs the handshake, never static ECDH)
+- Cluster as a distributed `authorized_keys` + GPG keyring
+- **All code in nornd/CLI — libnorn unchanged** (per the 0.3.0 mission)
+
+**Consumers:**
+- regin/dvalin/raven, wyrd packs — turnkey node daemon + CLI + key directory
 
 ---
 
@@ -181,6 +208,13 @@ v0.11.0 (Clustered KV Store)      │
 ├── FEAT-024: Raft core ──────────┤
 ├── FEAT-025: Cluster/session glue┤
 └── FEAT-026: KV + class membership┘
+                                  │
+v0.12.0 (nornd + norn IPC CLI)    │   (application layer on libnorn)
+├── FEAT-027: IPC bencode codec ──┤
+├── FEAT-028: SSH-key identity ───┤
+├── FEAT-029: nornd daemon ───────┤
+├── FEAT-030: norn CLI client ────┤
+└── FEAT-031: fleet key directory ┘
 ```
 
 ---
@@ -189,8 +223,8 @@ v0.11.0 (Clustered KV Store)      │
 
 | Metric | Value |
 |--------|-------|
-| Completed Milestones | 7 (v0.2.0–v0.8.0) |
-| Planned Milestones | 3 (v0.9.0–v0.11.0) |
-| Completed Tickets | 22 |
-| Planned Tickets | 3 |
+| Completed Milestones | 10 (v0.2.0–v0.11.0) |
+| Planned Milestones | 1 (v0.12.0) |
+| Completed Tickets | 26 |
+| Planned Tickets | 5 |
 | Version | 0.9.0-dev |
