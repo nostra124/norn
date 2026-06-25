@@ -92,12 +92,24 @@ norn authorized-keys        Emit an authorized_keys file assembled from the clus
 norn gpg-import [<nodeid>]  Import peer GPG key(s) into the local keyring (all if omitted)
 ```
 
-### Direct DHT (BEP-44, unchanged — no daemon needed for these)
+### Direct DHT (BEP-44 — no daemon needed for these)
+
+[BEP-44](https://www.bittorrent.org/beps/bep_0044.html) defines two DHT item
+kinds; the CLI exposes both:
 
 ```
-norn bep44 get <key>            Retrieve a mutable signed record from the DHT
-norn bep44 set <key> <value>    Store a mutable signed record
+# Mutable — signed records, keyed by SHA1(pubkey[+salt]), updatable via seq:
+norn bep44 set <value|->          Publish/update OUR mutable record (we sign; auto seq)
+norn bep44 get <author-pubkey>    Fetch a mutable record by its author's public key
+  [--salt <s>] [--seq <n>]        Optional BEP-44 salt / explicit sequence number
+
+# Immutable — content-addressed, key = SHA1(bencode(value)), no signature:
+norn bep44 put <value|->          Store an immutable item; prints its 40-hex content hash
+norn bep44 cat <hash>             Fetch an immutable item by its content hash
 ```
+
+`put`/`cat` are a tiny content-addressed store (the value's hash *is* the key);
+`set`/`get` are signed, updatable records addressed by author pubkey.
 
 ### Local / node
 

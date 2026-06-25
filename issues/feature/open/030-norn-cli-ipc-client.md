@@ -27,8 +27,13 @@ shell without each command spinning up its own node.
     / `watch <prefix>` / `members` / `leader` / `status` — each connects to the
     nornd socket (FEAT-027 codec), sends one request, prints the reply, exits.
     `watch` stays connected and prints streamed events.
-  - `norn bep44 get <k>` / `set <k> <v>` — today's direct-DHT BEP-44 record
-    commands, unchanged (move under the `bep44` namespace).
+  - `norn bep44 …` — direct-DHT BEP-44 (no daemon), both item kinds:
+    - **mutable** (signed, updatable): `set <value>` (our record, auto-seq;
+      `--salt`/`--seq`), `get <author-pubkey>`;
+    - **immutable** (content-addressed): `put <value>` → prints the content hash,
+      `cat <hash>`.
+    Backed by `norn_put_mutable`/`norn_get_mutable` and
+    `norn_put_immutable`/`norn_get_immutable`.
   - `norn keys <id>` / `authorized-keys` — read the key directory (FEAT-031).
   - `norn keygen` / `version` — local, no daemon.
 - Socket path resolution (`NORN_SOCK` → `$XDG_RUNTIME_DIR/nornd.sock` →
