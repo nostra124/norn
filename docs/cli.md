@@ -130,6 +130,30 @@ norn version      Print version
 
 ---
 
+## Size limits
+
+| Surface | Limit | Nature |
+|---------|-------|--------|
+| BEP-44 mutable value | 1000 B | spec-mandated (hard; `>1000` rejected) |
+| BEP-44 immutable value | 1000 B | spec-mandated (hard) |
+| Cluster KV key | 64 B | design (tunable) |
+| Cluster KV value | 256 B → raise for keys | design (tunable; must fit a raft entry) |
+| Raft log entry | 512 B | must be ≥ a full KV command |
+| IPC frame | ~1 MB cap | design (bounds the daemon) |
+| norn stream | effectively unbounded | reliable stream — for bulk/files |
+
+**Rule of thumb:** ≤1 KB records → BEP-44 or the cluster KV; public keys → the
+cluster KV (chunked if large); files/blobs → **streams** (`norn-forward`), with
+only a hash/pointer kept in the KV.
+
+**GPG keys.** An armored GPG public key (~1–4 KB) exceeds every inline limit
+above. The key directory therefore (a) raises the cluster value cap modestly to
+cover the common ed25519-GPG case, and (b) **chunks** larger keys across
+`peer/<id>/gpg/<n>` with a `peer/<id>/gpg` manifest (chunk count + content hash)
+written last; readers gate on the manifest and verify the reassembled key. This
+keeps raft/KV entries bounded (important for mobile learners) rather than
+bloating every fixed-size entry. SSH ed25519 pubkeys (~80 B) fit inline.
+
 ## Packaging (user & system daemon)
 
 `nornd` installs as **both** a per-user daemon and a system daemon, on Linux

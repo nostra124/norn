@@ -31,6 +31,14 @@ spawned_from: ~
     where `<nodeid>` is the node's pubkey (hex). They replicate to all members.
   - Re-publish on change / periodically; GPG keys are opaque KV values (norn
     does no GPG crypto).
+  - **Size handling.** SSH ed25519 pubkeys (~80 B) fit inline. Armored GPG keys
+    (~1–4 KB) exceed the cluster value cap, so the keydir **chunks** them across
+    `peer/<id>/gpg/<n>` (each ≤ the value limit) plus a `peer/<id>/gpg` manifest
+    `{chunks, sha256}` written **last**; readers gate on the manifest and verify
+    the reassembled key. The common ed25519-GPG case is covered by a modest
+    cluster value-cap raise (FEAT-026 tuning); raft entries stay bounded (no
+    8 KB fixed entries) so mobile learners aren't penalised. Bulk blobs are out
+    of scope — those ride norn streams with a hash kept in the KV.
   - Resolve helpers: get a peer's ssh/gpg key; enumerate `peer/*` for
     `authorized-keys`.
 - CLI surface (FEAT-030):
