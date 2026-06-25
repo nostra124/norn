@@ -45,6 +45,18 @@ ergonomic `mimir` crate; `libbawee`).
 2. The crate builds against the installed `libnorn` and round-trips a stream.
 3. Binding builds in CI on Linux + macOS.
 
+## Implementation Status
+
+- ✅ `norn-sys` raw FFI crate (hand-written; `build.rs` links via
+  `NORN_LIB_DIR` or `pkg-config`).
+- ✅ `norn` safe crate: `Keypair`, `Client` (new/id/bootstrap/tick/fd),
+  `Stream` (`std::io::Read`+`Write`, and tokio `AsyncRead`+`AsyncWrite` behind
+  the `tokio` feature), and `Pump` (FEAT-018 splice engine with Rust
+  `Endpoint` closures). `cargo test` 4/4, clippy clean.
+- ⏳ Safe `dial(pubkey)`/`listen` wrappers over the async session API, and the
+  end-to-end axum-over-norn example (acceptance #1) — next increment.
+- ⏳ CI wiring for the crate on Linux + macOS (acceptance #3).
+
 ## Cross-repo
 
 Enables thunder/mimir/regin/dvalin (Rust) to consume norn.
