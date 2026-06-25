@@ -41,10 +41,14 @@
   - All tests passing (32/32)
 
 ### In Progress
+- **FEAT-018**: Stream multiplexing (Phase 1 done, Phase 2-3 in progress)
+  - ✅ Basic API (open, read, write, close)
+  - ✅ Stream tracking in session
+  - ⏳ Session I/O integration
+  - ⏳ Testing
+- **FEAT-019**: Language bindings (Rust, Python)
 - **FEAT-021**: UPnP/NAT-PMP automatic port forwarding (optional enhancement)
 - **FEAT-022**: Multi-hop relay path integration (optional enhancement)
-- **FEAT-018**: Stream multiplexing (`norn_stream_open_async`)
-- **FEAT-019**: Language bindings (Rust, Python)
 
 ### Blocked
 - None

@@ -1,6 +1,6 @@
 # FEAT-018 Stream Multiplexing
 
-## Status: IN PROGRESS
+## Status: IN PROGRESS (Phase 1 Complete)
 
 ## Description
 
@@ -14,84 +14,61 @@ The streammux implementation (`streammux.h/c`) already exists with:
 - Backpressure
 - Multiple streams per session
 
-What's missing:
-- API to create/use streams from norn_session_t
-- Stream lifecycle management
-- Integration with session I/O
+What's now implemented:
+- ✅ API to create/use streams from norn_session_t
+- ✅ Stream lifecycle management
+- ⏳ Integration with session I/O (Phase 2)
 
-## Requirements
+## Progress
 
-### 1. Stream Creation API
+### Phase 1: Basic API ✅ COMPLETE
+1. ✅ Define stream handle structure
+2. ✅ Implement `norn_stream_open_async()`
+3. ✅ Implement basic read/write
+4. ✅ Add stream tracking to session
 
-```c
-typedef struct norn_stream norn_stream_t;
+**Completed:** 2026-06-25
 
-typedef enum {
-    NORN_STREAM_READY,      // Stream is ready for I/O
-    NORN_STREAM_CLOSED,     // Stream closed locally
-    NORN_STREAM_RESET,      // Stream reset by peer
-} norn_stream_state_t;
-
-typedef void (*norn_stream_callback_t)(norn_stream_t *stream,
-                                       norn_stream_state_t state,
-                                       void *user_data);
-
-int norn_stream_open_async(norn_session_t *session,
-                           norn_stream_callback_t callback,
-                           void *user_data);
-```
-
-### 2. Stream I/O API
-
-```c
-int norn_stream_write(norn_stream_t *stream,
-                      const unsigned char *data,
-                      size_t len);
-
-int norn_stream_read(norn_stream_t *stream,
-                     unsigned char *buf,
-                     size_t cap);
-
-size_t norn_stream_readable(const norn_stream_t *stream);
-
-int norn_stream_close(norn_stream_t *stream);
-
-int norn_stream_shutdown(norn_stream_t *stream);
-```
-
-### 3. Stream Lifecycle
-
-- Streams are created by `norn_stream_open_async()`
-- Each stream has a unique 16-bit ID
-- Streams are full-duplex
-- Streams can be closed independently
-- Session tracks all open streams
-- Streams are freed when session closes
-
-## Implementation Plan
-
-### Phase 1: Basic API (1-2 days)
-1. Define stream handle structure
-2. Implement `norn_stream_open_async()`
-3. Implement basic read/write
-4. Add stream tracking to session
-
-### Phase 2: Integration (1-2 days)
+### Phase 2: Integration (IN PROGRESS)
 1. Wire streammux to session I/O
 2. Handle incoming stream data
 3. Implement flow control
 4. Add stream events to session tick
 
-### Phase 3: Testing (1 day)
+### Phase 3: Testing (PLANNED)
 1. Unit tests for stream API
 2. Integration test with session
 3. Multi-stream test
 4. Flow control test
 
-### Phase 4: norn-forward Utility (Optional, 2-3 days)
+### Phase 4: norn-forward Utility (Optional, FUTURE)
 1. TCP forwarder over norn stream
 2. Unix socket forwarder
 3. Local/remote forwarding modes
+
+## API
+
+### Stream Creation
+
+```c
+norn_stream_t *stream = norn_stream_open_async(session, callback, user_data);
+```
+
+### Stream I/O
+
+```c
+int written = norn_stream_write(stream, data, len);
+int bytes = norn_stream_read(stream, buf, cap);
+size_t available = norn_stream_readable(stream);
+```
+
+### Stream Lifecycle
+
+```c
+int err = norn_stream_close(stream);  // Graceful close (FIN)
+int err = norn_stream_reset(stream);  // Immediate reset (RST)
+int closed = norn_stream_peer_closed(stream);  // Check peer FIN
+```
 
 ## Technical Details
 
@@ -125,7 +102,7 @@ Segment Header (8 bytes):
 
 ## Priority: Medium
 
-## Estimated Effort: 4-5 days
+## Estimated Effort: 4-5 days (2 days done, 2-3 remaining)
 
 ## Consumers
 
