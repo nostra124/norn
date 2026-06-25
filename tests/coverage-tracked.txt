@@ -32,3 +32,4 @@ src/libnorn/attr.c
 src/nornd/ipc.c
 src/nornd/identity.c
 src/nornd/dispatch.c
+src/nornd/client.c
