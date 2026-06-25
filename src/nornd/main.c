@@ -16,6 +16,7 @@
 #include "dispatch.h"
 #include "identity.h"
 #include "ipc.h"
+#include "keydir.h"
 #include "norn.h"
 #include "norn_cluster.h"
 
@@ -217,6 +218,25 @@ int main(int argc, char **argv) {
     nornd_backend_t be = {cl,         be_put,    be_del,    be_get,
                           be_is_leader, be_leader, be_members};
 
+    /* Read our SSH public-key line (`<identity>.pub`) to publish into the fleet
+     * key directory once we can lead. Optional: skip if it isn't there. */
+    char sshline[512];
+    size_t sshlen = 0;
+    {
+        char pubpath[640];
+        snprintf(pubpath, sizeof(pubpath), "%s.pub", idpath);
+        FILE *pf = fopen(pubpath, "rb");
+        if (pf) {
+            sshlen = fread(sshline, 1, sizeof(sshline) - 1, pf);
+            fclose(pf);
+            while (sshlen > 0 &&
+                   (sshline[sshlen - 1] == '\n' || sshline[sshlen - 1] == '\r'))
+                sshlen--;
+            sshline[sshlen] = '\0';
+        }
+    }
+    int ssh_published = 0;
+
     fprintf(stderr, "nornd: serving %s (identity %s)\n", sockpath, idpath);
 
     int clients[MAX_CLIENTS];
@@ -245,6 +265,12 @@ int main(int argc, char **argv) {
         int rc = poll(pfds, np, 10);
         norn_tick(client);
         norn_cluster_tick(cl, now_ms());
+
+        /* Once we can lead, publish our SSH public key to the directory. */
+        if (!ssh_published && sshlen > 0 && norn_cluster_is_leader(cl)) {
+            if (nornd_keydir_put_ssh(&be, kp.public_key, sshline) == 0)
+                ssh_published = 1;
+        }
         if (rc <= 0) continue;
 
         if (nfd >= 0 && (pfds[0].revents & POLLIN)) norn_tick(client);

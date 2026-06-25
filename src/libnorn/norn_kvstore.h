@@ -19,8 +19,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/** Max key length (bytes). */
-#define NORN_KV_MAX_KEY 64
+/** Max key length (bytes). Holds the key directory's `peer/<64-hex>/gpg/<n>`. */
+#define NORN_KV_MAX_KEY 128
 /** Max value length (bytes). */
 #define NORN_KV_MAX_VAL 256
 

@@ -19,7 +19,9 @@
 #include <stddef.h>
 #include "dispatch.h" /* nornd_backend_t, NORND_PUBKEY */
 
-#define NORND_KEYDIR_CHUNK 3072 /* max bytes of armored GPG per chunk value */
+/* Max armored-GPG bytes per chunk value. Bounded by the cluster value cap
+ * (NORN_KV_MAX_VAL) so each chunk fits one replicated KV entry. */
+#define NORND_KEYDIR_CHUNK 200
 
 /* Key-name builders. Each writes a NUL-terminated key into `out` and returns
  * its length, or -1 if it would not fit. */
