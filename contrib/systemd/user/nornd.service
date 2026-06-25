@@ -1,0 +1,16 @@
+[Unit]
+Description=norn node daemon (user)
+Documentation=man:nornd(8)
+After=network-online.target
+Wants=network-online.target
+Requires=nornd.socket
+
+[Service]
+Type=notify
+# Identity = ssh-agent if available, else ~/.ssh/id_ed25519 (nornd autodetects).
+ExecStart=/usr/bin/nornd --foreground --socket %t/nornd.sock
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

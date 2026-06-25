@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- System daemon: install to /Library/LaunchDaemons/io.norn.nornd.plist
+     and `sudo launchctl load -w` it. Socket-activated. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>io.norn.nornd</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/nornd</string>
+    <string>--foreground</string>
+    <string>--identity</string>
+    <string>/etc/ssh/ssh_host_ed25519_key</string>
+    <string>--class</string>
+    <string>server</string>
+  </array>
+
+  <!-- launchd creates and passes the listening socket (socket activation). -->
+  <key>Sockets</key>
+  <dict>
+    <key>Listener</key>
+    <dict>
+      <key>SockPathName</key>
+      <string>/var/run/nornd.sock</string>
+      <key>SockPathMode</key>
+      <integer>432</integer> <!-- 0660 -->
+    </dict>
+  </dict>
+
+  <key>KeepAlive</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>UserName</key>
+  <string>_norn</string>
+</dict>
+</plist>
