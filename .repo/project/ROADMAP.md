@@ -101,13 +101,13 @@ These tickets enable norn to serve multiple sister projects (bifrost, wyrd) with
 - bifrost FEAT-080 (session/sio retirement)
 - wyrd FEAT-292
 
-### 🔄 v0.9.0 — Tunnel & Bindings
-**Status:** PLANNED
+### ✅ v0.9.0 — Tunnel & Bindings
+**Status:** DONE — norn-forward (client+server) + Rust crate (PIT for live two-peer round-trips)
 
 | Ticket | Description | Priority | Depends On |
 |--------|-------------|----------|------------|
-| FEAT-018 | Stream-tunnel utility (norn-forward) | medium | FEAT-016 | engine + CLI client done |
-| FEAT-019 | Language binding (Rust crate) | medium | FEAT-016 | crate + dial/listen done; axum example next (PIT) |
+| FEAT-018 | Stream-tunnel utility (norn-forward) | medium | FEAT-016 | engine + client(-L) + server(-R) done; data plane verified |
+| FEAT-019 | Language binding (Rust crate) | medium | FEAT-016 | crate + dial/listen + stream + echo example done |
 
 **Key Features:**
 - `norn-forward` — TCP/Unix service over norn stream (ssh -L/-R equivalent)
