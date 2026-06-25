@@ -51,4 +51,4 @@ covhtml/
 *.swo
 *~
 .idea/
-.vscode/
+.vscode//nornd
