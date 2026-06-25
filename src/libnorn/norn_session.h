@@ -351,6 +351,22 @@ norn_stream_t *norn_stream_open_async(norn_session_t *session,
                                       void *user_data);
 
 /**
+ * @brief Register a handler for inbound (peer-initiated) streams (FEAT-018).
+ *
+ * On an established session, when the peer opens a logical stream, `cb` is
+ * invoked from norn_tick() with a stream handle ready for I/O — the server side
+ * of a stream tunnel.
+ *
+ * @param session Session handle
+ * @param cb Callback invoked per inbound stream (NULL to clear)
+ * @param user_data User data passed to the callback
+ * @return 0 on success, -1 if session is NULL
+ */
+int norn_session_set_accept_stream(norn_session_t *session,
+                                   void (*cb)(norn_stream_t *stream, void *user_data),
+                                   void *user_data);
+
+/**
  * @brief Write data to stream
  *
  * @param stream Stream handle
