@@ -34,3 +34,4 @@ src/nornd/identity.c
 src/nornd/dispatch.c
 src/nornd/client.c
 src/nornd/keydir.c
+src/nornd/served_proto.c
