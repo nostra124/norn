@@ -49,14 +49,14 @@ a reusable utility.
   backpressured buffers), unit-tested to 100% line+branch coverage with
   in-memory fakes (`tests/test_forward.c`). Shipped as a library entry so apps
   can embed it.
-- **Phase 3 — `norn-forward` CLI**: ✅ client side (local TCP listen → dial peer
-  by pubkey → splice over a norn stream); fd-backed and norn-stream-backed
-  endpoints. Server side (accept inbound peer streams → connect a local
-  service) is pending the session layer's inbound-stream accept API
-  (FEAT-016/017 completion); the splice engine and fd IO are already shared by
-  it.
+- **Phase 3 — `norn-forward` CLI**: ✅ client side (`-L`: local TCP listen →
+  dial peer by pubkey → splice) **and** server side (`-R`: accept inbound peer
+  streams → connect the wrapped local service → splice). The server side rides
+  the new `norn_session_set_accept_stream()` inbound-stream API; the underlying
+  session stream data plane is verified end-to-end by
+  `tests/test_session_loopback.c`.
 - Acceptance criterion 3 (expose verified peer pubkey to the wrapped service)
-  lands with the server side via `norn_session_get_peer()`.
+  is available via `norn_session_get_peer()` on the accepted session.
 
 ## Cross-repo
 

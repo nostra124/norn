@@ -171,6 +171,49 @@ static int set_nonblock(int fd) {
     return fl < 0 ? -1 : fcntl(fd, F_SETFL, fl | O_NONBLOCK);
 }
 
+/* === Server side: expose a local TCP service over norn (the `ssh -R` half) === */
+
+static int g_service_port; /* local TCP service to forward inbound streams to */
+
+static int dial_service(int port) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) return -1;
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = htons((uint16_t)port);
+    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+        close(fd);
+        return -1;
+    }
+    set_nonblock(fd);
+    return fd;
+}
+
+/* A peer opened a stream: connect to the wrapped local service and splice. */
+static void on_inbound_stream(norn_stream_t *stream, void *ud) {
+    (void)ud;
+    int svc = dial_service(g_service_port);
+    if (svc < 0) {
+        norn_stream_reset(stream);
+        return;
+    }
+    conn_t *c = conn_alloc(svc);
+    if (!c) {
+        close(svc);
+        norn_stream_reset(stream);
+        return;
+    }
+    conn_start_pump(c, stream);
+}
+
+/* A peer dialed us: route its inbound streams to the local service. */
+static void on_accept_session(norn_session_t *session, void *ud) {
+    (void)ud;
+    norn_session_set_accept_stream(session, on_inbound_stream, NULL);
+}
+
 static int make_listener(int port) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) return -1;
@@ -190,18 +233,21 @@ static int make_listener(int port) {
 }
 
 static void usage(FILE *out, const char *prog) {
-    fprintf(out, "Usage: %s -L <local-port> <peer-pubkey-hex>\n\n", prog);
-    fprintf(out, "Tunnel a local TCP port to a remote service addressed by public key,\n");
-    fprintf(out, "over an encrypted norn stream (the `ssh -L` equivalent).\n\n");
+    fprintf(out, "Usage:\n");
+    fprintf(out, "  %s -L <local-port> <peer-pubkey-hex>   (client: local TCP -> peer)\n", prog);
+    fprintf(out, "  %s -R <service-port>                   (server: peer streams -> local service)\n\n", prog);
+    fprintf(out, "Tunnel a TCP service over an encrypted norn stream, addressed by public\n");
+    fprintf(out, "key (the `ssh -L` / `ssh -R` equivalent). No TLS — norn encrypts E2E.\n\n");
     fprintf(out, "Options:\n");
-    fprintf(out, "  -L <port>            Local TCP port to listen on (loopback)\n");
+    fprintf(out, "  -L <port>            Client: local TCP port to listen on (loopback)\n");
+    fprintf(out, "  -R <port>            Server: local TCP service to expose to peers\n");
     fprintf(out, "  --dht-port <port>    Local DHT/UDP port (default: ephemeral)\n");
     fprintf(out, "  --help               Show this help\n");
 }
 
 int main(int argc, char **argv) {
     const char *prog = "norn-forward";
-    int local_port = -1, dht_port = 0;
+    int local_port = -1, service_port = -1, dht_port = 0;
     const char *peer_hex = NULL;
 
     for (int i = 1; i < argc; i++) {
@@ -210,6 +256,8 @@ int main(int argc, char **argv) {
             return 0;
         } else if (strcmp(argv[i], "-L") == 0 && i + 1 < argc) {
             local_port = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "-R") == 0 && i + 1 < argc) {
+            service_port = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--dht-port") == 0 && i + 1 < argc) {
             dht_port = atoi(argv[++i]);
         } else if (argv[i][0] != '-') {
@@ -221,7 +269,13 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (local_port <= 0 || local_port > 65535 || !peer_hex) {
+    int server_mode = service_port > 0;
+    if (server_mode) {
+        if (service_port > 65535) {
+            usage(stderr, prog);
+            return 1;
+        }
+    } else if (local_port <= 0 || local_port > 65535 || !peer_hex) {
         usage(stderr, prog);
         return 1;
     }
@@ -229,9 +283,10 @@ int main(int argc, char **argv) {
         fprintf(stderr, "%s: libsodium init failed\n", prog);
         return 1;
     }
-    if (strlen(peer_hex) != NORN_PUBKEY_BYTES * 2 ||
-        sodium_hex2bin(g_peer, sizeof(g_peer), peer_hex, strlen(peer_hex),
-                       NULL, NULL, NULL) != 0) {
+    if (!server_mode &&
+        (strlen(peer_hex) != NORN_PUBKEY_BYTES * 2 ||
+         sodium_hex2bin(g_peer, sizeof(g_peer), peer_hex, strlen(peer_hex),
+                        NULL, NULL, NULL) != 0)) {
         fprintf(stderr, "%s: invalid peer pubkey (need %d hex chars)\n",
                 prog, NORN_PUBKEY_BYTES * 2);
         return 1;
@@ -251,7 +306,6 @@ int main(int argc, char **argv) {
     norn_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.version = NORN_VERSION;
-    (void)dht_port; /* reserved: bind DHT to a fixed UDP port when supported */
 
     norn_client_t *client = norn_new(kp.public_key, kp.secret_key, &cfg);
     if (!client) {
@@ -260,26 +314,46 @@ int main(int argc, char **argv) {
     }
     norn_bootstrap(client);
 
-    int listen_fd = make_listener(local_port);
-    if (listen_fd < 0) {
-        fprintf(stderr, "%s: cannot listen on 127.0.0.1:%d: %s\n",
-                prog, local_port, strerror(errno));
-        norn_free(client);
-        return 2;
+    int listen_fd = -1;
+    if (server_mode) {
+        g_service_port = service_port;
+        if (norn_listen_async(client, htons((uint16_t)dht_port), NULL,
+                              on_accept_session, NULL) != 0) {
+            fprintf(stderr, "%s: failed to listen for norn sessions\n", prog);
+            norn_free(client);
+            return 2;
+        }
+        unsigned char selfpk[NORN_PUBKEY_BYTES];
+        char hex[NORN_PUBKEY_BYTES * 2 + 1];
+        memcpy(selfpk, kp.public_key, NORN_PUBKEY_BYTES);
+        sodium_bin2hex(hex, sizeof(hex), selfpk, NORN_PUBKEY_BYTES);
+        fprintf(stderr, "%s: exposing 127.0.0.1:%d to peers; our pubkey: %s\n",
+                prog, service_port, hex);
+    } else {
+        listen_fd = make_listener(local_port);
+        if (listen_fd < 0) {
+            fprintf(stderr, "%s: cannot listen on 127.0.0.1:%d: %s\n",
+                    prog, local_port, strerror(errno));
+            norn_free(client);
+            return 2;
+        }
+        fprintf(stderr, "%s: forwarding 127.0.0.1:%d -> %s\n", prog, local_port, peer_hex);
     }
-    fprintf(stderr, "%s: forwarding 127.0.0.1:%d -> %s\n", prog, local_port, peer_hex);
 
     while (g_running) {
         norn_tick(client);
 
-        int cfd = accept(listen_fd, NULL, NULL);
-        if (cfd >= 0) {
-            set_nonblock(cfd);
-            conn_t *c = conn_alloc(cfd);
-            if (!c) {
-                close(cfd); /* table full */
-            } else if (norn_dial_async(client, g_peer, NULL, on_session, c) != 0) {
-                conn_kill(c);
+        /* Client mode: accept local TCP connections and dial the peer. */
+        if (!server_mode) {
+            int cfd = accept(listen_fd, NULL, NULL);
+            if (cfd >= 0) {
+                set_nonblock(cfd);
+                conn_t *c = conn_alloc(cfd);
+                if (!c) {
+                    close(cfd); /* table full */
+                } else if (norn_dial_async(client, g_peer, NULL, on_session, c) != 0) {
+                    conn_kill(c);
+                }
             }
         }
 
@@ -297,7 +371,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < MAX_CONN; i++) {
         if (g_conns[i].state != CONN_DEAD && g_conns[i].fd >= 0) conn_kill(&g_conns[i]);
     }
-    close(listen_fd);
+    if (listen_fd >= 0) close(listen_fd);
     norn_free(client);
     return 0;
 }
