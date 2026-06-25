@@ -122,7 +122,7 @@ These tickets enable norn to serve multiple sister projects (bifrost, wyrd) with
 
 | Ticket | Description | Priority | Depends On |
 |--------|-------------|----------|------------|
-| FEAT-020 | Private overlay bootstrap | medium | FEAT-014, FEAT-016 |
+| FEAT-020 | Private overlay bootstrap | medium | FEAT-014, FEAT-016 | config API + docs done; network via PIT |
 
 **Key Features:**
 - Private mesh formation from fleet bootstrap nodes

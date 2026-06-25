@@ -23,6 +23,7 @@ libnorn_la_SOURCES = \
 	src/libnorn/norn_raft.c \
 	src/libnorn/norn_kvstore.c \
 	src/libnorn/norn_cluster.c \
+	src/libnorn/norn_overlay.c \
 	src/libnorn/transport.c \
 	src/libnorn/transport_udp.c \
 	src/libnorn/transport_tcp.c \
@@ -69,6 +70,7 @@ include_HEADERS = src/libnorn/norn.h \
                    src/libnorn/norn_raft.h \
                    src/libnorn/norn_kvstore.h \
                    src/libnorn/norn_cluster.h \
+                   src/libnorn/norn_overlay.h \
                    src/libnorn/transport.h \
                    src/libnorn/transport_udp.h \
                    src/libnorn/transport_tcp.h \
@@ -87,7 +89,7 @@ norn_forward_SOURCES = src/norn_forward_main.c
 norn_forward_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 norn_forward_LDADD = libnorn.la $(SODIUM_LIBS)
 
-check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_forward test_raft test_kvstore test_cluster test_transport test_transport_udp test_transport_tcp test_idexch test_attr test_net test_suite test_norn_kad test_norn_idexch test_norn_session test_rendezvous test_relay
+check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_forward test_raft test_kvstore test_cluster test_overlay test_transport test_transport_udp test_transport_tcp test_idexch test_attr test_net test_suite test_norn_kad test_norn_idexch test_norn_session test_rendezvous test_relay
 
 test_norn_SOURCES = tests/test_norn.c
 test_norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
@@ -184,6 +186,10 @@ test_kvstore_LDADD = libnorn.la $(SODIUM_LIBS)
 test_cluster_SOURCES = tests/test_cluster.c
 test_cluster_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_cluster_LDADD = libnorn.la $(SODIUM_LIBS)
+
+test_overlay_SOURCES = tests/test_overlay.c
+test_overlay_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
+test_overlay_LDADD = libnorn.la $(SODIUM_LIBS)
 
 test_transport_SOURCES = tests/test_transport.c
 test_transport_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
