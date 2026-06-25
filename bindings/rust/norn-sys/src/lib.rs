@@ -122,6 +122,11 @@ extern "C" {
         callback: norn_stream_callback_t,
         user_data: *mut c_void,
     ) -> *mut norn_stream;
+    pub fn norn_session_set_accept_stream(
+        session: *mut norn_session,
+        callback: Option<unsafe extern "C" fn(stream: *mut norn_stream, user_data: *mut c_void)>,
+        user_data: *mut c_void,
+    ) -> c_int;
     pub fn norn_stream_write(stream: *mut norn_stream, data: *const u8, len: usize) -> c_int;
     pub fn norn_stream_read(stream: *mut norn_stream, buf: *mut u8, cap: usize) -> c_int;
     pub fn norn_stream_readable(stream: *const norn_stream) -> usize;
