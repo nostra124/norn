@@ -1,0 +1,7 @@
+norn (0.9.0~dev) unstable; urgency=medium
+
+  * Package the norn stack: libnorn (shared library), libnorn-dev
+    (headers/.pc/static lib), norn (norn/nornd/norn-forward + units), and
+    libnorn-doc (Doxygen API reference + design docs).
+
+ -- norn developers <noreply@example.com>  Fri, 26 Jun 2026 00:00:00 +0000

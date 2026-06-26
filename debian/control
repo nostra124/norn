@@ -1,0 +1,65 @@
+Source: norn
+Section: net
+Priority: optional
+Maintainer: norn developers <noreply@example.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ pkg-config,
+ libsodium-dev,
+ doxygen,
+Standards-Version: 4.6.2
+Homepage: https://github.com/nostra124/norn
+Rules-Requires-Root: no
+
+Package: libnorn
+Section: libs
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Mainline DHT, secure sessions and cluster KV library (runtime)
+ libnorn is a C library for peer-to-peer applications: a Mainline DHT client
+ (BEP-5/BEP-44), authenticated pubkey-addressed sessions and reliable streams
+ with NAT traversal, and a class-aware Raft cluster key-value store.
+ .
+ This package contains the shared library.
+
+Package: libnorn-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends:
+ libnorn (= ${binary:Version}),
+ libsodium-dev,
+ ${misc:Depends}
+Description: Mainline DHT, secure sessions and cluster KV library (development)
+ libnorn is a C library for peer-to-peer applications: a Mainline DHT client
+ (BEP-5/BEP-44), authenticated pubkey-addressed sessions and reliable streams
+ with NAT traversal, and a class-aware Raft cluster key-value store.
+ .
+ This package contains the headers, the static library, the pkg-config file
+ and the libnorn(3) manual page needed to build against libnorn.
+
+Package: norn
+Section: net
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: norn command-line client and node daemon
+ The norn CLI drives the Mainline DHT directly and acts as a thin IPC client
+ to nornd, the node daemon that runs a norn node and hosts the replicated
+ cluster key-value store and the fleet SSH/GPG key directory.
+ .
+ This package contains the norn, nornd and norn-forward programs, their manual
+ pages and the systemd units.
+
+Package: libnorn-doc
+Section: doc
+Architecture: all
+Multi-Arch: foreign
+Depends: ${misc:Depends}
+Description: Mainline DHT, secure sessions and cluster KV library (documentation)
+ libnorn is a C library for peer-to-peer applications: a Mainline DHT client
+ (BEP-5/BEP-44), authenticated pubkey-addressed sessions and reliable streams
+ with NAT traversal, and a class-aware Raft cluster key-value store.
+ .
+ This package contains the Doxygen-generated API reference and the design
+ documents.

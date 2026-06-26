@@ -1,0 +1,11 @@
+# debhelper / dpkg-buildpackage build products
+/.debhelper/
+/files
+/tmp/
+/norn/
+/libnorn/
+/libnorn-dev/
+/libnorn-doc/
+*.substvars
+*.debhelper.log
+debhelper-build-stamp
