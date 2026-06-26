@@ -6,10 +6,12 @@ PROJECT_NUMBER         = @PACKAGE_VERSION@
 PROJECT_BRIEF          = "Mainline DHT, secure sessions, and cluster KV library"
 OUTPUT_DIRECTORY       = docs/api
 
-# Inputs: the public headers (and sources, for full coverage) plus the prose.
+# Inputs: the public headers (and sources, for full coverage) plus the README
+# as the main page. The design docs under docs/ are authored for GitHub
+# rendering (their intra-doc anchors don't match Doxygen's), so they're linked
+# from the README rather than fed through Doxygen.
 INPUT                  = @top_srcdir@/src/libnorn \
                          @top_srcdir@/src/nornd \
-                         @top_srcdir@/docs \
                          @top_srcdir@/README.md
 FILE_PATTERNS          = *.h *.c *.md
 RECURSIVE              = YES

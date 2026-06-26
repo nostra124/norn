@@ -5,7 +5,7 @@
  * Provides structured logging with four severity levels and threshold-based
  * filtering. Messages below the configured level are dropped.
  * 
- * @section usage Basic Usage
+ * @par Basic Usage
  * @code
  * #include "log.h"
  * 
@@ -21,13 +21,13 @@
  * }
  * @endcode
  * 
- * @section levels Log Levels
+ * @par Log Levels
  * - LOG_DEBUG: Detailed debugging information
  * - LOG_INFO: Normal operational messages
  * - LOG_WARN: Warning conditions (non-fatal)
  * - LOG_ERROR: Error conditions (may be fatal)
  * 
- * @section format Output Format
+ * @par Output Format
  * Format: "[timestamp] LEVEL category: message"
  * 
  * The level token enables `bifrost daemon log` to color and filter by severity.

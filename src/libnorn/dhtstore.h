@@ -5,21 +5,21 @@
  * Provides volatile, capped storage for BEP-44 mutable and immutable items
  * that this node holds for the network as a good DHT citizen (BPE-0004).
  * 
- * @section features Key Features
+ * @par Key Features
  * - Byte budget (RAM/512 by default, max 64MB)
  * - Per-source-IP rate limiting (max 32 items/IP)
  * - 2-hour TTL with LRU eviction
  * - Signature verification before storage
  * - Sequence number monotonicity enforcement
  * 
- * @section security Security Model
+ * @par Security Model
  * - Items are UNTRUSTED (from arbitrary DHT nodes)
  * - Signature verified before storage
  * - Sequence number must be newer than existing
  * - Per-IP rate limiting prevents abuse
  * - Budget enforcement prevents memory exhaustion
  * 
- * @section difference Difference from recstore
+ * @par Difference from recstore
  * - dhtstore: Untrusted items from the network
  * - recstore: Trusted items we signed ourselves
  * 
