@@ -1,0 +1,184 @@
+.TH NORND 8 "2026" "norn @PACKAGE_VERSION@" "System Administration"
+.SH NAME
+nornd \- norn node daemon: cluster KV host and IPC server
+.SH SYNOPSIS
+.B nornd
+.RB [ \-\-identity
+.IR PATH ]
+.RB [ \-\-socket
+.IR PATH ]
+.RB [ \-\-class
+.IR CLASS ]
+.RB [ \-\-data\-dir
+.IR PATH ]
+.RB [ \-\-foreground ]
+.SH DESCRIPTION
+.B nornd
+is the reference node daemon built on
+.BR libnorn (3).
+One process owns the event loop: it runs a norn node, hosts a replica of the
+fleet's Raft-replicated key-value store, and serves local tools (the
+.BR norn (1)
+CLI and applications) over a Unix-domain socket.
+.PP
+A node's identity is its
+.B Ed25519 SSH key.
+The daemon signs norn handshakes with that key directly, so the key never has
+to be re-encoded and an ssh-agent-held key can be used without exposing it. A
+system instance defaults to the host key
+.RI ( /etc/ssh/ssh_host_ed25519_key );
+a per-user instance defaults to
+.IR ~/.ssh/id_ed25519 .
+.PP
+The daemon exposes three distinct key-value surfaces:
+.IP \(bu 3
+the
+.B cluster KV
+\(em small values replicated by Raft across the fleet (also holds the
+SSH/GPG key directory);
+.IP \(bu 3
+the
+.B node-served KV
+\(em a node's own values streamed directly to a peer on request (unbounded
+size); and
+.IP \(bu 3
+.B BEP-44
+DHT records (public, size-limited).
+.PP
+On gaining leadership the daemon publishes its own SSH public key into the
+cluster key directory under
+.IR peer/<nodeid>/ssh .
+.SH OPTIONS
+.TP
+.BR \-\-identity " " \fIPATH\fP
+OpenSSH Ed25519 private key file to use as the node identity. Default
+.I ~/.ssh/id_ed25519
+(user) or the host key (system unit).
+.TP
+.BR \-\-socket " " \fIPATH\fP
+Unix socket to listen on. Default
+.I $XDG_RUNTIME_DIR/nornd.sock
+or
+.IR ~/.norn/nornd.sock .
+Ignored when the socket is passed in by socket activation.
+.TP
+.BR \-\-class " " \fICLASS\fP
+Node class:
+.BR server ,
+.BR workstation ,
+.BR laptop ,
+or
+.BR mobile .
+Only
+.B server
+nodes with proven uptime are eligible to lead the cluster; the others join as
+learners so a mostly-offline edge fleet never stalls writes. Default
+.BR server .
+.TP
+.BR \-\-data\-dir " " \fIPATH\fP
+State directory (reserved for node-served content and snapshots).
+.TP
+.B \-\-foreground
+Do not detach. The daemon already runs in the foreground; this flag is
+accepted for
+.B Type=notify
+service units.
+.SH SOCKET ACTIVATION
+.B nornd
+supports systemd and launchd socket activation. When a listening descriptor is
+handed over via
+.B LISTEN_FDS
+(with a matching
+.BR LISTEN_PID ),
+the daemon uses it instead of binding its own socket and does not unlink it on
+exit. For
+.B Type=notify
+units it sends
+.B READY=1
+to
+.B NOTIFY_SOCKET
+once it is serving (no libsystemd dependency).
+.SH ENVIRONMENT
+.TP
+.B XDG_RUNTIME_DIR
+Base directory for the default socket path.
+.TP
+.B HOME
+Used to resolve the default identity and socket when
+.B XDG_RUNTIME_DIR
+is unset.
+.TP
+.BR LISTEN_FDS ", " LISTEN_PID
+Socket-activation handover (systemd/launchd).
+.TP
+.B NOTIFY_SOCKET
+Readiness notification socket for
+.BR Type=notify .
+.SH FILES
+.TP
+.I /run/nornd/nornd.sock
+System-instance IPC socket (per the shipped unit).
+.TP
+.I $XDG_RUNTIME_DIR/nornd.sock
+User-instance IPC socket.
+.TP
+.IR /etc/ssh/ssh_host_ed25519_key ", " ~/.ssh/id_ed25519
+Default node identities (system / user).
+.TP
+.IR @prefix@/lib/systemd/system/nornd.{socket,service} ", " @prefix@/lib/systemd/user/nornd.{socket,service}
+Installed systemd units.
+.TP
+.I @prefix@/lib/launchd/io.norn.nornd*.plist
+Installed launchd plists.
+.SH SIGNALS
+.TP
+.BR SIGINT ", " SIGTERM
+Graceful shutdown: stop serving, and unlink the socket unless it was
+socket-activated.
+.SH EXAMPLES
+Run a user instance against your SSH key:
+.PP
+.RS
+.EX
+$ nornd --identity ~/.ssh/id_ed25519 --class workstation
+$ norn cluster status
+role: leader
+members: 1
+.EE
+.RE
+.PP
+Enable the socket-activated user service:
+.PP
+.RS
+.EX
+$ systemctl --user enable --now nornd.socket
+.EE
+.RE
+.PP
+Enable the system service (keyed on the host SSH key):
+.PP
+.RS
+.EX
+# systemctl enable --now nornd.socket
+.EE
+.RE
+.SH EXIT STATUS
+.TP
+.B 0
+Clean shutdown.
+.TP
+.B 1
+Startup failure: unreadable identity, client/cluster creation failed, or the
+socket could not be bound.
+.TP
+.B 2
+Usage error.
+.SH SEE ALSO
+.BR norn (1),
+.BR libnorn (3),
+.BR systemd.socket (5),
+.BR sd_notify (3)
+.SH AUTHOR
+The norn development team.
+.SH LICENSE
+MIT License. See the LICENSE file for details.
