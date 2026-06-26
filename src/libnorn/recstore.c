@@ -88,7 +88,8 @@ int recstore_accept(const unsigned char k[32], uint32_t seq,
     /* verify the signature over the BEP-44 canonical buffer */
     unsigned char buf[64 + RECSTORE_VMAX];
     int bn = bep44_signbuf(seq, v, vlen, buf, sizeof(buf));
-    if (bn < 0 || bf_verify(sig, buf, (size_t)bn, k) != 0) return 0;
+    if (bn < 0 /* LCOV_EXCL_BR_LINE: buf sized 64+VMAX always fits a vlen<=VMAX item */
+        || bf_verify(sig, buf, (size_t)bn, k) != 0) return 0;
 
     unsigned char target[20]; bep44_target(k, target);
     rec_t *e = find(target);

@@ -45,7 +45,7 @@ void norn_transaction_remove(norn_transaction_state_t *state,
     if (!state || !txn) return;
     
     int idx = txn - state->transactions;
-    if (idx < 0 || idx >= state->count) return;
+    if (idx < 0 || idx >= state->count) return;  /* LCOV_EXCL_BR_LINE: idx<0 needs a pointer before the array (UB); unreachable via the public API */
     
     /* Swap with last and decrement */
     state->transactions[idx] = state->transactions[state->count - 1];

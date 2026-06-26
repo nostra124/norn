@@ -108,9 +108,44 @@ static void test_null_params(void) {
 
 static void test_empty_key(void) {
     norn_attr_clear();
-    
+
     assert(norn_set_attr("", "value", 5) == -1);
-    
+
+    norn_attr_clear();
+}
+
+static void test_invalid_args(void) {
+    norn_attr_clear();
+
+    /* value_len exceeding the max is rejected (attr.c:27). */
+    char big[300];
+    memset(big, 'x', sizeof(big));
+    assert(norn_set_attr("k", big, 257) == -1);
+
+    /* Key at/over the max length is rejected (attr.c:29). */
+    char longkey[200];
+    memset(longkey, 'a', sizeof(longkey) - 1);
+    longkey[sizeof(longkey) - 1] = '\0';
+    assert(norn_set_attr(longkey, "v", 1) == -1);
+
+    /* get with a non-NULL key but NULL out is rejected (attr.c:57). */
+    assert(norn_get_attr("k", NULL, 0) == -1);
+
+    norn_attr_clear();
+}
+
+static void test_lookup_skips_other_used(void) {
+    /* With used entries present whose keys don't match, get/del must skip them
+     * and report not-found (attr.c:62 and attr.c:78 used-but-no-match arms). */
+    norn_attr_clear();
+
+    norn_set_attr("alpha", "1", 1);
+    norn_set_attr("beta", "2", 1);
+
+    char buf[16];
+    assert(norn_get_attr("gamma", buf, sizeof(buf)) == -1);
+    assert(norn_del_attr("gamma") == -1);
+
     norn_attr_clear();
 }
 
@@ -184,6 +219,8 @@ int main(void) {
     test_buffer_too_small();
     test_null_params();
     test_empty_key();
+    test_invalid_args();
+    test_lookup_skips_other_used();
     test_binary_value();
     test_builtin_attrs();
     test_lazy_init();

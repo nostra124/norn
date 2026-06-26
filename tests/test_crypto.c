@@ -132,7 +132,12 @@ static void test_keypair_load_error_paths(void) {
     
     ret = crypto_keypair_load(&kp, path);
     assert(ret == -1);
-    
+
+    /* Saving to a path whose directory does not exist fails fopen (crypto.c:79). */
+    crypto_keypair_new(&kp);
+    ret = crypto_keypair_save(&kp, "/nonexistent/path/key");
+    assert(ret == -1);
+
     unlink(path);
     printf("  test_keypair_load_error_paths: OK\n");
 }
@@ -193,7 +198,13 @@ static void test_bf_seal(void) {
     
     ret = bf_seal(pk, pt, sizeof(pt) - 1, ct);
     assert(ret == 0);
-    
+
+    /* Invalid ed25519 public key fails the curve25519 conversion (crypto.c:116). */
+    unsigned char bad_pub[32];
+    memset(bad_pub, 0xFF, sizeof(bad_pub));
+    ret = bf_seal(bad_pub, pt, sizeof(pt) - 1, ct);
+    assert(ret == -1);
+
     printf("  test_bf_seal: OK\n");
 }
 
@@ -226,7 +237,13 @@ static void test_bf_seal_open(void) {
     ret = bf_seal_open(pk, sk, ct, ctlen, out);
     assert(ret == 0);
     assert(memcmp(pt, out, sizeof(pt) - 1) == 0);
-    
+
+    /* Invalid ed25519 public key fails the curve25519 conversion (crypto.c:125). */
+    unsigned char bad_pub[32];
+    memset(bad_pub, 0xFF, sizeof(bad_pub));
+    ret = bf_seal_open(bad_pub, sk, ct, ctlen, out);
+    assert(ret == -1);
+
     printf("  test_bf_seal_open: OK\n");
 }
 

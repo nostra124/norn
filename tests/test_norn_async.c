@@ -154,18 +154,17 @@ static void test_transaction_expire_txns(void) {
 static void test_transaction_max(void) {
     printf("  test_transaction_max: starting...\n");
     fflush(stdout);
-    
+
     norn_transaction_state_t state;
     norn_transaction_init(&state);
-    
+
     printf("  test_transaction_max: initialized\n");
     fflush(stdout);
-    
+
     unsigned char target[20] = {0};
-    
-    /* Create fewer transactions to avoid timeout in test */
-    int max_test = 10;
-    for (int i = 0; i < max_test; i++) {
+
+    /* Fill the table completely to the maximum capacity. */
+    for (int i = 0; i < NORN_MAX_TRANSACTIONS; i++) {
         norn_transaction_t *txn = norn_transaction_new(&state, TXN_GET_MUTABLE, target);
         if (!txn) {
             printf("  test_transaction_max: txn %d failed\n", i);
@@ -173,10 +172,59 @@ static void test_transaction_max(void) {
         }
         assert(txn != NULL);
     }
-    
-    assert(state.count == max_test);
-    
+
+    assert(state.count == NORN_MAX_TRANSACTIONS);
+
+    /* One more must be rejected: count >= NORN_MAX_TRANSACTIONS arm. */
+    norn_transaction_t *overflow = norn_transaction_new(&state, TXN_GET_MUTABLE, target);
+    assert(overflow == NULL);
+    assert(state.count == NORN_MAX_TRANSACTIONS);
+
     printf("  test_transaction_max: OK\n");
+}
+
+static void test_transaction_remove_out_of_range(void) {
+    norn_transaction_state_t state;
+    norn_transaction_init(&state);
+
+    unsigned char target[20] = {0};
+
+    norn_transaction_t *t1 = norn_transaction_new(&state, TXN_GET_MUTABLE, target);
+    norn_transaction_t *t2 = norn_transaction_new(&state, TXN_GET_IMMUTABLE, target);
+    assert(t1 != NULL && t2 != NULL);
+    assert(state.count == 2);
+
+    /* t2 lives at index 1. Drop the count to 1 so index 1 is now
+     * out of range (idx >= count), then attempt to remove t2. */
+    state.count = 1;
+    norn_transaction_remove(&state, t2);
+    assert(state.count == 1);
+
+    printf("  test_transaction_remove_out_of_range: OK\n");
+}
+
+static void test_transaction_next_id_wraparound(void) {
+    norn_transaction_state_t state;
+    norn_transaction_init(&state);
+
+    /* NULL guard. */
+    uint32_t id = norn_transaction_next_id(NULL);
+    assert(id == 0);
+
+    /* Force wraparound: next_id is 0xFFFFFFFF, so the next call returns
+     * that value and post-increment overflows next_id to 0, which the
+     * guard then rewrites to 1. */
+    state.next_id = 0xFFFFFFFFu;
+    id = norn_transaction_next_id(&state);
+    assert(id == 0xFFFFFFFFu);
+    assert(state.next_id == 1);
+
+    /* Following call must skip 0 and yield 1. */
+    id = norn_transaction_next_id(&state);
+    assert(id == 1);
+    assert(state.next_id == 2);
+
+    printf("  test_transaction_next_id_wraparound: OK\n");
 }
 
 static void test_get_mutable_async(void) {
@@ -408,6 +456,8 @@ int main(void) {
     test_transaction_remove();
     test_transaction_expire_txns();
     test_transaction_max();
+    test_transaction_remove_out_of_range();
+    test_transaction_next_id_wraparound();
     test_get_mutable_async();
     test_get_mutable_null();
     test_get_immutable_async();

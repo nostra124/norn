@@ -34,7 +34,7 @@ static int lstream_send(void *vctx, const unsigned char *seg, size_t len) {
 
 streammux_t *streammux_new(streammux_send_fn send, void *ctx) {
     streammux_t *m = calloc(1, sizeof(*m));
-    if (!m) return NULL;
+    if (!m) return NULL;   /* LCOV_EXCL_BR_LINE: calloc failure not unit-tested */
     m->send = send;
     m->ctx = ctx;
     return m;
@@ -61,7 +61,7 @@ static lstream_t *open_stream(streammux_t *m, uint16_t sid) {
         lstream_t *n = &m->s[i];
         n->used = 1; n->sid = sid; n->m = m;
         n->st = stream_new(lstream_send, n);   /* ctx = the lstream, so the cb knows the id */
-        if (!n->st) { n->used = 0; return NULL; }
+        if (!n->st) { n->used = 0; return NULL; }   /* LCOV_EXCL_BR_LINE: stream_new calloc failure not unit-tested */
         return n;
     }
     return NULL;                                 /* table full */
