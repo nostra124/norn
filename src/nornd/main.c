@@ -19,6 +19,9 @@
 #include "keydir.h"
 #include "norn.h"
 #include "norn_cluster.h"
+#include "norn_raft.h"
+#include "peers.h"
+#include "transport.h"
 
 #include <errno.h>
 #include <poll.h>
@@ -68,15 +71,6 @@ static const unsigned char *be_leader(void *c) {
 }
 static int be_members(void *c, unsigned char out[][NORND_PUBKEY], int max) {
     return norn_cluster_members((norn_cluster_t *)c, out, max);
-}
-
-/* Peer frame transport seam: single-node needs none. */
-static void cluster_send(void *ctx, const unsigned char pk[NORN_CLUSTER_PUBKEY],
-                         const unsigned char *data, size_t len) {
-    (void)ctx;
-    (void)pk;
-    (void)data;
-    (void)len; /* multi-node transport over norn sessions plugs in here */
 }
 
 /* ---- IPC socket ---- */
@@ -185,6 +179,9 @@ int main(int argc, char **argv) {
     char idbuf[600], sockbuf[600];
     const char *idpath = NULL, *sockpath = NULL;
     norn_node_class_t cls = NORN_NODE_SERVER;
+    nornd_peer_t peers[RAFT_MAX_NODES];
+    int n_peers = 0;
+    uint16_t listen_port = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--identity") == 0 && i + 1 < argc)
@@ -197,11 +194,23 @@ int main(int argc, char **argv) {
             ++i; /* accepted for the service units; state dir is reserved */
         else if (strcmp(argv[i], "--foreground") == 0)
             ; /* we never daemonize; accepted for Type=notify units */
-        else {
+        else if (strcmp(argv[i], "--listen-port") == 0 && i + 1 < argc)
+            listen_port = (uint16_t)atoi(argv[++i]);
+        else if (strcmp(argv[i], "--peer") == 0 && i + 1 < argc) {
+            if (n_peers >= RAFT_MAX_NODES ||
+                nornd_peer_parse(argv[++i], &peers[n_peers]) != 0) {
+                fprintf(stderr, "nornd: bad --peer spec (want <64-hex-pubkey>"
+                                "[@host:port])\n");
+                return 2;
+            }
+            n_peers++;
+        } else {
             fprintf(stderr,
                     "usage: nornd [--identity PATH] [--socket PATH] "
                     "[--class server|workstation|laptop|mobile]\n"
-                    "             [--data-dir PATH] [--foreground]\n");
+                    "             [--data-dir PATH] [--foreground] "
+                    "[--listen-port PORT]\n"
+                    "             [--peer <64-hex-pubkey>[@host:port]] ...\n");
             return 2;
         }
     }
@@ -224,7 +233,16 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    norn_cluster_io_t io = {cluster_send, NULL};
+    /* Multi-node frame transport over norn sessions (single-node: no peers). */
+    nornd_transport_t *xport =
+        nornd_transport_new(client, listen_port, peers, n_peers);
+    if (!xport) {
+        fprintf(stderr, "nornd: failed to create transport\n");
+        norn_free(client);
+        return 1;
+    }
+
+    norn_cluster_io_t io = {nornd_transport_send, xport};
     norn_cluster_config_t ccfg;
     memset(&ccfg, 0, sizeof(ccfg));
     ccfg.self_class = cls;
@@ -232,9 +250,14 @@ int main(int argc, char **argv) {
     norn_cluster_t *cl = norn_cluster_new(kp.public_key, &io, &ccfg);
     if (!cl) {
         fprintf(stderr, "nornd: failed to create cluster\n");
+        nornd_transport_free(xport);
         norn_free(client);
         return 1;
     }
+    /* Configured peers are voting servers; wire inbound frames to the cluster. */
+    for (int i = 0; i < n_peers; i++)
+        norn_cluster_add_member(cl, peers[i].pubkey, NORN_NODE_SERVER, 1);
+    nornd_transport_set_cluster(xport, cl);
 
     int activated = 0;
     int lfd = activated_fd();
@@ -306,6 +329,7 @@ int main(int argc, char **argv) {
 
         int rc = poll(pfds, np, 10);
         norn_tick(client);
+        nornd_transport_poll(xport); /* drain peer frames into the cluster */
         norn_cluster_tick(cl, now_ms());
 
         /* Once we can lead, publish our SSH public key to the directory. */
@@ -343,6 +367,7 @@ int main(int argc, char **argv) {
     close(lfd);
     if (!activated) unlink(sockpath); /* systemd owns an activated socket */
     norn_cluster_free(cl);
+    nornd_transport_free(xport);
     norn_free(client);
     return 0;
 }

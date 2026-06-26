@@ -42,6 +42,9 @@ struct norn_session {
     
     /* Transport */
     int fd;                           /* UDP socket, -1 if not connected */
+    int shared_fd;                    /* 1 if fd is the client's shared listen
+                                         socket (inbound session): demuxed by the
+                                         listener, not closed on free */
     uint32_t peer_ip;                 /* Network byte order */
     uint16_t peer_port;               /* Network byte order */
     
