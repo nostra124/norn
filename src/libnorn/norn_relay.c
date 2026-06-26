@@ -178,7 +178,9 @@ int norn_relay_handle_create(norn_relay_t *relay,
     memset(session, 0, sizeof(*session));
     
     memcpy(session->session_id, req->session_id, NORN_RELAY_SESSION_ID_LEN);
-    memcpy(session->initiator_pubkey, req->session_id, 32); /* Will be filled from signature */
+    /* initiator_pubkey is filled from the verified signature later; leave it
+     * zeroed (from the memset above). The previous code copied 32 bytes out of
+     * the 16-byte session_id, an out-of-bounds read. */
     memcpy(session->target_pubkey, req->target_pubkey, 32);
     session->initiator_ip = from_ip;
     session->initiator_port = from_port;

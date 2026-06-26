@@ -27,8 +27,14 @@
 #include <stddef.h>
 
 /* Forward declarations - types defined elsewhere */
+#ifndef NORN_CLIENT_T_DEFINED
+#define NORN_CLIENT_T_DEFINED
 typedef struct norn_client norn_client_t;
+#endif
+#ifndef NORN_SESSION_T_DEFINED
+#define NORN_SESSION_T_DEFINED
 typedef struct norn_session norn_session_t;
+#endif
 
 #define NORN_RELAY_SESSION_ID_LEN 16
 #define NORN_RELAY_CREATE_LEN (1 + 32 + NORN_RELAY_SESSION_ID_LEN + 64)
