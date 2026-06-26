@@ -29,7 +29,9 @@ echo "==> Checking coverage for tracked sources"
 # those: a source passes when every instrumented line and branch is hit
 # (LH==LF and BRH==BRF), after LCOV_EXCL markers have removed untestable paths.
 FAILED=0
-while read -r src; do
+# `|| [ -n "$src" ]` so the final entry is still processed when the tracked
+# file lacks a trailing newline (read returns non-zero at EOF but fills $src).
+while read -r src || [ -n "$src" ]; do
     [ -z "$src" ] && continue
     [ "${src:0:1}" = "#" ] && continue
 
