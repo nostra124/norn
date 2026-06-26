@@ -52,6 +52,14 @@ noinst_LTLIBRARIES = libnornd.la
 libnornd_la_SOURCES = src/nornd/ipc.c src/nornd/identity.c src/nornd/dispatch.c src/nornd/client.c src/nornd/cli_cluster.c src/nornd/cli_keys.c src/nornd/keydir.c src/nornd/served_proto.c
 libnornd_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 
+# Internal headers: not installed, but must ship in the tarball (they're
+# #included by the sources) so a VPATH/dist build can find them.
+noinst_HEADERS = src/nornd/ipc.h src/nornd/identity.h src/nornd/dispatch.h \
+                 src/nornd/client.h src/nornd/cli_cluster.h src/nornd/cli_keys.h \
+                 src/nornd/keydir.h src/nornd/served_proto.h \
+                 src/libnorn/norn_internal.h src/libnorn/norn_session_internal.h \
+                 src/libnorn/norn_endpoint_cache.h src/libnorn/norn_upnp.h
+
 include_HEADERS = src/libnorn/norn.h \
                    src/libnorn/mainline.h \
                    src/libnorn/norn_transaction.h \
@@ -306,16 +314,17 @@ coverage:
 
 # API documentation (Doxygen). Generates HTML + man3 from the header comments
 # into docs/api/. The headers already use Doxygen markup (@file/@brief/@param).
-# `docs` is .PHONY so it doesn't collide with the docs/ source directory.
-.PHONY: docs clean-docs coverage check-sit check-pit
-docs:
+# Named `apidocs` (not `docs`) so it never collides with the docs/ directory,
+# which is shipped via EXTRA_DIST and would otherwise be treated as a target.
+.PHONY: apidocs clean-apidocs coverage check-sit check-pit
+apidocs:
 	@command -v doxygen >/dev/null 2>&1 || { \
 		echo "ERROR: doxygen not found. Install it (e.g. apt-get install doxygen graphviz)."; \
 		exit 1; \
 	}
 	doxygen Doxyfile
 
-clean-docs:
+clean-apidocs:
 	rm -rf docs/api
 
 # System Integration Tests (SIT)

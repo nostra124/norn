@@ -72,7 +72,7 @@ mostly-offline edge fleet (laptops, phones) never stalls writes.
 - **API reference** — generated from the header comments with Doxygen:
 
   ```sh
-  make docs        # writes HTML + man3 into docs/api/
+  make apidocs        # writes HTML + man3 into docs/api/
   ```
 
   (needs `doxygen`; `graphviz` is optional and off by default.)

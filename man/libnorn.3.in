@@ -99,7 +99,7 @@ from the header comments with Doxygen:
 .PP
 .RS
 .EX
-make docs        # writes HTML + man3 to docs/api/
+make apidocs        # writes HTML + man3 to docs/api/
 .EE
 .RE
 .SH SEE ALSO
