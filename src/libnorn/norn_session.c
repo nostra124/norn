@@ -28,6 +28,21 @@
 
 /* === Internal Session Management === */
 
+/* Send one datagram to the session's peer. An outbound dial has its own socket
+ * connect()ed to the peer, so a plain send() suffices (and Linux rejects sendto
+ * with an address on a connected socket). An inbound session shares the client's
+ * unconnected listen socket, so it must address the peer explicitly. */
+static ssize_t session_dgram_send(norn_session_t *s, const unsigned char *buf,
+                                  size_t len) {
+    if (!s->shared_fd) return send(s->fd, buf, len, 0);
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof(a));
+    a.sin_family = AF_INET;
+    a.sin_addr.s_addr = s->peer_ip;
+    a.sin_port = s->peer_port;
+    return sendto(s->fd, buf, len, 0, (struct sockaddr *)&a, sizeof(a));
+}
+
 /* Stream data plane (FEAT-016/018): the streammux emits id-framed segments
  * through this callback; we seal each as one datagram over the channel. The
  * peer's process_packet decrypts it back into a segment and feeds its mux. */
@@ -38,7 +53,7 @@ static int session_mux_send(void *ctx, const unsigned char *seg, size_t len) {
     if (len + CHANNEL_OVERHEAD > sizeof(out)) return 0; /* drop oversized (bounded MTU) */
     int sl = channel_seal(&s->channel, seg, len, out, sizeof(out));
     if (sl < 0) return 0;
-    ssize_t sent = send(s->fd, out, (size_t)sl, 0);
+    ssize_t sent = session_dgram_send(s, out, (size_t)sl);
     return sent == sl ? 0 : 1;
 }
 
@@ -362,16 +377,14 @@ int norn_dial_direct_async(norn_client_t *client,
                            norn_session_callback_t callback,
                            void *user_data) {
     if (!client || !endpoint || !pubkey) return -1;
-    
-    /* Get identity from client */
-    unsigned char self_pub[32], self_sec[64];
-    crypto_sign_keypair(self_pub, self_sec);
-    
+
     norn_session_t *session = norn_session_new(client, suite);
     if (!session) return -1;
-    
+
     session->is_initiator = 1;
-    norn_session_set_identity(session, self_pub, self_sec);
+    /* Identity is the client's own keypair, so the peer authenticates us as the
+     * node it expects (e.g. a cluster member) — not a throwaway key. */
+    norn_session_set_identity(session, client->self_pub, client->self_sec);
     memcpy(session->peer_pubkey, pubkey, session->suite->pubkey_len);
     
     session->peer_ip = endpoint->ip;
@@ -534,7 +547,7 @@ int norn_session_process_packet(norn_session_t *session,
         if (confirm_len < 0) return -1;
         
         /* Send CONFIRM */
-        ssize_t sent = send(session->fd, confirm_msg, confirm_len, 0);
+        ssize_t sent = session_dgram_send(session, confirm_msg, (size_t)confirm_len);
         if (sent != confirm_len) return -1;
         
         /* Session established */
@@ -557,7 +570,7 @@ int norn_session_process_packet(norn_session_t *session,
             if (resp_len < 0) return -1;
             
             /* Send RESP */
-            ssize_t sent = send(session->fd, resp_msg, resp_len, 0);
+            ssize_t sent = session_dgram_send(session, resp_msg, (size_t)resp_len);
             if (sent != resp_len) return -1;
             
             session->hs_state = HS_RESP_SENT;
@@ -590,19 +603,14 @@ int norn_session_send_pending(norn_session_t *session) {
     
     /* Send pending handshake message (for initiator) */
     if (session->is_initiator && session->hs_state == HS_NONE) {
-        /* Build and send INIT */
+        /* Build and send INIT. The initiator's socket is connect()ed to the
+         * peer, so this goes via send() — sendto() with an address on a
+         * connected UDP socket is rejected with EISCONN on macOS/BSD. */
         unsigned char init_msg[CHANNEL_INIT_LEN];
         int init_len = norn_session_build_init(session, init_msg, sizeof(init_msg));
         if (init_len < 0) return -1;
-        
-        struct sockaddr_in addr;
-        memset(&addr, 0, sizeof(addr));
-        addr.sin_family = AF_INET;
-        addr.sin_addr.s_addr = session->peer_ip;
-        addr.sin_port = session->peer_port;
-        
-        ssize_t sent = sendto(session->fd, init_msg, init_len, 0,
-                              (struct sockaddr *)&addr, sizeof(addr));
+
+        ssize_t sent = session_dgram_send(session, init_msg, (size_t)init_len);
         if (sent != init_len) return -1;
         
         session->hs_state = HS_INIT_SENT;
@@ -659,24 +667,61 @@ int norn_client_remove_session(norn_client_t *client, norn_session_t *session) {
     return -1;
 }
 
+/* Route a datagram that arrived on the shared listen socket. If it belongs to an
+ * existing inbound session (matched by peer endpoint), feed it there; otherwise
+ * treat it as a new peer's INIT: spin up a responder session bound to the shared
+ * listen fd, run the handshake, and hand it to the accept callback. */
+static void accept_or_route(norn_client_t *client, const unsigned char *buf,
+                            size_t len, uint32_t ip, uint16_t port) {
+    for (int i = 0; i < client->session_count; i++) {
+        norn_session_t *s = client->sessions[i];
+        if (s->shared_fd && s->state != NORN_SESSION_CLOSED &&
+            s->peer_ip == ip && s->peer_port == port) {
+            norn_session_process_packet(s, buf, len, ip, port);
+            return;
+        }
+    }
+
+    if (!client->listen_callback) return; /* not listening for new peers */
+
+    norn_session_t *s = norn_session_new(client, client->listen_suite);
+    if (!s) return;
+    s->fd = client->listen_fd;
+    s->shared_fd = 1; /* shared socket: never closed/recv-drained by the session */
+    s->is_initiator = 0;
+    s->state = NORN_SESSION_CONNECTING;
+    s->hs_state = HS_NONE;
+    s->peer_ip = ip;
+    s->peer_port = port;
+    norn_session_set_identity(s, client->self_pub, client->self_sec);
+    if (channel_gen_ephemeral(&s->channel) != 0 ||
+        norn_client_add_session(client, s) != 0) {
+        norn_session_free(s);
+        return;
+    }
+    /* Consume the INIT we already read (sends RESP back via the shared fd). */
+    norn_session_process_packet(s, buf, len, ip, port);
+    client->listen_callback(s, client->listen_user_data);
+}
+
 int norn_client_tick_sessions(norn_client_t *client) {
     if (!client) return -1;
-    
+
     int processed = 0;
     uint32_t now_ms = 0; /* TODO: Get actual time */
-    
+
     /* Process each registered session */
     for (int i = 0; i < client->session_count; i++) {
         norn_session_t *session = client->sessions[i];
-        
+
         /* Skip closed sessions */
         if (session->state == NORN_SESSION_CLOSED) continue;
-        
+
         /* Send pending handshake messages */
         if (session->state == NORN_SESSION_CONNECTING) {
             norn_session_send_pending(session);
         }
-        
+
         /* Check timeouts */
         norn_session_check_timeout(session, now_ms);
 
@@ -686,8 +731,9 @@ int norn_client_tick_sessions(norn_client_t *client) {
         }
 
         /* Process incoming packets if fd is set. Drain all queued datagrams so a
-         * burst of stream segments is delivered in one tick. */
-        if (session->fd >= 0) {
+         * burst of stream segments is delivered in one tick. Inbound sessions
+         * share the listen socket and are fed by the listener block below. */
+        if (session->fd >= 0 && !session->shared_fd) {
             unsigned char buf[4096];
             struct sockaddr_in from;
             socklen_t fromlen = sizeof(from);
@@ -701,23 +747,23 @@ int norn_client_tick_sessions(norn_client_t *client) {
             }
         }
     }
-    
-    /* Process listener socket */
+
+    /* Process listener socket: demux datagrams to inbound sessions / accept new
+     * peers. Drain all queued datagrams so a burst is handled in one tick. */
     if (client->listen_fd >= 0) {
         unsigned char buf[4096];
         struct sockaddr_in from;
         socklen_t fromlen = sizeof(from);
-        
-        ssize_t len = recvfrom(client->listen_fd, buf, sizeof(buf), MSG_DONTWAIT,
-                               (struct sockaddr *)&from, &fromlen);
-        
-        if (len > 0) {
-            /* TODO Phase 1: Handle incoming handshake */
-            /* For now, would create new session and call norn_session_process_packet */
+
+        ssize_t len;
+        while ((len = recvfrom(client->listen_fd, buf, sizeof(buf), MSG_DONTWAIT,
+                               (struct sockaddr *)&from, &fromlen)) > 0) {
+            accept_or_route(client, buf, (size_t)len, from.sin_addr.s_addr,
+                            from.sin_port);
             processed++;
         }
     }
-    
+
     return processed;
 }
 
@@ -736,11 +782,12 @@ int norn_get_session_fds(norn_client_t *client,
         count++;
     }
     
-    /* Add session sockets */
+    /* Add session sockets (inbound sessions share the listen fd, already added) */
     for (int i = 0; i < client->session_count && count < max_fds; i++) {
         norn_session_t *session = client->sessions[i];
-        
-        if (session->fd >= 0 && session->state != NORN_SESSION_CLOSED) {
+
+        if (session->fd >= 0 && !session->shared_fd &&
+            session->state != NORN_SESSION_CLOSED) {
             fds[count] = session->fd;
             events[count] = POLLIN;
             count++;
@@ -776,8 +823,9 @@ int norn_session_get_fd(const norn_session_t *session) {
 
 void norn_session_free(norn_session_t *session) {
     if (!session) return;
-    
-    if (session->fd >= 0) {
+
+    /* Don't close a shared listen fd — it's owned by the client, not us. */
+    if (session->fd >= 0 && !session->shared_fd) {
         close(session->fd);
     }
     
