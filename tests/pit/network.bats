@@ -2,13 +2,15 @@
 # PIT: Network integration with real DHT nodes
 # These tests require network access to mainline DHT bootstrap nodes
 
+load test_helper
+
 setup() {
     WORK_DIR="$(mktemp -d)"
     export WORK_DIR
     cd "$WORK_DIR"
     
     # Copy source to work directory
-    cp -r /Users/rene/Projekte/norn/* "$WORK_DIR/"
+    copy_src
     
     # Build and install
     autoreconf -fi

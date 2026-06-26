@@ -53,7 +53,7 @@ int main(void) {
     
     norn_session_free(NULL);
     
-    assert(norn_stream_open_async(NULL, NULL, NULL) == -1);
+    assert(norn_stream_open_async(NULL, NULL, NULL) == NULL);
     
     return 0;
 }

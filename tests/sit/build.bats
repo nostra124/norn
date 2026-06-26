@@ -1,13 +1,15 @@
 #!/usr/bin/env bats
 # SIT: Build and install norn in a container
 
+load test_helper
+
 setup() {
     WORK_DIR="$(mktemp -d)"
     export WORK_DIR
     cd "$WORK_DIR"
     
     # Copy source to work directory
-    cp -r /Users/rene/Projekte/norn/* "$WORK_DIR/"
+    copy_src
 }
 
 teardown() {
