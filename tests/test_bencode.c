@@ -304,6 +304,357 @@ static void test_roundtrip(void) {
     printf("  test_roundtrip: OK\n");
 }
 
+/* Decode error/edge inputs: each must reject (return NULL) unless noted, exercising
+ * the parse_int_bounded, decode_int, decode_string, decode_list and decode_dict
+ * rejection branches reachable through the public bencode_decode entry point. */
+static void test_decode_int_edges(void) {
+    size_t pos;
+    bencode_value_t *val;
+
+    /* small negative integer: non-MIN branch of parse_int_bounded's ternary */
+    pos = 0;
+    val = bencode_decode("i-42e", 5, &pos);
+    assert(val != NULL);
+    assert(val->type == BENCODE_INT);
+    assert(val->val.int_val == -42);
+    assert(pos == 5);
+    bencode_free(val);
+
+    /* '-' with no following digit */
+    pos = 0;
+    assert(bencode_decode("i-e", 3, &pos) == NULL);
+
+    /* negative overflow (INT64_MIN - 1) */
+    pos = 0;
+    assert(bencode_decode("i-9223372036854775809e", 22, &pos) == NULL);
+
+    /* positive overflow (INT64_MAX + 1) */
+    pos = 0;
+    assert(bencode_decode("i9223372036854775808e", 21, &pos) == NULL);
+
+    /* digits but no 'e' terminator */
+    pos = 0;
+    assert(bencode_decode("i42x", 4, &pos) == NULL);
+
+    /* 'i' with nothing after it (i >= len before reading a digit) */
+    pos = 0;
+    assert(bencode_decode("i", 1, &pos) == NULL);
+
+    /* 'i' then a byte below '0' (data[i] < '0') */
+    pos = 0;
+    assert(bencode_decode("i/e", 3, &pos) == NULL);
+
+    /* 'i' then a byte above '9' (data[i] > '9') */
+    pos = 0;
+    assert(bencode_decode("ize", 3, &pos) == NULL);
+
+    /* '-' with no digit and end-of-buffer (i >= len after the sign) */
+    pos = 0;
+    assert(bencode_decode("i-", 2, &pos) == NULL);
+
+    /* a digit followed by a byte below '0' mid-scan (loop's data[i] >= '0' false arm) */
+    pos = 0;
+    assert(bencode_decode("i5/e", 4, &pos) == NULL);
+
+    printf("  test_decode_int_edges: OK\n");
+}
+
+static void test_decode_string_edges(void) {
+    size_t pos;
+
+    /* leading non-digit, non-marker byte: decode_depth falls through to NULL */
+    pos = 0;
+    assert(bencode_decode("abc:data", 8, &pos) == NULL);
+
+    /* length digits but no ':' separator */
+    pos = 0;
+    assert(bencode_decode("5hello", 6, &pos) == NULL);
+
+    /* declared length runs past the buffer */
+    pos = 0;
+    assert(bencode_decode("10:hello", 8, &pos) == NULL);
+
+    /* length digits that consume the whole buffer (p >= len before ':') */
+    pos = 0;
+    assert(bencode_decode("5", 1, &pos) == NULL);
+
+    /* unknown leading marker */
+    pos = 0;
+    assert(bencode_decode("xi42e", 5, &pos) == NULL);
+
+    /* leading byte below '0': decode_depth's digit test takes its false arm */
+    pos = 0;
+    assert(bencode_decode("-9e", 3, &pos) == NULL);
+    pos = 0;
+    assert(bencode_decode("?", 1, &pos) == NULL);
+
+    printf("  test_decode_string_edges: OK\n");
+}
+
+static void test_decode_list_edges(void) {
+    size_t pos;
+    bencode_value_t *val;
+
+    /* 'l' then a malformed item: inner decode fails, list freed */
+    pos = 0;
+    assert(bencode_decode("li42", 4, &pos) == NULL);
+
+    /* one good item but missing the final 'e' */
+    pos = 0;
+    assert(bencode_decode("li42e", 5, &pos) == NULL);
+
+    /* well-formed single-element list */
+    pos = 0;
+    val = bencode_decode("li42ee", 6, &pos);
+    assert(val != NULL);
+    assert(val->type == BENCODE_LIST);
+    assert(val->val.list_val.count == 1);
+    assert(val->val.list_val.items[0]->type == BENCODE_INT);
+    assert(val->val.list_val.items[0]->val.int_val == 42);
+    assert(pos == 6);
+    bencode_free(val);
+
+    printf("  test_decode_list_edges: OK\n");
+}
+
+static void test_decode_dict_edges(void) {
+    size_t pos;
+    bencode_value_t *val;
+
+    /* non-string key (integer) is rejected */
+    pos = 0;
+    assert(bencode_decode("di5e", 4, &pos) == NULL);
+
+    /* key present but value missing */
+    pos = 0;
+    assert(bencode_decode("d3:foo", 6, &pos) == NULL);
+
+    /* key present, value malformed */
+    pos = 0;
+    assert(bencode_decode("d3:foox", 7, &pos) == NULL);
+
+    /* key + value but no closing 'e' */
+    pos = 0;
+    assert(bencode_decode("d3:fooi42e", 10, &pos) == NULL);
+
+    /* well-formed single-pair dict */
+    pos = 0;
+    val = bencode_decode("d3:fooi42ee", 11, &pos);
+    assert(val != NULL);
+    assert(val->type == BENCODE_DICT);
+    assert(val->val.dict_val.count == 1);
+    bencode_value_t *foo = bencode_dict_get(val, "foo");
+    assert(foo != NULL);
+    assert(foo->type == BENCODE_INT);
+    assert(foo->val.int_val == 42);
+    assert(pos == 11);
+    bencode_free(val);
+
+    printf("  test_decode_dict_edges: OK\n");
+}
+
+/* Decode a list and a dict large enough to force the items/keys/values arrays to
+ * grow past their initial capacity of 8 (realloc-success branch). */
+static void test_decode_capacity_growth(void) {
+    char buf[256];
+    size_t len, pos;
+    bencode_value_t *val;
+    int i;
+
+    /* list of 10 integers */
+    len = 0;
+    buf[len++] = 'l';
+    for (i = 0; i < 10; i++) {
+        int n = snprintf(buf + len, sizeof(buf) - len, "i%de", i);
+        len += (size_t)n;
+    }
+    buf[len++] = 'e';
+    pos = 0;
+    val = bencode_decode(buf, len, &pos);
+    assert(val != NULL);
+    assert(val->type == BENCODE_LIST);
+    assert(val->val.list_val.count == 10);
+    assert(val->val.list_val.capacity >= 10);
+    bencode_free(val);
+
+    /* dict of 10 string->int pairs */
+    len = 0;
+    buf[len++] = 'd';
+    for (i = 0; i < 10; i++) {
+        int n = snprintf(buf + len, sizeof(buf) - len, "1:%ci%de", 'a' + i, i);
+        len += (size_t)n;
+    }
+    buf[len++] = 'e';
+    pos = 0;
+    val = bencode_decode(buf, len, &pos);
+    assert(val != NULL);
+    assert(val->type == BENCODE_DICT);
+    assert(val->val.dict_val.count == 10);
+    assert(val->val.dict_val.capacity >= 10);
+    bencode_free(val);
+
+    printf("  test_decode_capacity_growth: OK\n");
+}
+
+/* Helper: build a string value of exactly `data_len` bytes. */
+static bencode_value_t *make_filler_string(size_t data_len) {
+    char *buf = malloc(data_len);
+    assert(buf != NULL);
+    memset(buf, 'x', data_len);
+    bencode_value_t *s = bencode_string_new(buf, data_len);
+    assert(s != NULL);
+    free(buf);
+    return s;
+}
+
+/* The encode buffer starts at cap=1024 and only grows when `needed > cap`. Each
+ * encoder (int/string/list/dict open and close) has its own growth block, and
+ * the growing element over-allocates (new_cap = needed*2), so the FIRST element
+ * to cross 1024 is the only one that grows. These cases pad the buffer so the
+ * crossing byte is, in turn, an int, a nested list 'l', a nested dict 'd', a
+ * list-closing 'e' and a dict-closing 'e' -- hitting every growth path. */
+static void test_encode_buffer_growth(void) {
+    size_t enc_len;
+    char *enc;
+
+    /* (a0) encode_string growth: a single ~2000-byte string overflows the
+     * initial 1024 cap directly inside encode_string. */
+    {
+        bencode_value_t *s = make_filler_string(2000);
+        enc = bencode_encode(s, &enc_len);
+        assert(enc != NULL);
+        assert(enc_len > 2000);
+        free(enc);
+        bencode_free(s);
+    }
+
+    /* (a) encode_int growth: list = [ <1016-byte string> , 0 ].
+     * 'l'(->1) + string(1+5+1016=1022, fits) -> new_pos 1022; int "i0e" needs
+     * 1025 > 1024 -> encode_int grows. */
+    {
+        bencode_value_t *list = bencode_list_new();
+        assert(bencode_list_add(list, make_filler_string(1016)) == 0);
+        assert(bencode_list_add(list, bencode_int_new(0)) == 0);
+        enc = bencode_encode(list, &enc_len);
+        assert(enc != NULL);
+        free(enc);
+        bencode_free(list);
+    }
+
+    /* (b) encode_list close growth: list = [ <1018-byte string> ].
+     * 'l'(->1) + string(1+5+1018=1024, fits exactly) -> new_pos 1024; closing
+     * 'e' needs 1025 > 1024 -> encode_list close grows. */
+    {
+        bencode_value_t *list = bencode_list_new();
+        assert(bencode_list_add(list, make_filler_string(1018)) == 0);
+        enc = bencode_encode(list, &enc_len);
+        assert(enc != NULL);
+        free(enc);
+        bencode_free(list);
+    }
+
+    /* (c) encode_list open growth (nested): list = [ <1018-byte string>, [] ].
+     * outer 'l' + string -> new_pos 1024; the inner list's opening 'l' needs
+     * 1025 > 1024 -> encode_list open grows. */
+    {
+        bencode_value_t *outer = bencode_list_new();
+        assert(bencode_list_add(outer, make_filler_string(1018)) == 0);
+        assert(bencode_list_add(outer, bencode_list_new()) == 0);
+        enc = bencode_encode(outer, &enc_len);
+        assert(enc != NULL);
+        free(enc);
+        bencode_free(outer);
+    }
+
+    /* (d) encode_dict open growth (nested): list = [ <1018-byte string>, {} ].
+     * the inner dict's opening 'd' is the byte at offset 1024 -> grows. */
+    {
+        bencode_value_t *outer = bencode_list_new();
+        assert(bencode_list_add(outer, make_filler_string(1018)) == 0);
+        assert(bencode_list_add(outer, bencode_dict_new()) == 0);
+        enc = bencode_encode(outer, &enc_len);
+        assert(enc != NULL);
+        free(enc);
+        bencode_free(outer);
+    }
+
+    /* (e) encode_dict close growth: dict = { <1015-byte key> : 0 }.
+     * 'd'(->1) + key(1+(4+1015)=1020, prefix "1015:") -> new_pos 1021; value
+     * "i0e" -> 1024 (fits); closing 'e' needs 1025 > 1024 -> encode_dict close
+     * grows. The out_len == NULL path is exercised here too. */
+    {
+        size_t klen = 1015;
+        char *key = malloc(klen + 1);
+        assert(key != NULL);
+        memset(key, 'k', klen);
+        key[klen] = '\0';
+        bencode_value_t *dict = bencode_dict_new();
+        assert(bencode_dict_add(dict, key, bencode_int_new(0)) == 0);
+        enc = bencode_encode(dict, NULL);   /* out_len == NULL */
+        assert(enc != NULL);
+        free(enc);
+        bencode_free(dict);
+        free(key);
+    }
+
+    printf("  test_encode_buffer_growth: OK\n");
+}
+
+/* Grow the dict and list builder arrays past the initial capacity of 8 via the
+ * public add API (realloc-success branch in bencode_dict_add/bencode_list_add). */
+static void test_builder_capacity_growth(void) {
+    bencode_value_t *list = bencode_list_new();
+    assert(list != NULL);
+    for (int i = 0; i < 10; i++) {
+        assert(bencode_list_add(list, bencode_int_new(i)) == 0);
+    }
+    assert(list->val.list_val.count == 10);
+    assert(list->val.list_val.capacity >= 10);
+    bencode_free(list);
+
+    bencode_value_t *dict = bencode_dict_new();
+    assert(dict != NULL);
+    for (int i = 0; i < 10; i++) {
+        char key[8];
+        snprintf(key, sizeof(key), "k%d", i);
+        assert(bencode_dict_add(dict, key, bencode_int_new(i)) == 0);
+    }
+    assert(dict->val.dict_val.count == 10);
+    assert(dict->val.dict_val.capacity >= 10);
+    bencode_free(dict);
+
+    printf("  test_builder_capacity_growth: OK\n");
+}
+
+/* Argument-validation branches of the public mutator/accessor helpers. */
+static void test_arg_validation(void) {
+    bencode_value_t *dict = bencode_dict_new();
+    bencode_value_t *list = bencode_list_new();
+    bencode_value_t *anint = bencode_int_new(1);
+    assert(dict && list && anint);
+
+    /* bencode_dict_get on a non-dict and with NULL key */
+    assert(bencode_dict_get(anint, "x") == NULL);
+    assert(bencode_dict_get(dict, NULL) == NULL);
+
+    /* bencode_dict_add rejects NULL dict, wrong type, NULL key, NULL val */
+    assert(bencode_dict_add(NULL, "k", anint) == -1);
+    assert(bencode_dict_add(list, "k", anint) == -1);
+    assert(bencode_dict_add(dict, NULL, anint) == -1);
+    assert(bencode_dict_add(dict, "k", NULL) == -1);
+
+    /* bencode_list_add rejects NULL list, wrong type, NULL val */
+    assert(bencode_list_add(NULL, anint) == -1);
+    assert(bencode_list_add(dict, anint) == -1);
+    assert(bencode_list_add(list, NULL) == -1);
+
+    bencode_free(dict);
+    bencode_free(list);
+    bencode_free(anint);
+
+    printf("  test_arg_validation: OK\n");
+}
+
 int main(void) {
     printf("test_bencode:\n");
     
@@ -326,7 +677,15 @@ int main(void) {
     test_free_null();
     test_encode_null();
     test_roundtrip();
-    
+    test_decode_int_edges();
+    test_decode_string_edges();
+    test_decode_list_edges();
+    test_decode_dict_edges();
+    test_decode_capacity_growth();
+    test_encode_buffer_growth();
+    test_builder_capacity_growth();
+    test_arg_validation();
+
     printf("test_bencode: OK\n");
     return 0;
 }

@@ -149,6 +149,34 @@ static void test_sack_apply_and_fast_retransmit(void) {
     printf("  sack_apply_and_fast_retransmit: OK\n");
 }
 
+/* stream_peer_finished: cover both arms of `peer_fin && deliv_count==0` — with the
+ * peer's FIN delivered but data still unread (right arm false), then after draining
+ * (right arm true). */
+static void test_peer_finished_arms(void) {
+    stream_t *s = stream_new(cap_send, NULL);
+    unsigned char p[10]; memset(p, 4, sizeof p);
+
+    /* a DATA+FIN segment at seq0: delivers payload in order and sets peer_fin */
+    unsigned char seg[STREAM_SEG_MAX];
+    seg[0] = F_DATA | F_ACK | F_FIN;
+    put32(seg + 1, 0);
+    put32(seg + 5, 0);
+    put16(seg + 9, 256);
+    memcpy(seg + STREAM_HEADER, p, sizeof p);
+    stream_input(s, seg, STREAM_HEADER + sizeof p, 0);
+
+    /* peer_fin set, but unread data remains → right arm false → not finished yet */
+    assert(stream_readable(s) == sizeof p);
+    assert(stream_peer_finished(s) == 0);
+
+    /* drain the delivered bytes → deliv_count==0 → both arms true → finished */
+    unsigned char out[16];
+    assert(stream_read(s, out, sizeof out) == (int)sizeof p);
+    assert(stream_peer_finished(s) == 1);
+    stream_free(s);
+    printf("  peer_finished_arms: OK\n");
+}
+
 static void test_tick_guards(void) {
     unsigned char d[100]; memset(d, 1, sizeof d);
     /* tick on an idle stream: no timer armed → the RTO block is skipped */
@@ -167,6 +195,7 @@ static void test_tick_guards(void) {
 
 int main(void) {
     test_short_and_malformed_input();
+    test_peer_finished_arms();
     test_tick_guards();
     test_rto_clamp_and_karn();
     test_fin_on_empty();

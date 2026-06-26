@@ -33,7 +33,7 @@ int idexch_build(unsigned char type, const unsigned char nonce[16],
     *p++ = (unsigned char)alen; memcpy(p, account, alen); p += alen;
     *p++ = (unsigned char)(paylen >> 8); *p++ = (unsigned char)(paylen & 0xff);
     if (paylen) { memcpy(p, payload, paylen); p += paylen; }
-    if (bf_sign(p, signed_start, (size_t)(p - signed_start), sk) != 0) return -1;
+    if (bf_sign(p, signed_start, (size_t)(p - signed_start), sk) != 0) return -1;   /* LCOV_EXCL_BR_LINE: ed25519 sign never fails */
     p += SIG_LEN;
     return (int)(p - out);
 }

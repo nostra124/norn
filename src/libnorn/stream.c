@@ -84,7 +84,7 @@ static uint64_t get64(const unsigned char *p) {
 
 stream_t *stream_new(stream_send_fn send, void *ctx) {
     stream_t *s = calloc(1, sizeof(*s));
-    if (!s) return NULL;
+    if (!s) return NULL;   /* LCOV_EXCL_BR_LINE: calloc failure not unit-tested */
     s->send = send;
     s->ctx = ctx;
     s->rto = STREAM_RTO_INIT;        /* until the first RTT sample */

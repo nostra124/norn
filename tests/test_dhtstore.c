@@ -127,6 +127,10 @@ static void test_list(void) {
     
     count = dhtstore_list(0, items, 10);
     assert(count == 0);
+
+    /* max smaller than held count -> loop stops on the n<max guard */
+    count = dhtstore_list(1, items, 1);
+    assert(count == 1);
     printf("  test_list: OK\n");
 }
 
@@ -363,6 +367,151 @@ static void test_auto_budget(void) {
     printf("  test_auto_budget: OK\n");
 }
 
+/* dhtstore_put rejects everything while serving is disabled (budget==0). */
+static void test_put_client_only(void) {
+    dhtstore_init(2, 1);
+
+    keypair_t kp;
+    crypto_keypair_new(&kp);
+    unsigned char target[20];
+    bep44_target(kp.public_key, target);
+
+    unsigned char value[] = "v";
+    unsigned char buf[256], sig[64];
+    int len = bep44_signbuf(1, value, sizeof(value) - 1, buf, sizeof(buf));
+    bf_sign(sig, buf, (size_t)len, kp.secret_key);
+
+    assert(dhtstore_put(target, kp.public_key, 1, value, sizeof(value) - 1, sig, NULL, 0, 0x01020304) == 0);
+    printf("  test_put_client_only: OK\n");
+}
+
+/* Each NULL/invalid-argument arm of the dhtstore_put guard. */
+static void test_put_invalid_args(void) {
+    dhtstore_init(2, 0);
+
+    keypair_t kp;
+    crypto_keypair_new(&kp);
+    unsigned char target[20];
+    bep44_target(kp.public_key, target);
+
+    unsigned char value[] = "v";
+    unsigned char buf[256], sig[64];
+    int len = bep44_signbuf(1, value, sizeof(value) - 1, buf, sizeof(buf));
+    bf_sign(sig, buf, (size_t)len, kp.secret_key);
+
+    size_t vlen = sizeof(value) - 1;
+    assert(dhtstore_put(NULL, kp.public_key, 1, value, vlen, sig, NULL, 0, 1) == 0);
+    assert(dhtstore_put(target, NULL, 1, value, vlen, sig, NULL, 0, 1) == 0);
+    assert(dhtstore_put(target, kp.public_key, 1, NULL, vlen, sig, NULL, 0, 1) == 0);
+    assert(dhtstore_put(target, kp.public_key, 1, value, 0, sig, NULL, 0, 1) == 0);
+    assert(dhtstore_put(target, kp.public_key, 1, value, DHTSTORE_VMAX + 1, sig, NULL, 0, 1) == 0);
+    assert(dhtstore_put(target, kp.public_key, 1, value, vlen, NULL, NULL, 0, 1) == 0);
+    assert(dhtstore_count() == 0);
+    printf("  test_put_invalid_args: OK\n");
+}
+
+/* salt!=NULL but saltlen==0 takes the unsalted path (false arm of `salt && saltlen`). */
+static void test_put_salt_zero_len(void) {
+    dhtstore_init(2, 0);
+
+    keypair_t kp;
+    crypto_keypair_new(&kp);
+    unsigned char target[20];
+    bep44_target(kp.public_key, target);   /* unsalted target */
+
+    unsigned char salt[] = "ignored";
+    unsigned char value[] = "value";
+    unsigned char buf[256], sig[64];
+    /* sign with the unsalted buffer; saltlen==0 must hash/verify as unsalted */
+    int len = bep44_signbuf_salted(salt, 0, 1, value, sizeof(value) - 1, buf, sizeof(buf));
+    bf_sign(sig, buf, (size_t)len, kp.secret_key);
+
+    assert(dhtstore_put(target, kp.public_key, 1, value, sizeof(value) - 1, sig, salt, 0, 0x01020304) == 1);
+    printf("  test_put_salt_zero_len: OK\n");
+}
+
+/* put_immutable with target_out==NULL (false arm of `if (target_out)`). */
+static void test_put_immutable_null_out(void) {
+    dhtstore_init(2, 0);
+    unsigned char value[] = "no-out";
+    assert(dhtstore_put_immutable(value, sizeof(value) - 1, 0x01020304, NULL) == 1);
+    assert(dhtstore_count() == 1);
+    printf("  test_put_immutable_null_out: OK\n");
+}
+
+/* get_ex with every optional output pointer NULL, plus the v_out/vlen_out
+ * partial-NULL combinations (both arms of `v_out && vlen_out`). */
+static void test_get_ex_null_outputs(void) {
+    dhtstore_init(2, 0);
+    unsigned char value[] = "payload";
+    unsigned char target[20];
+    dhtstore_put_immutable(value, sizeof(value) - 1, 0x01020304, target);
+
+    /* all optional outputs NULL */
+    assert(dhtstore_get_ex(target, NULL, NULL, NULL, 0, NULL, NULL, NULL) == 1);
+
+    unsigned char v_out[64];
+    size_t vlen_out = 123;
+    /* v_out set but vlen_out NULL -> value not copied */
+    assert(dhtstore_get_ex(target, NULL, NULL, v_out, sizeof(v_out), NULL, NULL, NULL) == 1);
+    /* v_out NULL but vlen_out set -> value not copied, vlen_out untouched */
+    assert(dhtstore_get_ex(target, NULL, NULL, NULL, 0, &vlen_out, NULL, NULL) == 1);
+    assert(vlen_out == 123);
+    printf("  test_get_ex_null_outputs: OK\n");
+}
+
+/* LRU picks the strictly-oldest item: store one, wait a second so a later
+ * batch has a larger `stored`, then force eviction (exercises the `<` true arm). */
+static void test_lru_oldest_selected(void) {
+    dhtstore_init(1, 0);
+    size_t budget = 1 * 1024 * 1024;
+
+    keypair_t kp0;
+    crypto_keypair_new(&kp0);
+    unsigned char t0[20];
+    bep44_target(kp0.public_key, t0);
+    unsigned char value[900];
+    memset(value, 'A', sizeof(value));
+    unsigned char b0[3000], s0[64];
+    int l0 = bep44_signbuf(1, value, sizeof(value), b0, sizeof(b0));
+    bf_sign(s0, b0, (size_t)l0, kp0.secret_key);
+    assert(dhtstore_put(t0, kp0.public_key, 1, value, sizeof(value), s0, NULL, 0, 0x01020304) == 1);
+
+    sleep(1);   /* t0 is the oldest; the "mid" item below is strictly newer than t0 */
+
+    /* A second item at a distinct middle timestamp. After t0 (at index 0) is
+     * evicted and swap-replaced by a newest item, the next eviction scan finds
+     * this older "mid" item at a higher index, exercising the `<` true arm. */
+    keypair_t kpm;
+    crypto_keypair_new(&kpm);
+    unsigned char tm[20];
+    bep44_target(kpm.public_key, tm);
+    unsigned char bm[3000], sm[64];
+    int lm = bep44_signbuf(1, value, sizeof(value), bm, sizeof(bm));
+    bf_sign(sm, bm, (size_t)lm, kpm.secret_key);
+    assert(dhtstore_put(tm, kpm.public_key, 1, value, sizeof(value), sm, NULL, 0, 0x01030305) == 1);
+
+    sleep(1);   /* the bulk batch below is strictly newer than both t0 and tm */
+
+    for (int i = 0; i < 1500; i++) {
+        keypair_t kp2;
+        crypto_keypair_new(&kp2);
+        unsigned char t[20];
+        bep44_target(kp2.public_key, t);
+        unsigned char b[3000], s[64];
+        int l = bep44_signbuf(1, value, sizeof(value), b, sizeof(b));
+        bf_sign(s, b, (size_t)l, kp2.secret_key);
+        dhtstore_put(t, kp2.public_key, 1, value, sizeof(value), s, NULL, 0, (uint32_t)(0x02000000 + i));
+    }
+
+    /* the original (oldest) item must have been evicted */
+    unsigned char v_out[1024];
+    size_t vlen_out;
+    assert(dhtstore_get(t0, NULL, NULL, v_out, sizeof(v_out), &vlen_out, NULL) == 0);
+    assert(dhtstore_bytes() <= budget);
+    printf("  test_lru_oldest_selected: OK\n");
+}
+
 int main(void) {
     crypto_init();
     printf("test_dhtstore:\n");
@@ -386,7 +535,13 @@ int main(void) {
     test_immutable_dedup();
     test_get_ex_buffer_truncation();
     test_large_value_reject();
-    
+    test_put_client_only();
+    test_put_invalid_args();
+    test_put_salt_zero_len();
+    test_put_immutable_null_out();
+    test_get_ex_null_outputs();
+    test_lru_oldest_selected();
+
     printf("test_dhtstore: OK\n");
     return 0;
 }

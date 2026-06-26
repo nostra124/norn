@@ -145,20 +145,77 @@ static void test_send_recv_connected(void) {
     norn_transport_close(t);
 }
 
-/* Test send error path */
-static void test_send_error(void) {
-    int fds[2];
-    int rc = socketpair(AF_UNIX, SOCK_DGRAM, 0, fds);
-    assert(rc == 0);
-    
-    norn_transport_t *t = norn_udp_new(fds[0], 1);
+/* Test recv error path (invalid fd -> recv returns -1) */
+static void test_recv_error(void) {
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    assert(fd >= 0);
+
+    norn_transport_t *t = norn_udp_new(fd, 0);
     assert(t != NULL);
-    
-    close(fds[1]);  /* close other end */
-    
-    /* May succeed or fail depending on socket state */
-    norn_transport_send(t, "test", 4);
-    
+
+    close(fd);  /* invalidate the fd so recv fails with EBADF */
+
+    char buf[64];
+    int n = norn_transport_recv(t, buf, sizeof(buf));
+    assert(n == -1);
+
+    norn_transport_close(t);
+}
+
+/* Test local_endpoint error: getsockname fails on invalid fd */
+static void test_local_endpoint_getsockname_error(void) {
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    assert(fd >= 0);
+
+    norn_transport_t *t = norn_udp_new(fd, 0);
+    assert(t != NULL);
+
+    close(fd);  /* invalidate the fd so getsockname fails with EBADF */
+
+    char buf[128];
+    int rc = norn_transport_local_endpoint(t, buf, sizeof(buf));
+    assert(rc == -1);
+
+    norn_transport_close(t);
+}
+
+/* Test local_endpoint error: output buffer too small for the sockaddr */
+static void test_local_endpoint_cap_too_small(void) {
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    assert(fd >= 0);
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = 0;
+    int rc = bind(fd, (struct sockaddr *)&addr, sizeof(addr));
+    assert(rc == 0);
+
+    norn_transport_t *t = norn_udp_new(fd, 0);
+    assert(t != NULL);
+
+    char buf[1];
+    int len = norn_transport_local_endpoint(t, buf, 1);  /* cap < sizeof(sockaddr_storage) */
+    assert(len == -1);
+
+    norn_transport_close(t);
+    close(fd);
+}
+
+/* Test send error path (invalid fd -> send returns -1) */
+static void test_send_error(void) {
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    assert(fd >= 0);
+
+    norn_transport_t *t = norn_udp_new(fd, 0);
+    assert(t != NULL);
+
+    close(fd);  /* invalidate the fd so send fails with EBADF */
+
+    int n = norn_transport_send(t, "test", 4);
+    assert(n == -1);
+
     norn_transport_close(t);
 }
 
@@ -171,6 +228,9 @@ int main(void) {
     test_local_endpoint();
     test_null_dispatch();
     test_send_recv_connected();
+    test_recv_error();
+    test_local_endpoint_getsockname_error();
+    test_local_endpoint_cap_too_small();
     test_send_error();
     printf("transport_udp tests passed\n");
     return 0;
