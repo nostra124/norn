@@ -223,6 +223,15 @@ extern "C" {
         vlen: usize,
     ) -> c_int;
     pub fn norn_cluster_kv_del(cl: *mut norn_cluster, key: *const u8, klen: usize) -> c_int;
+    pub fn norn_cluster_kv_cas(
+        cl: *mut norn_cluster,
+        key: *const u8,
+        klen: usize,
+        expect: *const u8,
+        elen: usize,
+        val: *const u8,
+        vlen: usize,
+    ) -> c_int;
     pub fn norn_cluster_kv_get(
         cl: *mut norn_cluster,
         key: *const u8,
