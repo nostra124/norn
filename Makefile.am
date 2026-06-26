@@ -304,6 +304,20 @@ coverage:
 	fi
 	$(top_srcdir)/contrib/coverage.sh
 
+# API documentation (Doxygen). Generates HTML + man3 from the header comments
+# into docs/api/. The headers already use Doxygen markup (@file/@brief/@param).
+# `docs` is .PHONY so it doesn't collide with the docs/ source directory.
+.PHONY: docs clean-docs coverage check-sit check-pit
+docs:
+	@command -v doxygen >/dev/null 2>&1 || { \
+		echo "ERROR: doxygen not found. Install it (e.g. apt-get install doxygen graphviz)."; \
+		exit 1; \
+	}
+	doxygen Doxyfile
+
+clean-docs:
+	rm -rf docs/api
+
 # System Integration Tests (SIT)
 check-sit:
 	@if command -v bats >/dev/null 2>&1; then \
@@ -328,12 +342,14 @@ check-all: check check-sit check-pit
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = norn.pc
 
-man_MANS = man/norn.1
+# Man pages are generated from .in templates so the version tracks the package.
+man_MANS = man/norn.1 man/nornd.8 man/libnorn.3
+CLEANFILES = $(man_MANS)
 
 EXTRA_DIST = README.md LICENSE docs AGENTS.md tests/sit tests/pit \
              .clang-format .clang-tidy cppcheck.supp codecov.yml \
              contrib/coverage.sh tests/coverage-tracked.txt \
-             man/norn.1 VERSION \
+             man/norn.1.in man/nornd.8.in man/libnorn.3.in Doxyfile.in VERSION \
              src/libnorn/mainline.h \
              src/libnorn/norn_transaction.h \
              src/libnorn/norn_suite.h \

@@ -1,44 +1,104 @@
-# norn — Mainline DHT client library
+# norn
 
-Named after the Norns of Nordic mythology who control destiny, this library
-provides a reusable mainline DHT client for peer discovery and bootstrap.
+Named after the Norns of Nordic mythology who weave destiny, **norn** is a C99
+stack for peer-to-peer applications: a Mainline DHT client, secure
+pubkey-addressed sessions, and a Raft-replicated cluster key-value store —
+plus a node daemon and a CLI on top.
 
 ## Components
 
-- **libnorn** — In-memory DHT client library (no config/file I/O)
-- **norn** — CLI with set/get + über daemon (systemd/launchd)
+- **libnorn** — the library: Mainline DHT (BEP-5/BEP-44), authenticated
+  sessions and reliable streams, NAT traversal, a private-overlay bootstrap,
+  and a class-aware Raft cluster KV store. In-memory and dependency-light
+  (only libsodium).
+- **nornd** — the node daemon: runs a norn node and hosts the cluster KV store,
+  serving local tools over a Unix socket. Identity is the user's (or host's)
+  **Ed25519 SSH key**.
+- **norn** — the CLI: direct DHT operations, plus a thin IPC client to `nornd`
+  for the cluster store and the fleet key directory.
 
 ## Building
 
-```
+```sh
 autoreconf -fi
 ./configure
 make
-make check
-sudo make install
+make check          # unit tests (100% line+branch on tracked modules)
+sudo make install   # installs libnorn, norn, nornd, man pages, service units
 ```
+
+Requires a C compiler, autotools, and **libsodium** (`libsodium-dev`).
 
 ## Usage
 
+Direct DHT (no daemon):
+
+```sh
+norn keygen                       # create ~/.norn/key.pem, print the pubkey
+norn set <key> <value>            # publish a signed BEP-44 record
+norn get <author-pubkey>          # fetch a record
+norn daemon                       # run a standalone public-DHT node
 ```
-norn set <key> <value>      # Store a mutable signed record
-norn get <key>               # Retrieve a record
-norn daemon                  # Run the DHT node as a daemon
+
+Cluster KV and key directory (via a running `nornd`):
+
+```sh
+nornd --identity ~/.ssh/id_ed25519 --class workstation &
+norn cluster put greet hello
+norn cluster get greet            # -> hello
+norn cluster status               # role / leader / member count
+norn keys <nodeid>                # a peer's SSH + GPG public keys
 ```
+
+`nornd` is socket-activated as a user or system service — see
+`contrib/systemd/` and `contrib/launchd/`, e.g.
+`systemctl --user enable --now nornd.socket`.
+
+## Three key-value surfaces
+
+| Surface        | Backed by            | For                                   |
+| -------------- | -------------------- | ------------------------------------- |
+| Cluster KV     | Raft replication     | small shared state; the key directory |
+| Node-served KV | direct norn streams  | a node's own values, streamed, large  |
+| BEP-44         | the public DHT       | small public records                  |
+
+Only **server** nodes with proven uptime are eligible to lead the cluster, so a
+mostly-offline edge fleet (laptops, phones) never stalls writes.
+
+## Documentation
+
+- **Man pages** (installed by `make install`): `norn(1)`, `nornd(8)`,
+  `libnorn(3)`.
+- **API reference** — generated from the header comments with Doxygen:
+
+  ```sh
+  make docs        # writes HTML + man3 into docs/api/
+  ```
+
+  (needs `doxygen`; `graphviz` is optional and off by default.)
+- **Design docs** under `docs/`: `architecture.md`, `nornd.md`, `cli.md`,
+  `cluster-kv.md`, `private-overlay.md`, NAT traversal, and the BEP references.
 
 ## Architecture
 
 ```
-libnorn
-├── norn.c/h      — Main client API (norn_get, norn_set, norn_bootstrap)
-├── kademlia.c/h  — Kademlia protocol implementation
-├── bep44.c/h     — BEP-44 mutable signed records
-├── sha1.c/h      — SHA-1 for BEP-44
-└── dhtstore.c/h  — In-memory DHT node storage
+application        norn (CLI)            nornd (daemon)
+                       │  IPC (unix socket)  │
+                       └─────────┬───────────┘
+                                 │
+   libnorn ──────────────────────┴───────────────────────────────
+     DHT/BEP-44 · sessions+streams · NAT/rendezvous/relay
+     private overlay · stream forward · cluster KV (Raft)
+                                 │
+                            libsodium
 ```
 
 ## Integration
 
-libnorn is used by:
-- **bifrost** — P2P connectivity layer for bootstrap/discovery
-- **Other projects** — Any application needing mainline DHT functionality
+libnorn is the foundation layer for **bifrost** (P2P connectivity) and other
+applications needing DHT discovery, secure pubkey-addressed transport, or a
+fleet-wide replicated store. Rust bindings live under `bindings/rust/`.
+
+## License
+
+MIT. See `LICENSE`.

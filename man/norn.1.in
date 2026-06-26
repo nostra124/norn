@@ -1,0 +1,193 @@
+.TH NORN 1 "2026" "norn @PACKAGE_VERSION@" "User Commands"
+.SH NAME
+norn \- Mainline DHT client and control program for the norn node daemon
+.SH SYNOPSIS
+.B norn
+.RI [ "GLOBAL OPTIONS" ]
+.I COMMAND
+.RI [ ARGS ]
+.SH DESCRIPTION
+.B norn
+is the command-line front end to the norn stack. It does two distinct jobs:
+.IP \(bu 3
+direct Mainline DHT operations (BEP-5 / BEP-44): key generation, mutable
+record get/set, and a standalone DHT daemon; and
+.IP \(bu 3
+a thin IPC client to
+.BR nornd (8),
+the node daemon that hosts the replicated cluster key-value store and the
+fleet key directory. The
+.B cluster
+and
+.B keys
+commands connect to a running
+.B nornd
+over its Unix socket and exit.
+.SH COMMANDS
+.SS Local / DHT
+.TP
+.B keygen
+Generate an Ed25519 keypair and write it to
+.I ~/.norn/key.pem
+(or
+.BR --key / NORN_KEY ).
+Prints the 32-byte public key, hex-encoded, to standard output. The key file
+is created with mode 0600.
+.TP
+.B get \fIKEY\fP
+Retrieve a mutable record from the DHT addressed by the author's 64-character
+hex public
+.IR KEY .
+.TP
+.B set \fIKEY VALUE\fP
+Publish a signed mutable record (BEP-44) to the DHT. Requires a keypair.
+.TP
+.B daemon \fR[\fIOPTIONS\fR]
+Run a standalone Mainline DHT node that answers queries. Supports read-only
+mode (BEP-43) and a private overlay. This is the public-DHT daemon; for the
+cluster KV host see
+.BR nornd (8).
+.TP
+.B version
+Print version information and exit.
+.SS Cluster KV (via nornd)
+.TP
+.B cluster put \fIKEY VALUE\fP
+Propose a write to the replicated cluster store. On a follower the request is
+forwarded to the leader.
+.TP
+.B cluster get \fIKEY\fP
+Read the local replica and print the raw value on standard output.
+.TP
+.B cluster del \fIKEY\fP
+Propose a delete.
+.TP
+.B cluster cas \fIKEY EXPECT VALUE\fP
+Compare-and-swap: write
+.I VALUE
+only if the current value equals
+.IR EXPECT .
+.TP
+.B cluster watch \fIPREFIX\fP
+Stay connected and print a line for every committed change whose key begins
+with
+.IR PREFIX .
+.TP
+.B cluster members
+Print the cluster members' public keys (hex), one per line.
+.TP
+.B cluster leader
+Print the current leader's public key (hex), or fail if none is known.
+.TP
+.B cluster status
+Print this node's role (leader/follower), the leader, and the member count.
+.SS Fleet key directory (via nornd)
+.TP
+.B keys \fINODEID\fP
+Resolve and print a peer's published SSH public-key line and, if present, its
+reassembled GPG public key.
+.I NODEID
+is the peer's 64-character hex node id (its Ed25519/SSH public key).
+.SH GLOBAL OPTIONS
+.TP
+.BR \-\-key " " \fIPATH\fP
+Key file path. Default
+.IR ~/.norn/key.pem .
+.TP
+.BR \-\-port " " \fIPORT\fP
+DHT UDP port. Default 6881.
+.TP
+.BR \-\-timeout " " \fIMS\fP
+DHT query timeout in milliseconds. Default 5000.
+.TP
+.BR \-\-log\-level " " \fILEVEL\fP
+One of
+.BR debug ,
+.BR info ,
+.BR warn ,
+.BR error .
+Default
+.BR info .
+.TP
+.B \-\-read\-only
+Read-only DHT mode (BEP-43).
+.TP
+.BR \-\-help ", " \-h
+Show usage and exit 0.
+.SH ENVIRONMENT
+.TP
+.B NORN_KEY
+Default key file path; overrides
+.IR ~/.norn/key.pem .
+.TP
+.B NORN_SOCK
+Path to the
+.BR nornd (8)
+IPC socket used by
+.B cluster
+and
+.BR keys .
+If unset, the client tries
+.I $XDG_RUNTIME_DIR/nornd.sock
+then
+.IR ~/.norn/nornd.sock .
+.SH FILES
+.TP
+.I ~/.norn/key.pem
+Default Ed25519 keypair, created by
+.B keygen
+with mode 0600.
+.TP
+.I $XDG_RUNTIME_DIR/nornd.sock
+Default nornd IPC socket.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Runtime error: not found, no leader, nornd unreachable, DHT failure.
+.TP
+.B 2
+Usage error: unknown command, missing or malformed arguments.
+.SH EXAMPLES
+Generate a keypair:
+.PP
+.RS
+.EX
+$ norn keygen
+1b0138d6a0aa9b34c8e7eb2769260dfb04db0985bf7184944916e6d5a94ecd9f
+.EE
+.RE
+.PP
+Round-trip a value through the cluster (needs a running nornd):
+.PP
+.RS
+.EX
+$ norn cluster put greet hello
+OK
+$ norn cluster get greet
+hello
+.EE
+.RE
+.PP
+Resolve a peer's keys:
+.PP
+.RS
+.EX
+$ norn keys 1b0138d6...a94ecd9f
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... user@host
+.EE
+.RE
+.SH SEE ALSO
+.BR nornd (8),
+.BR libnorn (3)
+.PP
+BEP-5 (DHT Protocol), BEP-43 (Read-Only Nodes), BEP-44 (Mutable/Immutable
+Items).
+.SH BUGS
+Report bugs at https://github.com/nostra124/norn/issues
+.SH AUTHOR
+The norn development team.
+.SH LICENSE
+MIT License. See the LICENSE file for details.

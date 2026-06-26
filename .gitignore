@@ -53,3 +53,10 @@ covhtml/
 .idea/
 .vscode/
 /nornd
+
+# Generated from .in templates by configure / make docs
+/Doxyfile
+/man/norn.1
+/man/nornd.8
+/man/libnorn.3
+/docs/api/
