@@ -15,11 +15,11 @@
  * one side and norn-stream-backed endpoints for the other; an embedding app can
  * supply whatever it likes.
  *
- * @section model Threading / Loop Model
+ * @par Threading / Loop Model
  * Single-threaded and non-blocking, like the rest of norn: the host drives the
  * pump from its event loop via norn_pump_drive(), interleaved with norn_tick().
  *
- * @section memory Memory
+ * @par Memory
  * Bounded: each direction has a fixed buffer (bufsize). Backpressure is implicit
  * — when the destination cannot accept more, the source is not read, so memory
  * never exceeds 2 * bufsize per pump.

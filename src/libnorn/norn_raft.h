@@ -10,7 +10,7 @@
  * eligibility, membership changes) is unit-testable in-memory and
  * deterministically.
  *
- * @section heterogeneity Class-aware membership (the norn twist)
+ * @par Class-aware membership (the norn twist)
  * Two liveness-only, safety-preserving features let a cluster of mixed
  * availability (phones, laptops, servers) work:
  *   - **Learners** (`RAFT_LEARNER`) receive the replicated log but are excluded
@@ -22,7 +22,7 @@
  *     to stop flaky members disrupting a healthy leader. This restricts *who
  *     leads*, never *who votes* or quorum math, so Raft safety is unaffected.
  *
- * @section determinism Determinism
+ * @par Determinism
  * All timing flows through `raft_tick(now_ms)`. Election timeouts are derived
  * deterministically from the node id (base + id-spread), so a multi-node
  * simulation is reproducible.

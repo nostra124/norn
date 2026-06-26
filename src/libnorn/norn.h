@@ -5,14 +5,14 @@
  * Named after the Norns of Nordic mythology who control destiny, this library
  * provides reusable DHT functionality for peer discovery and bootstrap.
  * 
- * @section features Key Features
+ * @par Key Features
  * - BEP-5 DHT protocol implementation
  * - BEP-44 mutable and immutable items
  * - BEP-43 read-only mode
  * - Event-loop compatible (non-blocking)
  * - In-memory only (no config files)
  * 
- * @section usage Basic Usage
+ * @par Basic Usage
  * @code
  * #include "norn.h"
  * 
@@ -36,16 +36,16 @@
  * }
  * @endcode
  * 
- * @section thread_safety Thread Safety
+ * @par Thread Safety
  * All functions are single-threaded. Caller must synchronize if using from
  * multiple threads.
  * 
- * @section memory Memory Management
+ * @par Memory Management
  * - Client allocates norn_client_t, all other memory managed internally
  * - All buffers are caller-owned unless explicitly documented
  * - No heap allocations in hot paths (uses arena/pool allocators)
  * 
- * @section error_handling Error Handling
+ * @par Error Handling
  * - int functions: return 0 on success, -1 on error
  * - pointer functions: return valid pointer or NULL on error
  * - All functions are NULL-safe (handle NULL inputs gracefully)

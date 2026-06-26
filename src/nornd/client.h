@@ -18,6 +18,7 @@
  * @param argv argument vector
  * @param req  filled request on success
  * @param err  optional human error (may be NULL)
+ * @param errcap capacity of `err`
  * @return 0 on success, -1 on unknown verb / missing or oversized args.
  */
 int nornd_client_build_req(int argc, char **argv, nornd_ipc_req_t *req,

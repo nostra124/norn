@@ -6,17 +6,17 @@
  * with peers identified only by their public key. All operations are non-blocking
  * and integrate with event loops via callbacks.
  *
- * @section mobile Mobile Platforms
+ * @par Mobile Platforms
  * - iOS: Use CFRunLoop integration via norn_get_fd() + CFSocket
  * - Android: Use epoll integration via norn_get_fd() + JNI
  * - libuv: Use norn_get_fd() + uv_poll_init
  *
- * @section lifecycle Session Lifecycle
+ * @par Session Lifecycle
  * 1. Dial: norn_dial_async() → callback(NORN_SESSION_ESTABLISHED)
  * 2. Use: norn_stream_write() / norn_stream_read() on streams
  * 3. Close: norn_session_close_async() → callback(NORN_SESSION_CLOSED)
  *
- * @section thread_safety Thread Safety
+ * @par Thread Safety
  * All functions are single-threaded. Caller must synchronize if using from
  * multiple threads.
  */
@@ -232,7 +232,6 @@ int norn_session_close_async(norn_session_t *session,
  * - Session state transitions
  * - Callback invocations
  *
- * @param client Client handle
  * @return Number of events processed, or -1 on error
  *
  * @note Non-blocking: Returns quickly even if no events
@@ -253,7 +252,6 @@ int norn_tick(norn_client_t *client);
  * Returns the main DHT socket FD. Use with select()/poll()/epoll/kqueue
  * to wait for events efficiently.
  *
- * @param client Client handle
  * @return Socket FD, or -1 on error
  *
  * @note Use for external event loop integration

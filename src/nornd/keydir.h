@@ -3,9 +3,11 @@
  * @brief Fleet key directory: publish/resolve SSH + GPG public keys (FEAT-031).
  *
  * Each member's public keys live in the cluster KV under well-known keys:
- *   peer/<hex-nodeid>/ssh        → `ssh-ed25519 AAAA…` (fits inline)
- *   peer/<hex-nodeid>/gpg        → manifest {n, len, sha256} (written last)
- *   peer/<hex-nodeid>/gpg/<i>    → armored-GPG chunk i
+ * @code
+ *   peer/<hex-nodeid>/ssh        -> `ssh-ed25519 AAAA…` (fits inline)
+ *   peer/<hex-nodeid>/gpg        -> manifest {n, len, sha256} (written last)
+ *   peer/<hex-nodeid>/gpg/<i>    -> armored-GPG chunk i
+ * @endcode
  *
  * Armored GPG keys (~1–4 KB) exceed the cluster value cap, so they are chunked
  * and gated on a manifest that readers verify (length + SHA-256) before

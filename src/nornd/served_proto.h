@@ -9,8 +9,10 @@
  * buffer in memory). The streaming/file-backing/dial live in glue; the line
  * codec here is testable in isolation.
  *
+ * @code
  * Request : "GET <key>\n" | "CAT <hash-hex>\n" | "LIST <prefix>\n"
  * Status  : "OK <len>\n"  (then <len> bytes follow) | "ERR <message>\n"
+ * @endcode
  */
 #ifndef NORND_SERVED_PROTO_H
 #define NORND_SERVED_PROTO_H
