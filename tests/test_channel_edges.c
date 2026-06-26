@@ -303,6 +303,11 @@ static void test_0rtt_guards(void) {
     int st4 = -1;
     assert(channel_hs_accept_0rtt(&r, kr.public_key, kr.secret_key, buf, il, psk, NULL, 0, pp, eout, sizeof eout, NULL, &st4, out, sizeof out) == R);
     assert(st4 == CHANNEL_0RTT_OK);
+
+    /* psk==NULL → the 0-RTT open block is skipped (118); RESP still built, status NOPSK */
+    int st5 = -1; size_t el5 = 9;
+    assert(channel_hs_accept_0rtt(&r, kr.public_key, kr.secret_key, buf, il, NULL, &rpc, 1, pp, eout, sizeof eout, &el5, &st5, out, sizeof out) == R);
+    assert(st5 == CHANNEL_0RTT_NOPSK && el5 == 0);
     printf("  0rtt_guards: OK\n");
 }
 

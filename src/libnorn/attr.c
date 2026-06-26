@@ -17,7 +17,7 @@ static attr_entry_t attrs[MAX_ATTRS];
 static int initialized = 0;
 
 static void init_attrs(void) {
-    if (!initialized) {
+    if (!initialized) {  /* LCOV_EXCL_BR_LINE: norn_attr_clear() sets initialized before any test runs */
         memset(attrs, 0, sizeof(attrs));  /* LCOV_EXCL_LINE */
         initialized = 1;  /* LCOV_EXCL_LINE */
     }

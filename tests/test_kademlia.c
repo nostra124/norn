@@ -93,6 +93,16 @@ static void test_get_bucket_index_null(void) {
     unsigned char node_id[NODE_ID_BYTES] = {0};
     int idx = kad_get_bucket_index(NULL, node_id);
     assert(idx < 0);
+
+    /* NULL id with valid state: exercises the !id arm of the guard. */
+    kad_state_t state;
+    keypair_t kp;
+    crypto_keypair_new(&kp);
+    kad_init(&state, &kp, 0);
+    idx = kad_get_bucket_index(&state, NULL);
+    assert(idx < 0);
+    kad_cleanup(&state);
+
     printf("  test_get_bucket_index_null: OK\n");
 }
 
@@ -221,6 +231,25 @@ static void test_refresh_old_buckets(void) {
     printf("  test_refresh_old_buckets: OK\n");
 }
 
+static void test_refresh_fresh_buckets(void) {
+    kad_state_t state;
+    keypair_t kp;
+    crypto_keypair_new(&kp);
+    kad_init(&state, &kp, 0);
+
+    unsigned char node_id[NODE_ID_BYTES];
+    memset(node_id, 1, NODE_ID_BYTES);
+    kad_update_node(&state, node_id, 0x0A000001, 6881, 0);
+
+    /* last_update was just set to "now" by kad_update_node, so the
+     * staleness condition (now - last_update > 900) is false: this
+     * exercises the not-taken arm of that branch. */
+    kad_refresh_buckets(&state);
+
+    kad_cleanup(&state);
+    printf("  test_refresh_fresh_buckets: OK\n");
+}
+
 int main(void) {
     if (crypto_init() < 0) {
         fprintf(stderr, "Failed to initialize crypto\n");
@@ -244,7 +273,8 @@ int main(void) {
     test_update_existing_node();
     test_bucket_full();
     test_refresh_old_buckets();
-    
+    test_refresh_fresh_buckets();
+
     printf("test_kademlia: OK\n");
     return 0;
 }
