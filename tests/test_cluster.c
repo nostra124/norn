@@ -147,6 +147,39 @@ static void test_elect_and_replicate(void) {
     cluster_free();
 }
 
+static void test_cas(void) {
+    /* compare-and-set is the single-owner-claim primitive: the condition is
+     * checked on apply, so exactly one of two racing claimants wins. */
+    norn_node_class_t cls[] = {NORN_NODE_SERVER, NORN_NODE_SERVER, NORN_NODE_SERVER};
+    cluster(3, cls);
+    steps(60);
+    cnode_t *l = leader();
+    assert(l);
+
+    /* claim an absent key (expect empty) → succeeds and replicates. */
+    assert(norn_cluster_kv_cas(l->cl, (const unsigned char *)"claim", 5,
+                               (const unsigned char *)"", 0,
+                               (const unsigned char *)"node-1", 6) == 0);
+    steps(20);
+    for (int i = 0; i < g_n; i++)
+        assert(kv_is(g_nodes[i].cl, "claim", "node-1"));
+
+    /* a second claimant with the wrong expectation (absent) is a no-op. */
+    assert(norn_cluster_kv_cas(l->cl, (const unsigned char *)"claim", 5,
+                               (const unsigned char *)"", 0,
+                               (const unsigned char *)"node-2", 6) == 0);
+    steps(20);
+    assert(kv_is(g_nodes[1].cl, "claim", "node-1")); /* still node-1 */
+
+    /* the owner can hand off with the matching expectation. */
+    assert(norn_cluster_kv_cas(l->cl, (const unsigned char *)"claim", 5,
+                               (const unsigned char *)"node-1", 6,
+                               (const unsigned char *)"node-2", 6) == 0);
+    steps(20);
+    assert(kv_is(g_nodes[2].cl, "claim", "node-2"));
+    cluster_free();
+}
+
 static void test_learner_and_voter_query(void) {
     norn_node_class_t cls[] = {NORN_NODE_SERVER, NORN_NODE_SERVER, NORN_NODE_SERVER,
                                NORN_NODE_MOBILE};
@@ -331,6 +364,7 @@ static void test_null_paths(void) {
     assert(norn_cluster_remove(NULL, pub) == -1);
     assert(norn_cluster_kv_put(NULL, pub, 1, pub, 1) == -1);
     assert(norn_cluster_kv_del(NULL, pub, 1) == -1);
+    assert(norn_cluster_kv_cas(NULL, pub, 1, pub, 1, pub, 1) == -1);
     assert(norn_cluster_kv_get(NULL, pub, 1, NULL, 0) == -1);
     assert(norn_cluster_kv_watch(NULL, pub, 1, on_change, NULL) == -1);
     assert(norn_cluster_is_leader(NULL) == 0);
@@ -348,6 +382,7 @@ static void test_null_paths(void) {
     assert(norn_cluster_promote(cl, g_nodes[1].pub) == -1); /* absent (uninit pub) */
     assert(norn_cluster_remove(cl, g_nodes[1].pub) == -1);
     assert(norn_cluster_kv_put(cl, NULL, 0, pub, 1) == -1); /* encode fails */
+    assert(norn_cluster_kv_cas(cl, NULL, 0, NULL, 0, pub, 1) == -1); /* encode fails */
     assert(norn_cluster_is_voter(cl, NULL) == 0);
     assert(norn_cluster_leader(cl) == NULL); /* no leader yet */
     norn_cluster_input(cl, pub, NULL, 0);    /* NULL data */
@@ -486,6 +521,7 @@ static void test_arg_corners(void) {
 
 int main(void) {
     test_elect_and_replicate();
+    test_cas();
     test_learner_and_voter_query();
     test_write_forwarding();
     test_remove_member();
