@@ -361,16 +361,17 @@ static void test_publine_errors(void) {
     assert(nornd_identity_parse_pubkey_line("ssh-ed25519 !!!!", 16, pub) == -1);
 }
 
-/* Encode a pubkey blob (type + pub) to base64 and wrap as a line. */
+/* Encode a pubkey blob (type + pub) to base64 and wrap as a line. The test
+ * blobs are tiny; the bounded b64 size lets the compiler prove no truncation. */
 static void publine_from_blob(const buf_t *blob, char *out, size_t cap) {
-    char b64[1024];
+    char b64[512];
     sodium_bin2base64(b64, sizeof(b64), blob->b, blob->n,
                       sodium_base64_VARIANT_ORIGINAL);
     snprintf(out, cap, "ssh-ed25519 %s comment\n", b64);
 }
 
 static void test_publine_blob_errors(void) {
-    unsigned char pub[32];
+    unsigned char pub[32] = {0};
     char line[1024];
     buf_t blob;
     /* inner type mismatch */

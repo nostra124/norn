@@ -1,13 +1,15 @@
 #!/usr/bin/env bats
 # SIT: CLI operations
 
+load test_helper
+
 setup() {
     WORK_DIR="$(mktemp -d)"
     export WORK_DIR
     cd "$WORK_DIR"
     
     # Copy source to work directory
-    cp -r /Users/rene/Projekte/norn/* "$WORK_DIR/"
+    copy_src
     
     # Build and install
     autoreconf -fi
@@ -18,6 +20,10 @@ setup() {
     # Set PATH
     NORN_BIN="$WORK_DIR/install/bin/norn"
     export NORN_BIN
+    # Keep keygen's default ~/.norn under the work dir, and let the installed
+    # binary find libnorn.so.
+    export HOME="$WORK_DIR"
+    export LD_LIBRARY_PATH="$WORK_DIR/install/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 }
 
 teardown() {
@@ -27,11 +33,13 @@ teardown() {
 
 @test "norn --help shows all commands" {
     run "$NORN_BIN" --help
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 0 ]   # --help is a successful invocation
     [[ "$output" == *"keygen"* ]]
     [[ "$output" == *"get"* ]]
     [[ "$output" == *"set"* ]]
     [[ "$output" == *"daemon"* ]]
+    [[ "$output" == *"cluster"* ]]
+    [[ "$output" == *"keys"* ]]
     [[ "$output" == *"version"* ]]
 }
 

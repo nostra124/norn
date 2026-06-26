@@ -172,6 +172,11 @@ static int do_keygen(int argc, char **argv) {
     }
     
     if (!key_path) {
+        /* Honor a global `--key` given before the subcommand (the top-level
+         * getopt consumed it into key_file). */
+        key_path = key_file;
+    }
+    if (!key_path) {
         key_path = getenv("NORN_KEY");
     }
     if (!key_path) {
