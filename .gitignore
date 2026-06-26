@@ -60,3 +60,7 @@ covhtml/
 /man/nornd.8
 /man/libnorn.3
 /docs/api/
+
+# Distribution tarballs and extracted dist trees (make dist / distcheck)
+*.tar.gz
+/norn-*/
