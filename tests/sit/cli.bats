@@ -137,7 +137,7 @@ teardown() {
 
 @test "norn daemon --help shows daemon options" {
     run "$NORN_BIN" daemon --help
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 0 ]   # --help is a successful invocation
     [[ "$output" == *"--port"* ]] || [[ "$output" == *"port"* ]]
 }
 
