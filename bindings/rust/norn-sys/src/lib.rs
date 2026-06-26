@@ -84,6 +84,46 @@ pub struct norn_forward_io_t {
     pub close: Option<unsafe extern "C" fn(ctx: *mut c_void)>,
 }
 
+/* === cluster KV (FEAT-024/025/026) === */
+
+pub const NORN_CLUSTER_PUBKEY: usize = 32;
+
+/* norn_node_class_t */
+pub const NORN_NODE_MOBILE: c_int = 0;
+pub const NORN_NODE_LAPTOP: c_int = 1;
+pub const NORN_NODE_WORKSTATION: c_int = 2;
+pub const NORN_NODE_SERVER: c_int = 3;
+
+#[repr(C)]
+pub struct norn_cluster {
+    _private: [u8; 0],
+}
+
+/// Transport vtable: how the cluster sends a wire frame to a member by pubkey.
+pub type norn_cluster_send_fn = unsafe extern "C" fn(
+    ctx: *mut c_void,
+    pubkey: *const u8, /* [NORN_CLUSTER_PUBKEY] */
+    data: *const u8,
+    len: usize,
+);
+
+#[repr(C)]
+pub struct norn_cluster_io_t {
+    pub send: Option<norn_cluster_send_fn>,
+    pub ctx: *mut c_void,
+}
+
+#[repr(C)]
+pub struct norn_cluster_config_t {
+    pub self_class: c_int,
+    pub uptime_score: u32,
+    pub election_eligible: c_int,
+    pub max_kv_entries: c_int,
+    pub election_base_ms: u32,
+    pub election_spread_ms: u32,
+    pub heartbeat_ms: u32,
+}
+
 extern "C" {
     /* crypto */
     pub fn crypto_init() -> c_int;
@@ -147,4 +187,52 @@ extern "C" {
     pub fn norn_pump_status(p: *const norn_pump) -> c_int;
     pub fn norn_pump_stats(p: *const norn_pump, a_to_b: *mut usize, b_to_a: *mut usize);
     pub fn norn_pump_free(p: *mut norn_pump);
+
+    /* cluster KV (FEAT-024/025/026) */
+    pub fn norn_cluster_new(
+        self_pubkey: *const u8,
+        io: *const norn_cluster_io_t,
+        cfg: *const norn_cluster_config_t,
+    ) -> *mut norn_cluster;
+    pub fn norn_cluster_free(cl: *mut norn_cluster);
+    pub fn norn_cluster_add_member(
+        cl: *mut norn_cluster,
+        pubkey: *const u8,
+        cls: c_int,
+        eligible: c_int,
+    ) -> c_int;
+    pub fn norn_cluster_bootstrap(
+        cl: *mut norn_cluster,
+        peer_pubkeys: *const u8,
+        n_peers: c_int,
+    ) -> c_int;
+    pub fn norn_cluster_promote(cl: *mut norn_cluster, pubkey: *const u8) -> c_int;
+    pub fn norn_cluster_remove(cl: *mut norn_cluster, pubkey: *const u8) -> c_int;
+    pub fn norn_cluster_tick(cl: *mut norn_cluster, now_ms: u64);
+    pub fn norn_cluster_input(
+        cl: *mut norn_cluster,
+        from_pubkey: *const u8,
+        data: *const u8,
+        len: usize,
+    );
+    pub fn norn_cluster_kv_put(
+        cl: *mut norn_cluster,
+        key: *const u8,
+        klen: usize,
+        val: *const u8,
+        vlen: usize,
+    ) -> c_int;
+    pub fn norn_cluster_kv_del(cl: *mut norn_cluster, key: *const u8, klen: usize) -> c_int;
+    pub fn norn_cluster_kv_get(
+        cl: *mut norn_cluster,
+        key: *const u8,
+        klen: usize,
+        out: *mut u8,
+        cap: usize,
+    ) -> c_int;
+    pub fn norn_cluster_is_leader(cl: *const norn_cluster) -> c_int;
+    pub fn norn_cluster_leader(cl: *const norn_cluster) -> *const u8;
+    pub fn norn_cluster_member_count(cl: *const norn_cluster) -> c_int;
+    pub fn norn_cluster_members(cl: *const norn_cluster, out: *mut u8, max: c_int) -> c_int;
+    pub fn norn_cluster_is_voter(cl: *const norn_cluster, pubkey: *const u8) -> c_int;
 }
