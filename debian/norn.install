@@ -1,0 +1,7 @@
+usr/bin/norn
+usr/bin/nornd
+usr/bin/norn-forward
+usr/share/man/man1/norn.1
+usr/share/man/man8/nornd.8
+usr/lib/systemd/system/*
+usr/lib/systemd/user/*

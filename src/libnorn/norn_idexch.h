@@ -7,7 +7,7 @@
  * agreement and no per-peer state: each side sends one cleartext message
  * authenticated by a signature, proving the sender holds the private key.
  *
- * @section wire Wire Format
+ * @par Wire Format
  *
  * The message is a signed assertion binding:
  * - Public key (identity)
@@ -28,7 +28,7 @@
  *
  * The signature covers everything from `type` through `payload` (exclusive of magic and sig).
  *
- * @section usage Usage
+ * @par Usage
  *
  * Request:
  * @code
@@ -49,14 +49,14 @@
  * // send resp back to requester
  * @endcode
  *
- * @section application Application Payload
+ * @par Application Payload
  *
  * The payload is opaque to norn — applications define their own schemas:
  * - bifrost: account, ULA, version, capabilities (moved to bifrost layer)
  * - wyrd: Nostr pubkey, relay URLs, trust signals (defined by wyrd)
  * - Custom: Any application-specific data
  *
- * @section thread_safety Thread Safety
+ * @par Thread Safety
  * All functions are thread-safe.
  */
 

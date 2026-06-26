@@ -101,29 +101,28 @@ These tickets enable norn to serve multiple sister projects (bifrost, wyrd) with
 - bifrost FEAT-080 (session/sio retirement)
 - wyrd FEAT-292
 
-### 🔄 v0.9.0 — Tunnel & Bindings
-**Status:** PLANNED
+### ✅ v0.9.0 — Tunnel & Bindings
+**Status:** DONE — norn-forward (client+server) + Rust crate (PIT for live two-peer round-trips)
 
 | Ticket | Description | Priority | Depends On |
 |--------|-------------|----------|------------|
-| FEAT-018 | Stream-tunnel utility (norn-forward) | medium | FEAT-016 |
-| FEAT-019 | Language bindings (Rust, Python) | medium | FEAT-016 |
+| FEAT-018 | Stream-tunnel utility (norn-forward) | medium | FEAT-016 | engine + client(-L) + server(-R) done; data plane verified |
+| FEAT-019 | Language binding (Rust crate) | medium | FEAT-016 | crate + dial/listen + stream + echo example done |
 
 **Key Features:**
 - `norn-forward` — TCP/Unix service over norn stream (ssh -L/-R equivalent)
 - Rust crate with tokio AsyncRead/AsyncWrite
-- Python cffi binding
+- (Python binding dropped — not needed for the foreseeable future)
 
 **Consumers:**
 - thunder, mimir, regin, dvalin (Rust)
-- raven (Python)
 
 ### 🔄 v0.10.0 — Private Overlay
 **Status:** PLANNED
 
 | Ticket | Description | Priority | Depends On |
 |--------|-------------|----------|------------|
-| FEAT-020 | Private overlay bootstrap | medium | FEAT-014, FEAT-016 |
+| FEAT-020 | Private overlay bootstrap | medium | FEAT-014, FEAT-016 | config API + docs done; network via PIT |
 
 **Key Features:**
 - Private mesh formation from fleet bootstrap nodes
@@ -133,6 +132,70 @@ These tickets enable norn to serve multiple sister projects (bifrost, wyrd) with
 **Consumers:**
 - regin → dvalin → raven agent fleet
 - wyrd private packs/clans
+
+### ✅ v0.11.0 — Clustered Key-Value Store (class-aware Raft)
+**Status:** DONE — all three features at 100% line+branch coverage
+
+"etcd over libnorn": a replicated KV store shared across a cluster of nodes,
+addressed by public key, that tolerates mostly-offline edge members.
+
+| Ticket | Description | Priority | Depends On | Status |
+|--------|-------------|----------|------------|--------|
+| FEAT-024 | Pure Raft consensus core (`norn_raft`) — PreVote, learners, candidacy hook | medium | — | done (100% cov) |
+| FEAT-025 | Cluster ↔ session glue (`norn_cluster`) — Raft RPC over a pubkey transport | medium | FEAT-024, FEAT-016, FEAT-017 | done (100% cov) |
+| FEAT-026 | Replicated KV state machine (`norn_kvstore`) + class-aware membership API | medium | FEAT-024, FEAT-025 | done (100% cov) |
+
+**Key Features:**
+- Heterogeneous membership: servers are voting members (quorum over servers
+  only), phones/laptops/workstations are learners with a full replica
+- Leadership restricted to proven-uptime servers via a candidacy-eligibility
+  predicate + PreVote — no change to Raft's safety core
+- Learner-first joins; single-server membership changes
+- KV ops: put/get/cas/del/watch; snapshots
+
+**Consumers:**
+- regin (agent registry), thunder (shared config), dvalin/raven (state)
+
+### 🔄 v0.12.0 — nornd Daemon + norn IPC CLI
+**Status:** IN PROGRESS — daemon + CLI work end-to-end; see
+`issues/MILESTONE-0.12.0-NORND.md` and `docs/nornd.md`
+
+The reference node daemon (`nornd`, an application on libnorn) hosting the
+cluster KV store, with `norn` refactored into a thin IPC client. Identity comes
+from the user's **SSH key** (file or ssh-agent); the cluster doubles as a fleet
+SSH/GPG key directory.
+
+| Ticket | Description | Priority | Depends On | Status |
+|--------|-------------|----------|------------|--------|
+| FEAT-027 | IPC protocol codec — length-prefixed bencode request/response | medium | — | ✅ done |
+| FEAT-028 | SSH-key identity — OpenSSH ed25519 file + ssh-agent signer | medium | FEAT-013 | ✅ file parser done; ssh-agent signer pending |
+| FEAT-029 | `nornd` daemon — node + cluster host + unix-socket IPC server | medium | FEAT-027, FEAT-028, FEAT-025 | ✅ single-node done; multi-node peer transport pending |
+| FEAT-030 | `norn` CLI refactor — thin IPC client, namespaced verbs | medium | FEAT-027, FEAT-029 | ✅ `cluster`/`keys` done; `watch` stream + `bep44` namespacing pending |
+| FEAT-031 | Fleet key directory — publish/resolve SSH + GPG pubkeys | medium | FEAT-029, FEAT-028 | ✅ publish/resolve + GPG chunking done; `authorized-keys` enumeration pending |
+| FEAT-033 | Node-served KV — direct, streamed content (`node`/`peer`) | medium | FEAT-029, FEAT-018 | 🔄 stream protocol codec done; file store + dial transport pending |
+| FEAT-032 | Packaging — nornd as user + system daemon (systemd + launchd) | medium | FEAT-029 | ✅ units + socket activation + install done |
+
+**Delivered this milestone.** All pure cores ship at 100% line+branch
+coverage: IPC codec, SSH identity parser, request dispatcher, cluster member
+enumerator, fleet key directory (with GPG chunk/manifest/verify), CLI client
+helpers, and the node-served stream protocol. A single-node `nornd` elects
+itself and serves `norn cluster {put,get,del,cas,members,leader,status}` and
+`norn keys <id>` end-to-end over the Unix socket; systemd/launchd units install
+and socket-activate. Remaining integration (network-bound, not unit-testable in
+CI): multi-node cluster frame transport over norn sessions, the `watch` event
+stream, `authorized-keys` enumeration (needs a KV prefix-scan), the file-backed
+served store + peer dial transport, and the ssh-agent signer.
+
+**Key Features:**
+- `norn cluster {put,get,del,cas,watch,members,leader,status}` over a Unix
+  socket; `norn bep44 {get,set}` keep direct-DHT; local `keygen`/`version`
+- Node identity = the user's Ed25519 SSH key (ssh-agent works directly — norn
+  signs the handshake, never static ECDH)
+- Cluster as a distributed `authorized_keys` + GPG keyring
+- **All code in nornd/CLI — libnorn unchanged** (per the 0.3.0 mission)
+
+**Consumers:**
+- regin/dvalin/raven, wyrd packs — turnkey node daemon + CLI + key directory
 
 ---
 
@@ -154,6 +217,20 @@ v0.9.0 (Tunnel & Bindings)        │
                                   │
 v0.10.0 (Private Overlay)         │
 └── FEAT-020: Private bootstrap ──┘
+                                  │
+v0.11.0 (Clustered KV Store)      │
+├── FEAT-024: Raft core ──────────┤
+├── FEAT-025: Cluster/session glue┤
+└── FEAT-026: KV + class membership┘
+                                  │
+v0.12.0 (nornd + norn IPC CLI)    │   (application layer on libnorn)
+├── FEAT-027: IPC bencode codec ──┤
+├── FEAT-028: SSH-key identity ───┤
+├── FEAT-029: nornd daemon ───────┤
+├── FEAT-030: norn CLI client ────┤
+├── FEAT-031: fleet key directory ┤
+├── FEAT-033: node-served KV ──────┤
+└── FEAT-032: packaging (svc units)┘
 ```
 
 ---
@@ -162,8 +239,8 @@ v0.10.0 (Private Overlay)         │
 
 | Metric | Value |
 |--------|-------|
-| Completed Milestones | 6 (v0.2.0–v0.7.0) |
-| Planned Milestones | 3 (v0.8.0–v0.10.0) |
-| Completed Tickets | 15 |
-| Planned Tickets | 5 |
-| Version | 0.6.0 |
+| Completed Milestones | 10 (v0.2.0–v0.11.0) |
+| Planned Milestones | 1 (v0.12.0) |
+| Completed Tickets | 26 |
+| Planned Tickets | 7 |
+| Version | 0.9.0-dev |

@@ -37,7 +37,9 @@ AM_CONDITIONAL([ENABLE_COVERAGE], [test "x$enable_coverage" = "xyes"])
 AS_IF([test "x$enable_coverage" = "xyes"],
       [CFLAGS="$CFLAGS --coverage -O0"])
 
-AC_CONFIG_FILES([Makefile norn.pc])
+AC_CONFIG_FILES([Makefile norn.pc
+                 man/norn.1 man/nornd.8 man/libnorn.3
+                 Doxyfile])
 AC_OUTPUT
 
 AC_MSG_NOTICE([])

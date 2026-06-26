@@ -44,3 +44,16 @@ first-class "private overlay" story.
 
 The deployment mode for the agent fleet (regin → dvalin → raven) and for
 wyrd's private packs/clans.
+
+## Implementation Status
+
+- ✅ First-class private-overlay config API (`norn_overlay.{c,h}`): describe a
+  fleet's bootstrap set as **pubkey + endpoint** peers, validate it (no
+  zero/duplicate keys, bounded), and project it into a private-mode
+  `norn_config_t` (`private_mode = 1`, `boot_*` filled). Pure and 100%
+  unit-tested. Pubkeys also seed cluster membership (FEAT-025).
+- ✅ Modes documented in [`docs/private-overlay.md`](../../../docs/private-overlay.md)
+  (public-mainline bootstrap vs private overlay).
+- ⏳ Network acceptance (≥3 nodes form the overlay; NAT'd member reachable via
+  rendezvous/relay) rides the existing `private_mode` path + FEAT-017 and is
+  validated by integration (PIT), not unit tests.

@@ -1,0 +1,16 @@
+[Unit]
+Description=norn node daemon IPC socket (system)
+Documentation=man:nornd(8)
+PartOf=nornd.service
+
+[Socket]
+# The norn CLI connects here; the daemon is socket-activated on first use.
+ListenStream=/run/nornd/nornd.sock
+SocketMode=0660
+SocketUser=norn
+SocketGroup=norn
+RuntimeDirectory=nornd
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=sockets.target

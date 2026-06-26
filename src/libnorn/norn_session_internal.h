@@ -59,6 +59,10 @@ struct norn_session {
     /* Callbacks */
     norn_session_callback_t callback;
     void *user_data;
+
+    /* Inbound-stream accept handler (FEAT-018: server side) */
+    void (*accept_stream_cb)(norn_stream_t *stream, void *user_data);
+    void *accept_stream_ud;
 };
 
 /* Internal stream state */
@@ -69,6 +73,10 @@ struct norn_stream {
     norn_stream_callback_t callback;
     void *user_data;
 };
+
+/* Internal - allocate a session (state machine driven by the dial/listen path) */
+norn_session_t *norn_session_new(norn_client_t *client,
+                                 const norn_crypto_suite_t *suite);
 
 /* Internal helper - set identity keys */
 int norn_session_set_identity(norn_session_t *session,

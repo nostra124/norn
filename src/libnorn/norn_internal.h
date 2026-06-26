@@ -20,7 +20,10 @@
 #include "norn_transaction.h"
 
 /* Forward declarations */
+#ifndef NORN_SESSION_T_DEFINED
+#define NORN_SESSION_T_DEFINED
 typedef struct norn_session norn_session_t;
+#endif
 
 /* Dial context forward declaration (defined in norn_session.c) */
 struct dial_context;

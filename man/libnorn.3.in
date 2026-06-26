@@ -1,0 +1,113 @@
+.TH LIBNORN 3 "2026" "norn @PACKAGE_VERSION@" "Library Functions"
+.SH NAME
+libnorn \- embeddable Mainline DHT, secure sessions, and cluster KV library
+.SH SYNOPSIS
+.nf
+.B #include <norn.h>
+.fi
+.PP
+Link with the flags from
+.BR pkg-config (1):
+.PP
+.RS
+.EX
+cc $(pkg-config --cflags norn) app.c $(pkg-config --libs norn)
+.EE
+.RE
+.PP
+or directly:
+.B \-lnorn \-lsodium .
+.SH DESCRIPTION
+.B libnorn
+is a C99 library (the foundation under
+.BR norn (1)
+and
+.BR nornd (8))
+implementing, in layers:
+.IP \(bu 3
+.B Mainline DHT \(em
+BEP-5 routing and BEP-44 mutable/immutable items
+.RI ( norn.h ", " bep44.h ", " kademlia.h ).
+.IP \(bu 3
+.B Secure sessions and streams \(em
+SIGNATURE-authenticated handshakes (ephemeral X25519 signed by the static
+Ed25519 identity), reliable multiplexed streams, NAT traversal, rendezvous and
+relay
+.RI ( norn_session.h ", " stream.h ", " streammux.h ", " norn_nat.h ).
+.IP \(bu 3
+.B Cluster key-value store \(em
+a pure Raft core with PreVote, learners and class-aware candidacy, a replicated
+KV with watches and snapshots, and the cluster glue over a pubkey transport
+.RI ( norn_raft.h ", " norn_kvstore.h ", " norn_cluster.h ).
+.IP \(bu 3
+.B Private overlay and tunnelling \(em
+fleet bootstrap into a private DHT, and TCP-over-norn forwarding
+.RI ( norn_overlay.h ", " norn_forward.h ).
+.PP
+All cryptography is provided by libsodium
+.RI ( crypto.h ).
+The DHT and session APIs are asynchronous: drive them from a
+.BR poll (2)
+loop using
+.B norn_get_fd()
+and
+.BR norn_tick() .
+.SH KEY HEADERS
+.TP
+.B norn.h
+DHT client lifecycle, bootstrap, get/put of mutable and immutable items.
+.TP
+.B norn_session.h
+Dial/listen, streams, and the handshake state machine.
+.TP
+.B norn_cluster.h ", " norn_kvstore.h ", " norn_raft.h
+Replicated cluster key-value store and its consensus core.
+.TP
+.B norn_overlay.h ", " norn_forward.h
+Private-overlay bootstrap and stream tunnelling.
+.TP
+.B crypto.h
+Keypairs, signing/verification, and AEAD helpers.
+.SH EXAMPLE
+.PP
+.RS
+.EX
+#include <norn.h>
+
+keypair_t kp;
+crypto_keypair_new(&kp);
+
+norn_config_t cfg = { .version = "myapp/1.0" };
+norn_client_t *c = norn_new(kp.public_key, kp.secret_key, &cfg);
+norn_bootstrap(c);
+
+int fd = norn_get_fd(c);
+for (;;) {
+    /* poll(fd, ...) then: */
+    norn_tick(c);
+}
+norn_free(c);
+.EE
+.RE
+.SH THREAD SAFETY
+A client/session/cluster handle is not thread-safe; use one per thread or
+serialise access. Callbacks run inside
+.BR norn_tick ().
+.SH API REFERENCE
+This page is an overview. The complete, per-function API reference is generated
+from the header comments with Doxygen:
+.PP
+.RS
+.EX
+make apidocs        # writes HTML + man3 to docs/api/
+.EE
+.RE
+.SH SEE ALSO
+.BR norn (1),
+.BR nornd (8),
+.BR pkg-config (1),
+.BR doxygen (1)
+.SH AUTHOR
+The norn development team.
+.SH LICENSE
+MIT License. See the LICENSE file for details.

@@ -1,0 +1,41 @@
+[Unit]
+Description=norn node daemon (system)
+Documentation=man:nornd(8) https://github.com/nostra124/norn
+After=network-online.target
+Wants=network-online.target
+Requires=nornd.socket
+
+[Service]
+Type=notify
+# Identity = the host SSH key (already trusted via known_hosts). Override with
+# /etc/norn/nornd.toml or an --identity flag here if you prefer a dedicated key.
+ExecStart=/usr/bin/nornd --foreground \
+    --identity /etc/ssh/ssh_host_ed25519_key \
+    --socket /run/nornd/nornd.sock \
+    --data-dir /var/lib/nornd \
+    --class server
+Restart=on-failure
+RestartSec=2
+
+# Run unprivileged as the dedicated 'norn' user (created by the package).
+User=norn
+Group=norn
+# The host key is root:root 0600; the package grants the norn user read access
+# via a supplementary group or an ACL on /etc/ssh/ssh_host_ed25519_key.
+SupplementaryGroups=ssh_keys
+
+# State + sandboxing.
+StateDirectory=nornd
+RuntimeDirectory=nornd
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=multi-user.target

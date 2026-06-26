@@ -6,7 +6,7 @@
  * node ID width. The public mainline DHT (BEP-5/44) stays fixed at
  * 20-byte IDs and uses a separate implementation.
  *
- * @section usage Usage
+ * @par Usage
  *
  * The routing table is parameterized on node ID length from the crypto suite:
  * - Ed25519/SHA-256: 32-byte IDs (norn_suite_sodium)

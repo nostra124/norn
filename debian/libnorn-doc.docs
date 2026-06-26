@@ -1,0 +1,6 @@
+docs/api/html
+docs/architecture.md
+docs/nornd.md
+docs/cli.md
+docs/cluster-kv.md
+docs/private-overlay.md
