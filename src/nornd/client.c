@@ -104,7 +104,7 @@ static void put_cstr(sink_t *s, const char *str) { put_bytes(s, str, strlen(str)
 static void put_hex(sink_t *s, const unsigned char *b, size_t n) {
     static const char H[] = "0123456789abcdef";
     for (size_t i = 0; i < n; i++) {
-        char two[2] = {H[b[i] >> 4], H[b[i] & 0xf]};
+        const char two[2] = {H[b[i] >> 4], H[b[i] & 0xf]};
         put_bytes(s, two, 2);
     }
 }

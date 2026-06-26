@@ -141,7 +141,8 @@ jobs:
             --suppressions-list=cppcheck.supp \
             --inline-suppr \
             --suppress=missingInclude \
-            src/libnorn/*.c src/norn.c
+            -I src/libnorn -I src/nornd \
+            src/libnorn/*.c src/norn.c src/nornd/*.c
 
       - name: Run clang-tidy (optional)
         run: |
