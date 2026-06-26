@@ -18,6 +18,7 @@ normalCheckLevelMaxBranches
 unusedFunction
 constParameterPointer
 constVariablePointer
+constParameterCallback
 staticFunction
 unreadVariable
 knownConditionTrueFalse
