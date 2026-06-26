@@ -57,6 +57,16 @@ ergonomic `mimir` crate; `libbawee`).
   end-to-end axum-over-norn example (acceptance #1) — next increment.
 - ⏳ CI wiring for the crate on Linux + macOS (acceptance #3).
 
+## Progress — cluster KV bindings (2026-06-26)
+
+- ✅ Exposed the class-aware cluster KV (FEAT-024/025/026) to Rust: `norn-sys`
+  FFI for `norn_cluster_*` + a safe `norn::Cluster` (`new` with a `send` closure,
+  `add_member`/`bootstrap`/`promote`/`remove`, `tick`/`input`, `put`/`del`/`get`,
+  `is_leader`/`leader`/`member_count`/`members`/`is_voter`) + `NodeClass`.
+  `cargo test` 7/7 (a single-server node self-elects and serves KV; membership +
+  class checks). This is what dvalin's runtime (FEAT-148/149) binds against.
+- ⏳ `kv_watch` (reactive prefix watch) Rust wrapper — next increment.
+
 ## Cross-repo
 
 Enables thunder/mimir/regin/dvalin (Rust) to consume norn.

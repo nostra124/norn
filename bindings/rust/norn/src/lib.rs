@@ -22,10 +22,12 @@ use std::ptr;
 
 use norn_sys as sys;
 
+mod cluster;
 mod pump;
 mod session;
 mod stream;
 
+pub use cluster::{Cluster, NodeClass};
 pub use pump::{Endpoint, Io, Pump, PumpStatus};
 pub use session::{Session, SessionState};
 pub use stream::Stream;
