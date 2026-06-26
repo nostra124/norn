@@ -6,19 +6,19 @@
  * Mutable items are signed with Ed25519 keys and can be updated by the
  * key holder. Immutable items are content-addressed (SHA1 hash).
  * 
- * @section mutable Mutable Items
+ * @par Mutable Items
  * - target = SHA1("k" || pubkey)
  * - Value signed with Ed25519 secret key
  * - Sequence number must increase monotonically
  * - Max value size: 1000 bytes
  * 
- * @section immutable Immutable Items
+ * @par Immutable Items
  * - target = SHA1(bencode(value))
  * - Content-addressed, self-verifying
  * - No signature or sequence number
  * - Max value size: 1000 bytes
  * 
- * @section security Security
+ * @par Security
  * - Ed25519 signatures prevent forgery
  * - Sequence numbers prevent replay attacks
  * - SHA1 hashes ensure content integrity

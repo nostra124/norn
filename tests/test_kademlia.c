@@ -90,7 +90,7 @@ static void test_get_bucket_index(void) {
 }
 
 static void test_get_bucket_index_null(void) {
-    unsigned char node_id[NODE_ID_BYTES];
+    unsigned char node_id[NODE_ID_BYTES] = {0};
     int idx = kad_get_bucket_index(NULL, node_id);
     assert(idx < 0);
     printf("  test_get_bucket_index_null: OK\n");

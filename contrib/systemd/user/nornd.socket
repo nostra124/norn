@@ -1,0 +1,12 @@
+[Unit]
+Description=norn node daemon IPC socket (user)
+Documentation=man:nornd(8)
+PartOf=nornd.service
+
+[Socket]
+# %t expands to $XDG_RUNTIME_DIR for user units.
+ListenStream=%t/nornd.sock
+SocketMode=0600
+
+[Install]
+WantedBy=sockets.target

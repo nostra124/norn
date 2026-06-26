@@ -7,20 +7,20 @@
  * All distribution paths (BEP-44 DHT put/get, gossip) funnel through this
  * single validating gate.
  * 
- * @section features Key Features
+ * @par Key Features
  * - Trusted records (signed by us)
  * - Sequence monotonicity enforcement
  * - Account-based lookup (via node_id)
  * - Private record support (FEAT-048)
  * - Write-through persistence
  * 
- * @section security Security Model
+ * @par Security Model
  * - Records are TRUSTED (signed by our own key)
  * - Sequence number must be newer than existing
  * - Signature verified before storage
  * - Private records never written to disk or DHT
  * 
- * @section difference Difference from dhtstore
+ * @par Difference from dhtstore
  * - dhtstore: Untrusted items from the network (bounded cache)
  * - recstore: Trusted items we signed ourselves (persistent store)
  * 

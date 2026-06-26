@@ -2,40 +2,47 @@
 # PIT: Network integration with real DHT nodes
 # These tests require network access to mainline DHT bootstrap nodes
 
-setup() {
+load test_helper
+
+# Is the real mainline DHT reachable? (No → every test self-skips.)
+have_network() {
+    [ -z "$SKIP_PIT" ] && ping -c 1 -W 2 router.bittorrent.com >/dev/null 2>&1
+}
+
+# Build + install once for the whole file — but only when the network these
+# tests need is actually available, so an offline run skips instantly instead
+# of paying for a build whose result every test would then skip.
+setup_file() {
+    if ! have_network; then
+        export PIT_OFFLINE=1
+        return 0
+    fi
     WORK_DIR="$(mktemp -d)"
     export WORK_DIR
     cd "$WORK_DIR"
-    
-    # Copy source to work directory
-    cp -r /Users/rene/Projekte/norn/* "$WORK_DIR/"
-    
-    # Build and install
+    copy_src
     autoreconf -fi
     ./configure --prefix="$WORK_DIR/install"
     make
     make install
-    
-    NORN_BIN="$WORK_DIR/install/bin/norn"
-    export NORN_BIN
-    
-    # Generate key for tests
+
+    export NORN_BIN="$WORK_DIR/install/bin/norn"
+    export HOME="$WORK_DIR"
+    export LD_LIBRARY_PATH="$WORK_DIR/install/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     "$NORN_BIN" keygen 2>/dev/null || true
 }
 
-teardown() {
-    cd /
-    rm -rf "$WORK_DIR"
+teardown_file() {
+    if [ -n "$WORK_DIR" ]; then
+        rm -rf "$WORK_DIR"
+    fi
 }
 
-# Skip all PIT tests if SKIP_PIT is set
 skip_if_no_network() {
     if [ -n "$SKIP_PIT" ]; then
         skip "PIT tests disabled (SKIP_PIT is set)"
     fi
-    
-    # Check network connectivity
-    if ! ping -c 1 -W 2 router.bittorrent.com >/dev/null 2>&1; then
+    if [ -n "$PIT_OFFLINE" ] || ! ping -c 1 -W 2 router.bittorrent.com >/dev/null 2>&1; then
         skip "No network connectivity"
     fi
 }

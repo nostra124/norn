@@ -273,8 +273,8 @@ static void test_get_mutable(void) {
 }
 
 static void test_get_mutable_null(void) {
-    unsigned char pk[32];
-    
+    unsigned char pk[32] = {0};
+
     int ret = norn_get_mutable(NULL, pk, NULL, NULL);
     assert(ret == -1);
     

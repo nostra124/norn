@@ -37,12 +37,12 @@ if [ -n "$SKIP_PIT" ]; then
     exit 0
 fi
 
-# Check network connectivity
+# Note external connectivity, but don't skip the whole suite: network-dependent
+# tests self-skip via skip_if_no_network, while local performance tests (e.g.
+# the nornd IPC workload) run regardless.
 echo "==> Checking network connectivity"
 if ! ping -c 1 -W 2 router.bittorrent.com >/dev/null 2>&1; then
-    echo "==> No network connectivity, skipping PIT tests"
-    echo "==> Set SKIP_PIT=1 to skip these tests"
-    exit 0
+    echo "==> No external DHT connectivity; network tests will self-skip"
 fi
 
 # Run PIT tests

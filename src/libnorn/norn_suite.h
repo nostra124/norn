@@ -6,7 +6,7 @@
  * The default suite uses libsodium (Ed25519/X25519/NaCl), but applications
  * can install custom suites (e.g., secp256k1/ChaCha20-Poly1305 for Nostr).
  *
- * @section usage Basic Usage
+ * @par Basic Usage
  *
  * Default sodium suite (no configuration needed):
  * @code
@@ -21,7 +21,7 @@
  * norn_client_t *client = norn_new(pubkey, seckey, &cfg);
  * @endcode
  *
- * @section implementing Implementing a Custom Suite
+ * @par Implementing a Custom Suite
  *
  * A suite must implement all function pointers in norn_crypto_suite_t.
  * The suite is installed at client creation and used for:
@@ -31,7 +31,7 @@
  * - AEAD seal/open for encrypted channels
  * - Node ID derivation from public key
  *
- * @section thread_safety Thread Safety
+ * @par Thread Safety
  * Suite functions may be called concurrently. Implementations must be thread-safe.
  */
 

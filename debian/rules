@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+# This repository tracks generated build artifacts: a Makefile embedding the
+# original author's build path (so `make distclean` fails), plus stale *.o/*.lo
+# and .libs/ objects that would be mixed into the package build and break the
+# link. Purge them so dh_autoreconf + dh_auto_configure rebuild from sources.
+override_dh_auto_clean:
+	rm -f Makefile
+	find . -path ./debian -prune -o \
+	    \( -name '*.o' -o -name '*.lo' -o -name '*.la' -o -name '*.lai' \) -print \
+	    | xargs -r rm -f
+	find . -path ./debian -prune -o -type d -name .libs -print | xargs -r rm -rf
+	dh_auto_clean
+
+override_dh_auto_configure:
+	dh_auto_configure -- --enable-static --disable-silent-rules
+
+override_dh_auto_build:
+	dh_auto_build
+	# API reference for the libnorn-doc package (doxygen is a build-dep).
+	$(MAKE) apidocs
+
+override_dh_auto_install:
+	dh_auto_install
+	# Debian ships neither libtool .la files nor the macOS launchd plists.
+	rm -f debian/tmp/usr/lib/*/libnorn.la
+	rm -rf debian/tmp/usr/lib/launchd

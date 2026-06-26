@@ -1,0 +1,35 @@
+# Doxygen configuration for libnorn (processed from Doxyfile.in by configure).
+# Run `make docs` (or `doxygen Doxyfile`) to generate docs/api/{html,man}.
+
+PROJECT_NAME           = "libnorn"
+PROJECT_NUMBER         = @PACKAGE_VERSION@
+PROJECT_BRIEF          = "Mainline DHT, secure sessions, and cluster KV library"
+OUTPUT_DIRECTORY       = docs/api
+
+# Inputs: the public headers (and sources, for full coverage) plus the README
+# as the main page. The design docs under docs/ are authored for GitHub
+# rendering (their intra-doc anchors don't match Doxygen's), so they're linked
+# from the README rather than fed through Doxygen.
+INPUT                  = @top_srcdir@/src/libnorn \
+                         @top_srcdir@/src/nornd \
+                         @top_srcdir@/README.md
+FILE_PATTERNS          = *.h *.c *.md
+RECURSIVE              = YES
+USE_MDFILE_AS_MAINPAGE = @top_srcdir@/README.md
+
+# C project: extract everything, treat // /** comments as brief.
+OPTIMIZE_OUTPUT_FOR_C  = YES
+EXTRACT_ALL            = YES
+EXTRACT_STATIC         = YES
+JAVADOC_AUTOBRIEF      = YES
+QUIET                  = YES
+WARN_IF_UNDOCUMENTED   = NO
+
+# Outputs.
+GENERATE_HTML          = YES
+GENERATE_MAN           = YES
+MAN_LINKS              = YES
+GENERATE_LATEX         = NO
+
+# Keep the dependency footprint small: no graphviz/dot required.
+HAVE_DOT               = NO

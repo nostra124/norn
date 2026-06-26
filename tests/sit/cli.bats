@@ -1,37 +1,46 @@
 #!/usr/bin/env bats
 # SIT: CLI operations
 
-setup() {
+load test_helper
+
+# Build + install once for the whole file; every test runs the installed CLI.
+setup_file() {
     WORK_DIR="$(mktemp -d)"
     export WORK_DIR
     cd "$WORK_DIR"
-    
-    # Copy source to work directory
-    cp -r /Users/rene/Projekte/norn/* "$WORK_DIR/"
-    
-    # Build and install
+    copy_src
     autoreconf -fi
     ./configure --prefix="$WORK_DIR/install"
     make
     make install
-    
-    # Set PATH
-    NORN_BIN="$WORK_DIR/install/bin/norn"
-    export NORN_BIN
+
+    export NORN_BIN="$WORK_DIR/install/bin/norn"
+    # Keep keygen's default ~/.norn under the work dir, and let the installed
+    # binary find libnorn.so.
+    export HOME="$WORK_DIR"
+    export LD_LIBRARY_PATH="$WORK_DIR/install/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 }
 
-teardown() {
-    cd /
+teardown_file() {
     rm -rf "$WORK_DIR"
+}
+
+# The build is shared across tests (setup_file), but key state is per-test:
+# reset it so "no key" tests aren't affected by an earlier keygen.
+setup() {
+    rm -rf "$HOME/.norn"
+    rm -f "$WORK_DIR"/*.pem
 }
 
 @test "norn --help shows all commands" {
     run "$NORN_BIN" --help
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 0 ]   # --help is a successful invocation
     [[ "$output" == *"keygen"* ]]
     [[ "$output" == *"get"* ]]
     [[ "$output" == *"set"* ]]
     [[ "$output" == *"daemon"* ]]
+    [[ "$output" == *"cluster"* ]]
+    [[ "$output" == *"keys"* ]]
     [[ "$output" == *"version"* ]]
 }
 
@@ -45,13 +54,13 @@ teardown() {
 @test "norn keygen creates key file" {
     # Remove existing key if present
     rm -f "$WORK_DIR/.norn/key.pem"
-    
+
     run "$NORN_BIN" keygen
     [ "$status" -eq 0 ]
-    
+
     # Key file should exist
     [ -f "$WORK_DIR/.norn/key.pem" ]
-    
+
     # Key file should have correct permissions (0600)
     perms=$(stat -c "%a" "$WORK_DIR/.norn/key.pem" 2>/dev/null || stat -f "%OLp" "$WORK_DIR/.norn/key.pem")
     [ "$perms" = "600" ]
@@ -59,21 +68,21 @@ teardown() {
 
 @test "norn keygen prints public key" {
     rm -f "$WORK_DIR/.norn/key.pem"
-    
+
     run "$NORN_BIN" keygen
     [ "$status" -eq 0 ]
-    
+
     # Should contain hex-encoded public key (64 chars)
     [[ "$output" =~ [0-9a-f]{64} ]]
 }
 
 @test "norn keygen fails if key already exists" {
     rm -f "$WORK_DIR/.norn/key.pem"
-    
+
     # First keygen should succeed
     run "$NORN_BIN" keygen
     [ "$status" -eq 0 ]
-    
+
     # Second keygen should fail
     run "$NORN_BIN" keygen
     [ "$status" -eq 1 ]
@@ -83,16 +92,16 @@ teardown() {
 @test "norn keygen respects --key option" {
     run "$NORN_BIN" --key "$WORK_DIR/custom-key.pem" keygen
     [ "$status" -eq 0 ]
-    
+
     [ -f "$WORK_DIR/custom-key.pem" ]
 }
 
 @test "norn keygen respects NORN_KEY environment variable" {
     export NORN_KEY="$WORK_DIR/env-key.pem"
-    
+
     run "$NORN_BIN" keygen
     [ "$status" -eq 0 ]
-    
+
     [ -f "$WORK_DIR/env-key.pem" ]
 }
 
@@ -129,7 +138,7 @@ teardown() {
 
 @test "norn daemon --help shows daemon options" {
     run "$NORN_BIN" daemon --help
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 0 ]   # --help is a successful invocation
     [[ "$output" == *"--port"* ]] || [[ "$output" == *"port"* ]]
 }
 

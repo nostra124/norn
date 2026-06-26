@@ -1,0 +1,5 @@
+usr/include/*.h
+usr/lib/*/libnorn.so
+usr/lib/*/libnorn.a
+usr/lib/*/pkgconfig/norn.pc
+usr/share/man/man3/libnorn.3

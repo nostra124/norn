@@ -61,7 +61,7 @@ pubkey* + opaque app payloads.
 | FEAT-016 | `norn_dial(pubkey) → session` connect orchestration (generic session/sio) | [ ] planned |
 | FEAT-017 | Harmonised NAT traversal — rendezvous hole-punch + onion relay | [ ] planned |
 | FEAT-018 | Generic stream-tunnel utility (`norn-forward`) — service-over-pubkey | [ ] planned |
-| FEAT-019 | Language bindings — Rust crate + Python (over the C SDK) | [ ] planned |
+| FEAT-019 | Language binding — Rust crate (over the C SDK) | [ ] planned |
 | FEAT-020 | Private-overlay bootstrap / fleet rendezvous | [ ] planned |
 
 ## Suggested order
