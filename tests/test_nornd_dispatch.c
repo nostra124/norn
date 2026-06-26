@@ -73,7 +73,7 @@ static nornd_ipc_req_t mkreq(const char *op) {
     strcpy(r.op, op);
     return r;
 }
-static void setkey(nornd_ipc_req_t *r, const char *k) {
+static void set_key(nornd_ipc_req_t *r, const char *k) {
     r->klen = strlen(k);
     memcpy(r->key, k, r->klen);
 }
@@ -105,7 +105,7 @@ static void test_get(void) {
     nornd_dispatch(&BE, &q, &r);
     assert(!r.ok && r.has_err);
     /* absent */
-    setkey(&q, "k1");
+    set_key(&q, "k1");
     nornd_dispatch(&BE, &q, &r);
     assert(!r.ok && strcmp(r.err, "not found") == 0);
     /* present */
@@ -126,7 +126,7 @@ static void test_put_del(void) {
     nornd_dispatch(&BE, &q, &r);
     assert(!r.ok && strcmp(r.err, "missing key") == 0);
     /* put missing val */
-    setkey(&q, "k");
+    set_key(&q, "k");
     nornd_dispatch(&BE, &q, &r);
     assert(!r.ok && strcmp(r.err, "missing val") == 0);
     /* put accepted */
@@ -144,7 +144,7 @@ static void test_put_del(void) {
     nornd_dispatch(&BE, &d, &r);
     assert(!r.ok && strcmp(r.err, "missing key") == 0);
     /* del accepted */
-    setkey(&d, "k");
+    set_key(&d, "k");
     g_del_rc = 0;
     nornd_dispatch(&BE, &d, &r);
     assert(r.ok && !g_have);
@@ -161,7 +161,7 @@ static void test_cas(void) {
     /* missing key */
     nornd_dispatch(&BE, &q, &r);
     assert(!r.ok && strcmp(r.err, "missing key") == 0);
-    setkey(&q, "k");
+    set_key(&q, "k");
     /* has_expect false (short-circuit) */
     nornd_dispatch(&BE, &q, &r);
     assert(!r.ok && strcmp(r.err, "cas needs expect and val") == 0);
