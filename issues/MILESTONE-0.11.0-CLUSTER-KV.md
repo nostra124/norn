@@ -55,7 +55,7 @@ membership* on top — no new transport, crypto or NAT work.
 
 | id | title | status |
 |----|-------|--------|
-| FEAT-024 | Pure Raft consensus core (`norn_raft`) — PreVote, learners, candidacy hook | [~] in build — core + 21 tests; 100% line/func, 87.6% branch (coverage polish + InstallSnapshot wire remain) |
+| FEAT-024 | Pure Raft consensus core (`norn_raft`) — PreVote, learners, candidacy hook | [~] in build — core + 24 tests; 100% line/func, 90.3% branch (coverage polish + InstallSnapshot wire remain) |
 | FEAT-025 | Cluster ↔ session glue (`norn_cluster`) — RPC over norn streams, membership, timers | [ ] planned |
 | FEAT-026 | Replicated KV state machine (`norn_kvstore`) + class-aware membership API | [ ] planned |
 

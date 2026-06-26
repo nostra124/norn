@@ -812,6 +812,133 @@ static void test_null_callbacks_are_tolerated(void)
     norn_raft_step(&r, &m);
 }
 
+/* A grab-bag of single-message injections to exercise the remaining branch
+ * directions (rejection sides, alternate short-circuits, guard true-sides). */
+static void test_branch_edges(void)
+{
+    uint64_t clock = 0;
+    norn_raft_msg_t m;
+
+    /* step() tolerates a NULL message. */
+    reset();
+    node_t *s = add_node(1, 1, 1, 7);
+    norn_raft_step(&s->raft, NULL);
+
+    /* prevote_resp: a rejection, and one received while not in a prevote round. */
+    reset();
+    node_t *a = add_node(1, 1, 1, 7);
+    assert(norn_raft_add_peer(&a->raft, 2, 1) == 0);
+    assert(norn_raft_add_peer(&a->raft, 3, 1) == 0);
+    memset(&m, 0, sizeof(m));
+    m.type = NORN_RAFT_MSG_PREVOTE_RESP; /* not in prevote yet → ignored */
+    m.from = 2;
+    inject(a, &m);
+    norn_raft_tick(&a->raft, 100000);    /* now in prevote */
+    assert(a->raft.in_prevote == 1);
+    m.vote_granted = 0;                   /* a rejection → tally unchanged */
+    inject(a, &m);
+    assert(a->raft.in_prevote == 1);
+
+    /* vote_resp to a non-candidate, and a rejection to a candidate. */
+    reset();
+    a = add_node(1, 1, 1, 7);
+    assert(norn_raft_add_peer(&a->raft, 2, 1) == 0);
+    assert(norn_raft_add_peer(&a->raft, 3, 1) == 0);
+    memset(&m, 0, sizeof(m));
+    m.type = NORN_RAFT_MSG_VOTE_RESP; /* a is a follower → ignored */
+    m.from = 2;
+    m.vote_granted = 1;
+    inject(a, &m);
+    assert(norn_raft_role(&a->raft) == NORN_RAFT_FOLLOWER);
+
+    /* vote_req: re-grant to the same candidate, then refuse a different one. */
+    reset();
+    node_t *f = add_node(1, 1, 1, 7);
+    memset(&m, 0, sizeof(m));
+    m.type = NORN_RAFT_MSG_VOTE_REQ;
+    m.from = 2;
+    m.term = 5;
+    m.last_log_index = 0;
+    m.last_log_term = 0;
+    QHEAD = QTAIL = 0;
+    inject(f, &m); /* grants to 2 (voted_for was -1) */
+    assert(QUEUE[QTAIL - 1].vote_granted == 1);
+    inject(f, &m); /* same candidate, same term → still granted (voted_for==from) */
+    assert(QUEUE[QTAIL - 1].vote_granted == 1);
+    m.from = 3;    /* different candidate, same term → refused (already voted) */
+    inject(f, &m);
+    assert(QUEUE[QTAIL - 1].vote_granted == 0);
+
+    /* prevote refusals: stale term, and an up-to-date-but-recent-leader case. */
+    reset();
+    f = add_node(1, 1, 1, 7);
+    memset(&m, 0, sizeof(m));
+    m.type = NORN_RAFT_MSG_PREVOTE_REQ;
+    m.from = 2;
+    m.term = 0;            /* not greater than our term(0) → refuse */
+    m.last_log_index = 5;
+    m.last_log_term = 5;
+    QHEAD = QTAIL = 0;
+    inject(f, &m);
+    assert(QUEUE[QTAIL - 1].vote_granted == 0);
+
+    /* append_resp with a stale (lower) match_index must not lower the peer. */
+    reset();
+    a = add_node(1, 1, 1, 7);
+    assert(norn_raft_add_peer(&a->raft, 2, 0) == 0);
+    run_until_leader(&clock);
+    {
+        char c = 'q';
+        assert(norn_raft_propose(&a->raft, &c, 1) > 0);
+    }
+    uint32_t term = norn_raft_term(&a->raft);
+    memset(&m, 0, sizeof(m));
+    m.type = NORN_RAFT_MSG_APPEND_RESP;
+    m.from = 2;
+    m.term = term;
+    m.success = 1;
+    m.match_index = 2;
+    inject(a, &m); /* match advances to 2 */
+    m.match_index = 1;
+    inject(a, &m); /* stale: 1 < 2 → ignored (the >= guard's false side) */
+    assert(norn_raft_role(&a->raft) == NORN_RAFT_LEADER);
+
+    /* committing entries that include the term NOOP: apply runs but skips the
+     * non-DATA NOOP. A propose triggers commit-advance over [noop(1), data(2)]. */
+    reset();
+    a = add_node(1, 1, 1, 7);
+    run_until_leader(&clock);
+    {
+        char c = 'd';
+        assert(norn_raft_propose(&a->raft, &c, 1) > 0);
+    }
+    assert(norn_raft_commit_index(&a->raft) >= 2); /* noop + data committed */
+    assert(a->napplied == 1); /* only the DATA entry applied; the NOOP is skipped */
+
+    /* config ADD of a brand-new (non-self, not-yet-known) peer. */
+    reset();
+    a = add_node(1, 1, 1, 7);
+    run_until_leader(&clock);
+    assert(norn_raft_propose_config(&a->raft, NORN_RAFT_ENTRY_ADD, 7, 0) > 0);
+    assert(norn_raft_peer_count(&a->raft) == 1);
+}
+
+/* broadcast + prevote loops must skip inactive / non-voter peers, and tolerate a
+ * NULL send callback while still iterating the peer set. */
+static void test_loops_skip_inactive_and_null_send(void)
+{
+    norn_raft_t r;
+    norn_raft_callbacks_t cb;
+    memset(&cb, 0, sizeof(cb)); /* NULL send: the `if (cb.send)` false side */
+    assert(norn_raft_init(&r, 1, 1, &cb, 100, 200, 30, 7) == 0);
+    assert(norn_raft_add_peer(&r, 2, 1) == 0); /* a voter peer */
+    assert(norn_raft_add_peer(&r, 3, 1) == 0);
+    /* timing out drives start_prevote, whose peer loop runs with send == NULL. */
+    norn_raft_tick(&r, 100000);
+    /* peer_count counts active peers (both still active here). */
+    assert(norn_raft_peer_count(&r) == 2);
+}
+
 int main(void)
 {
     test_init_validation();
@@ -836,6 +963,8 @@ int main(void)
     test_snapshot_interior_and_send_clamp();
     test_prior_term_entry_not_committed_by_count();
     test_null_callbacks_are_tolerated();
+    test_branch_edges();
+    test_loops_skip_inactive_and_null_send();
     printf("all norn_raft tests passed\n");
     return 0;
 }

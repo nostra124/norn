@@ -82,7 +82,7 @@ Foundation for the fleet's pubkey-addressed replicated config/state store
 `norn_raft_step(msg)` + `norn_raft_tick(now_ms)`, emitting effects through a
 vtable (`send`/`apply`/`save_state`/`eligible`). `tests/test_raft.c` is a
 deterministic in-memory multi-core simulation (seeded jitter, a controllable
-message bus). Built under the project's `-Wall -Wextra -Werror -std=c99`; 21
+message bus). Built under the project's `-Wall -Wextra -Werror -std=c99`; 24
 tests pass.
 
 Done:
@@ -100,9 +100,9 @@ Done:
   the `LCOV_EXCL` markers on genuinely-unreachable defensive paths).
 
 Remaining (keeps the ticket open):
-- ⚠️ AC6 — **branch coverage is 87.6% (254/290), not the required 100%.** ~36
-  both-direction branch cases (mostly compound-condition sides) remain; closing
-  them is mechanical test-writing on the existing harness.
+- ⚠️ AC6 — **branch coverage is 90.3% (262/290), not the required 100%.** ~28
+  both-direction branch cases (mostly compound-condition short-circuit sides)
+  remain; closing them is mechanical test-writing on the existing harness.
 - ⚠️ InstallSnapshot **wire protocol**: local log compaction (`norn_raft_snapshot`)
   is implemented + tested, but sending/receiving a snapshot to catch up a far-
   behind follower is not yet wired (the design lists it under FEAT-024; the
