@@ -33,7 +33,9 @@ setup_file() {
 }
 
 teardown_file() {
-    [ -n "$WORK_DIR" ] && rm -rf "$WORK_DIR"
+    if [ -n "$WORK_DIR" ]; then
+        rm -rf "$WORK_DIR"
+    fi
 }
 
 skip_if_no_network() {
