@@ -367,6 +367,16 @@ int norn_cluster_kv_del(norn_cluster_t *cl, const unsigned char *key, size_t kle
     return kv_submit(cl, cmd, (size_t)n);
 }
 
+int norn_cluster_kv_cas(norn_cluster_t *cl, const unsigned char *key, size_t klen,
+                        const unsigned char *expect, size_t elen,
+                        const unsigned char *val, size_t vlen) {
+    if (!cl) return -1;
+    unsigned char cmd[CMD_MAX];
+    int n = norn_kv_encode_cas(cmd, sizeof(cmd), key, klen, expect, elen, val, vlen);
+    if (n < 0) return -1;
+    return kv_submit(cl, cmd, (size_t)n);
+}
+
 int norn_cluster_kv_get(norn_cluster_t *cl, const unsigned char *key, size_t klen,
                         unsigned char *out, size_t cap) {
     if (!cl) return -1;
