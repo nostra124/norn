@@ -30,7 +30,10 @@
 #include <stddef.h>
 
 /* Opaque handles */
+#ifndef NORN_SESSION_T_DEFINED
+#define NORN_SESSION_T_DEFINED
 typedef struct norn_session norn_session_t;
+#endif
 typedef struct norn_stream norn_stream_t;
 
 /**

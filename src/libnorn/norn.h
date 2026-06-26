@@ -67,7 +67,10 @@
 #define NORN_SECRETKEY_BYTES 64
 
 /* Opaque handles */
+#ifndef NORN_CLIENT_T_DEFINED
+#define NORN_CLIENT_T_DEFINED
 typedef struct norn_client norn_client_t;
+#endif
 typedef struct norn_record norn_record_t;
 
 /**
