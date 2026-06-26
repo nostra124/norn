@@ -1,87 +1,82 @@
-# norn — Mainline DHT client library
+# norn — Mainline DHT, secure sessions and cluster KV (library + CLI + daemon)
 #
-# Formula for Homebrew package manager (https://brew.sh)
+# Homebrew formula (https://brew.sh).
 #
-# Install with:
-#   brew install ./Formula/norn.rb
-#
-# Or from a tap:
-#   brew tap your-org/norn
+# Install the released version from a tap:
+#   brew tap nostra124/norn
 #   brew install norn
+#
+# Or build the latest from git:
+#   brew install --HEAD ./Formula/norn.rb
 
 class Norn < Formula
-  desc "Mainline DHT client library for P2P peer discovery"
-  homepage "https://github.com/your-org/norn"
-  version "0.1.0"
+  desc "Mainline DHT, secure sessions and cluster KV store (CLI + node daemon)"
+  homepage "https://github.com/nostra124/norn"
   license "MIT"
 
-  # Adjust the URL and sha256 for your release
-  url "https://github.com/your-org/norn/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-
-  head "https://github.com/your-org/norn.git", branch: "main"
+  # No tagged release yet, so this formula builds from git (`brew install
+  # --HEAD norn`). When v0.12.0 is tagged, add the stable stanza:
+  #   url "https://github.com/nostra124/norn/archive/refs/tags/v0.12.0.tar.gz"
+  #   sha256 "<shasum -a 256 of that tarball>"
+  head "https://github.com/nostra124/norn.git", branch: "master"
 
   depends_on "autoconf" => :build
   depends_on "automake" => :build
   depends_on "libtool" => :build
+  depends_on "pkg-config" => :build
   depends_on "libsodium"
 
   def install
-    # Bootstrap autotools
-    system "./autogen.sh" if File.exist?("autogen.sh")
-    
-    # Configure with coverage disabled for production builds
-    system "./configure", "--prefix=#{prefix}",
-                          "--disable-coverage",
-                          "--disable-silent-rules"
-    
-    # Build
+    system "./autogen.sh"
+    system "./configure", *std_configure_args, "--disable-silent-rules"
     system "make"
-    
-    # Run tests
     system "make", "check"
-    
-    # Install
     system "make", "install"
   end
 
+  # Run nornd as a per-user daemon: `brew services start norn`.
+  service do
+    run [opt_bin/"nornd", "--foreground"]
+    keep_alive true
+    log_path var/"log/nornd.log"
+    error_log_path var/"log/nornd.log"
+  end
+
   test do
-    # Test that library is installed
+    # Library, headers and pkg-config metadata are installed.
     assert_predicate lib/"libnorn.dylib", :exist? if OS.mac?
     assert_predicate lib/"libnorn.so", :exist? if OS.linux?
-    
-    # Test that header is installed
     assert_predicate include/"norn.h", :exist?
-    
-    # Test that pkg-config file exists
     assert_predicate lib/"pkgconfig/norn.pc", :exist?
-    
-    # Test CLI
-    system bin/"norn", "version"
-    
-    # Test keygen
-    output = shell_output("#{bin}/norn keygen 2>&1")
-    assert_match(/Generated keypair/, output)
-    assert_match(/Public:/, output)
+
+    # CLI works and reports a version.
+    assert_match(/norn \d+\.\d+\.\d+/, shell_output("#{bin}/norn version"))
+
+    # keygen writes a 0600 key and prints the 64-hex public key.
+    output = shell_output("HOME=#{testpath} #{bin}/norn keygen").strip
+    assert_match(/\A[0-9a-f]{64}\z/, output)
+    assert_predicate testpath/".norn/key.pem", :exist?
+
+    # The daemon binary is present and shows its usage.
+    assert_match "nornd", shell_output("#{bin}/nornd --bogus 2>&1", 2)
   end
 
   def caveats
     <<~EOS
-      norn provides a mainline DHT client library (libnorn) and CLI tool (norn).
-      
-      Library usage:
-        #include <norn.h>
-        -lnorn
-      
-      CLI usage:
-        norn keygen              Generate ed25519 keypair
-        norn get <pubkey>        Retrieve record from DHT
-        norn set <value>         Store signed record to DHT
-        norn daemon              Run DHT node
-        
-      For async/event-loop integration, use:
-        int fd = norn_get_fd(client);
-        norn_tick(client);  // Process pending transactions
+      norn installs:
+        norn           CLI (DHT + a thin client to nornd)
+        nornd          node daemon hosting the cluster KV store
+        norn-forward   TCP-over-norn tunnel
+        libnorn        shared/static library (#include <norn.h>, pkg-config norn)
+
+      Run the node daemon as a per-user service:
+        brew services start norn
+
+      It uses your SSH key (~/.ssh/id_ed25519) as the node identity and serves
+      the IPC socket at $XDG_RUNTIME_DIR/nornd.sock. Then:
+        norn cluster put <k> <v>
+        norn cluster get <k>
+        norn keys <nodeid>
     EOS
   end
 end
