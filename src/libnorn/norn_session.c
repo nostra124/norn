@@ -603,19 +603,14 @@ int norn_session_send_pending(norn_session_t *session) {
     
     /* Send pending handshake message (for initiator) */
     if (session->is_initiator && session->hs_state == HS_NONE) {
-        /* Build and send INIT */
+        /* Build and send INIT. The initiator's socket is connect()ed to the
+         * peer, so this goes via send() — sendto() with an address on a
+         * connected UDP socket is rejected with EISCONN on macOS/BSD. */
         unsigned char init_msg[CHANNEL_INIT_LEN];
         int init_len = norn_session_build_init(session, init_msg, sizeof(init_msg));
         if (init_len < 0) return -1;
-        
-        struct sockaddr_in addr;
-        memset(&addr, 0, sizeof(addr));
-        addr.sin_family = AF_INET;
-        addr.sin_addr.s_addr = session->peer_ip;
-        addr.sin_port = session->peer_port;
-        
-        ssize_t sent = sendto(session->fd, init_msg, init_len, 0,
-                              (struct sockaddr *)&addr, sizeof(addr));
+
+        ssize_t sent = session_dgram_send(session, init_msg, (size_t)init_len);
         if (sent != init_len) return -1;
         
         session->hs_state = HS_INIT_SENT;
