@@ -143,6 +143,25 @@ impl Cluster {
         rc(unsafe { sys::norn_cluster_kv_del(self.raw, key.as_ptr(), key.len()) })
     }
 
+    /// Propose a compare-and-set: set `key` to `val` iff its current value equals
+    /// `expect` (an empty `expect` matches an absent key). The condition is
+    /// evaluated on apply by every replica, so it is linearizable — the basis for
+    /// single-owner claims. Returns `Ok` if accepted (proposed/forwarded); the
+    /// claim's *success* is observed by reading the key back after it commits.
+    pub fn cas(&mut self, key: &[u8], expect: &[u8], val: &[u8]) -> Result<(), Error> {
+        rc(unsafe {
+            sys::norn_cluster_kv_cas(
+                self.raw,
+                key.as_ptr(),
+                key.len(),
+                expect.as_ptr(),
+                expect.len(),
+                val.as_ptr(),
+                val.len(),
+            )
+        })
+    }
+
     /// Local read of the replicated map. Returns the value, or `None` if absent.
     pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
         // First sizing call with a generous buffer; the C API returns the length
@@ -266,6 +285,42 @@ mod tests {
             cl.tick(t);
         }
         assert!(cl.get(b"greet").is_none());
+    }
+
+    #[test]
+    fn cas_claims_a_key_for_exactly_one_owner() {
+        let pk = [9u8; PUBKEY_BYTES];
+        let mut cl = Cluster::new(&pk, NodeClass::Server, |_, _| {}).unwrap();
+        let mut t = 0u64;
+        for _ in 0..200 {
+            t += 20;
+            cl.tick(t);
+            if cl.is_leader() {
+                break;
+            }
+        }
+        assert!(cl.is_leader());
+        // claim an absent key (expect empty) → wins.
+        cl.cas(b"claim", b"", b"node-1").unwrap();
+        for _ in 0..40 {
+            t += 20;
+            cl.tick(t);
+        }
+        assert_eq!(cl.get(b"claim").as_deref(), Some(&b"node-1"[..]));
+        // a contender expecting "absent" loses (no-op).
+        cl.cas(b"claim", b"", b"node-2").unwrap();
+        for _ in 0..40 {
+            t += 20;
+            cl.tick(t);
+        }
+        assert_eq!(cl.get(b"claim").as_deref(), Some(&b"node-1"[..]));
+        // matching expectation hands it off.
+        cl.cas(b"claim", b"node-1", b"node-2").unwrap();
+        for _ in 0..40 {
+            t += 20;
+            cl.tick(t);
+        }
+        assert_eq!(cl.get(b"claim").as_deref(), Some(&b"node-2"[..]));
     }
 
     #[test]

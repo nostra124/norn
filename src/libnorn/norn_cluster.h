@@ -101,6 +101,14 @@ int norn_cluster_kv_put(norn_cluster_t *cl, const unsigned char *key, size_t kle
                         const unsigned char *val, size_t vlen);
 /** Propose a DEL (same routing as put). */
 int norn_cluster_kv_del(norn_cluster_t *cl, const unsigned char *key, size_t klen);
+/** Propose a compare-and-set: set `key` to `val` iff its current value equals
+ *  `expect` (an absent key matches an empty `expect`). Same leader-routing as
+ *  put. Returns 0 if accepted (proposed/forwarded), -1 on error/no leader. The
+ *  conditional check is evaluated on apply by every replica, so the outcome is
+ *  linearizable — the basis for single-owner claims. */
+int norn_cluster_kv_cas(norn_cluster_t *cl, const unsigned char *key, size_t klen,
+                        const unsigned char *expect, size_t elen,
+                        const unsigned char *val, size_t vlen);
 /** Local read of the replicated map. Returns value length or -1. */
 int norn_cluster_kv_get(norn_cluster_t *cl, const unsigned char *key, size_t klen,
                         unsigned char *out, size_t cap);
