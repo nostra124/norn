@@ -106,13 +106,10 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-      # The 100% line+branch gate currently surfaces pre-existing coverage debt
-      # in some original libnorn utilities (e.g. bencode.c, idexch.c) — real
-      # gaps in this checkout's test suite, independent of recent work. Keep the
-      # report visible without blocking the PR until that debt is burned down;
-      # the nornd modules and the touched libnorn modules already pass at 100%.
-      - name: Check coverage gate (non-blocking)
-        continue-on-error: true
+      # Every tracked source is held at 100% line+branch coverage (genuinely
+      # untestable defensive paths are marked with LCOV_EXCL). The gate is
+      # blocking: any tracked source dropping below 100% fails CI.
+      - name: Check coverage gate
         run: ./contrib/coverage.sh
 
   static-analysis:

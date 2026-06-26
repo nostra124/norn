@@ -132,6 +132,14 @@ static void test_streammux_edges(void) {
     streammux_finish(m, 6, 0);
     assert(streammux_count(m) == 2);
 
+    /* cfind on an OPEN id (ls != NULL → ternary true arm) vs a different id while
+     * other slots are used (cfind: used && sid!=sid → right arm false → miss) */
+    assert(streammux_peer_finished(m, 5) == 0);   /* open, no FIN seen yet */
+    assert(streammux_send_done(m, 5) == 0);        /* open, nothing finished/sent */
+    assert(streammux_peer_finished(m, 77) == 1);   /* miss past used slots → sentinel */
+    assert(streammux_send_done(m, 77) == 1);
+    assert(streammux_readable(m, 77) == 0);        /* same used&&sid!=sid miss in readable */
+
     /* fill the table (STREAMMUX_MAX), then one more open fails cleanly */
     for (int i = 100; streammux_count(m) < STREAMMUX_MAX; i++) streammux_open(m, (uint16_t)i);
     assert(streammux_count(m) == STREAMMUX_MAX);

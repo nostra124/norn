@@ -48,7 +48,7 @@ int kad_update_node(kad_state_t *state, const unsigned char *id, uint32_t ip, ui
     if (!state || !id) return -1;
     
     int bucket_idx = kad_get_bucket_index(state, id);
-    if (bucket_idx < 0 || bucket_idx >= MAX_BUCKETS) return -1;
+    if (bucket_idx < 0 || bucket_idx >= MAX_BUCKETS) return -1;  /* LCOV_EXCL_BR_LINE: state/id already non-NULL, so kad_get_bucket_index always returns 0..MAX_BUCKETS-1 */
     
     k_bucket_t *bucket = &state->buckets[bucket_idx];
     
