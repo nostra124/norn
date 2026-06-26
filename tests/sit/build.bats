@@ -63,7 +63,7 @@ teardown() {
     make install
     
     run "$WORK_DIR/install/bin/norn" --help
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 0 ]   # --help is a successful invocation
     [[ "$output" == *"Usage"* ]]
     [[ "$output" == *"Commands"* ]]
 }
@@ -86,8 +86,10 @@ teardown() {
     make install
     
     [ -f "$WORK_DIR/install/lib/pkgconfig/norn.pc" ]
-    
-    run pkg-config --cflags norn --define-variable=prefix="$WORK_DIR/install"
+
+    # The .pc lives under the test prefix, so point pkg-config at it.
+    PKG_CONFIG_PATH="$WORK_DIR/install/lib/pkgconfig" \
+        run pkg-config --cflags norn
     [ "$status" -eq 0 ]
 }
 
