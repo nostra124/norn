@@ -40,6 +40,7 @@ static void usage(FILE *out) {
     fprintf(out, "  cluster <sub> ...   Talk to nornd's cluster KV store:\n");
     fprintf(out, "                        put|get|del|cas|watch|members|leader|status\n");
     fprintf(out, "  keys <nodeid>       Resolve a peer's SSH + GPG public keys\n");
+    fprintf(out, "  authorized-keys     Print every fleet member's SSH key (authorized_keys)\n");
     fprintf(out, "  version             Print version\n");
     fprintf(out, "\n");
     fprintf(out, "Options:\n");
@@ -593,8 +594,13 @@ int main(int argc, char **argv) {
         return nornd_cli_cluster(argc - optind - 1, argv + optind + 1);
     } else if (strcmp(cmd, "keys") == 0) {
         return nornd_cli_keys(argc - optind - 1, argv + optind + 1);
+    } else if (strcmp(cmd, "authorized-keys") == 0) {
+        /* Enumerate every fleet member's published SSH key as an
+         * authorized_keys file. Reuses the cluster IPC client (op "authkeys"). */
+        char *av[] = {(char *)"authkeys"};
+        return nornd_cli_cluster(1, av);
     }
-    
+
     fprintf(stderr, "ERROR: Unknown command: %s\n", cmd);
     usage(stderr);
     return 1;

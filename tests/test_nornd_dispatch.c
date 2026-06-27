@@ -64,8 +64,32 @@ static int fk_members(void *c, unsigned char out[][NORND_PUBKEY], int max) {
     return n;
 }
 
+/* Emits a sequence that exercises every arm of the authkeys visitor: an
+ * oversized ssh value (size guard), a non-ssh key (suffix check), and
+ * NORND_IPC_MAX_ITEMS+1 valid ssh entries (table fills, the last is dropped). */
+static int fk_scan(void *c, const unsigned char *prefix, size_t plen,
+                   norn_kv_visit_fn fn, void *ud) {
+    (void)c;
+    (void)prefix;
+    (void)plen;
+    unsigned char big[NORND_IPC_MAX_ITEM + 1];
+    memset(big, 'x', sizeof(big));
+    fn(ud, (const unsigned char *)"peer/o/ssh", 10, big, sizeof(big)); /* oversize */
+    fn(ud, (const unsigned char *)"peer/g/gpg", 10,
+       (const unsigned char *)"x", 1); /* non-ssh */
+    fn(ud, (const unsigned char *)"k", 1, (const unsigned char *)"x", 1); /* short key */
+    for (int i = 0; i < NORND_IPC_MAX_ITEMS + 1; i++) {
+        char key[32], val[24];
+        int kn = snprintf(key, sizeof(key), "peer/%d/ssh", i);
+        int vn = snprintf(val, sizeof(val), "ssh-key-%d", i);
+        fn(ud, (const unsigned char *)key, (size_t)kn,
+           (const unsigned char *)val, (size_t)vn);
+    }
+    return NORND_IPC_MAX_ITEMS + 3;
+}
+
 static nornd_backend_t BE = {NULL,     fk_put,       fk_del,    fk_get,
-                             fk_is_leader, fk_leader, fk_members};
+                             fk_is_leader, fk_leader, fk_members, fk_scan};
 
 static nornd_ipc_req_t mkreq(const char *op) {
     nornd_ipc_req_t r;
@@ -247,6 +271,19 @@ static void test_status(void) {
     assert(r.val[1] == 0xAB && r.n_items == 2);
 }
 
+static void test_authkeys(void) {
+    reset_backend();
+    nornd_ipc_resp_t r;
+    nornd_ipc_req_t q = mkreq("authkeys");
+    nornd_dispatch(&BE, &q, &r);
+    /* Oversize and non-ssh entries are skipped; the table fills at the cap
+     * and the surplus valid entry is dropped. */
+    assert(r.ok);
+    assert(r.n_items == NORND_IPC_MAX_ITEMS);
+    assert(r.items[0].len == strlen("ssh-key-0"));
+    assert(memcmp(r.items[0].data, "ssh-key-0", r.items[0].len) == 0);
+}
+
 static void test_watch_and_unknown(void) {
     reset_backend();
     nornd_ipc_resp_t r;
@@ -265,6 +302,7 @@ int main(void) {
     test_members();
     test_leader();
     test_status();
+    test_authkeys();
     test_watch_and_unknown();
     printf("all nornd dispatch tests passed\n");
     return 0;

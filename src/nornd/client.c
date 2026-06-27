@@ -80,7 +80,7 @@ int nornd_client_build_req(int argc, char **argv, nornd_ipc_req_t *req,
         return 0;
     }
     if (strcmp(sub, "members") == 0 || strcmp(sub, "leader") == 0 ||
-        strcmp(sub, "status") == 0) {
+        strcmp(sub, "status") == 0 || strcmp(sub, "authkeys") == 0) {
         strcpy(req->op, sub);
         return 0;
     }
@@ -129,6 +129,12 @@ int nornd_client_format(const nornd_ipc_req_t *req, const nornd_ipc_resp_t *resp
     } else if (strcmp(op, "members") == 0) {
         for (int i = 0; i < resp->n_items; i++) {
             put_hex(&s, resp->items[i].data, resp->items[i].len);
+            put_cstr(&s, "\n");
+        }
+    } else if (strcmp(op, "authkeys") == 0) {
+        /* Each item is a verbatim authorized_keys line (ssh-ed25519 …). */
+        for (int i = 0; i < resp->n_items; i++) {
+            put_bytes(&s, resp->items[i].data, resp->items[i].len);
             put_cstr(&s, "\n");
         }
     } else if (strcmp(op, "status") == 0) {
