@@ -85,6 +85,18 @@ int norn_kv_get(const norn_kv_t *kv, const unsigned char *key, size_t klen,
 /** Number of keys currently stored. */
 int norn_kv_count(const norn_kv_t *kv);
 
+/**
+ * Visit callback for norn_kv_foreach. The `key`/`val` pointers are valid only
+ * for the duration of the call.
+ */
+typedef void (*norn_kv_visit_fn)(void *ud, const unsigned char *key, size_t klen,
+                                 const unsigned char *val, size_t vlen);
+/** Visit every stored key whose key starts with `prefix` (an empty prefix
+ *  matches all), in arbitrary order. Returns the number visited, or -1 on bad
+ *  args. A read-only scan — it fires no watches and mutates nothing. */
+int norn_kv_foreach(const norn_kv_t *kv, const unsigned char *prefix, size_t plen,
+                    norn_kv_visit_fn fn, void *ud);
+
 /* === Watches === */
 
 /** Register a prefix watch. An empty prefix matches all keys. Returns 0 on
