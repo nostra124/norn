@@ -13,6 +13,7 @@
  * remaining integration seam — cluster_send() is where it plugs in.
  */
 
+#include "agent.h"
 #include "dispatch.h"
 #include "identity.h"
 #include "ipc.h"
@@ -48,6 +49,77 @@ static uint64_t now_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000;
+}
+
+/* ---- ssh-agent signer (FEAT-028) ----
+ *
+ * When the identity key lives in ssh-agent, the node's public key still comes
+ * from the `<identity>.pub` line, but signing is delegated to the agent over
+ * $SSH_AUTH_SOCK so the secret never enters this process. The signer is
+ * installed via norn_set_signer; a fresh agent connection is made per signature
+ * (handshakes are infrequent), keeping the agent protocol strictly
+ * request/response. */
+typedef struct {
+    unsigned char pub[32];
+} agent_signer_t;
+
+static int connect_unix(const char *path) {
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0) return -1;
+    struct sockaddr_un sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sun_family = AF_UNIX;
+    if (strlen(path) >= sizeof(sa.sun_path)) {
+        close(fd);
+        return -1;
+    }
+    strcpy(sa.sun_path, path);
+    if (connect(fd, (struct sockaddr *)&sa, sizeof(sa)) != 0) {
+        close(fd);
+        return -1;
+    }
+    return fd;
+}
+
+static int agent_io_write(void *c, const unsigned char *b, size_t n) {
+    int fd = *(int *)c;
+    size_t off = 0;
+    while (off < n) {
+        ssize_t w = write(fd, b + off, n - off);
+        if (w < 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        }
+        off += (size_t)w;
+    }
+    return 0;
+}
+static int agent_io_read(void *c, unsigned char *b, size_t n) {
+    int fd = *(int *)c;
+    size_t off = 0;
+    while (off < n) {
+        ssize_t r = read(fd, b + off, n - off);
+        if (r == 0) return -1; /* EOF before the full reply */
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        }
+        off += (size_t)r;
+    }
+    return 0;
+}
+
+static int agent_sign_cb(void *ud, unsigned char sig[64], const unsigned char *msg,
+                         size_t msglen) {
+    agent_signer_t *a = ud;
+    const char *sock = getenv("SSH_AUTH_SOCK");
+    if (!sock || !sock[0]) return -1;
+    int fd = connect_unix(sock);
+    if (fd < 0) return -1;
+    nornd_agent_io_t io = {&fd, agent_io_write, agent_io_read};
+    int rc = nornd_agent_sign_io(&io, a->pub, msg, msglen, sig);
+    close(fd);
+    return rc;
 }
 
 /* ---- cluster <-> backend glue ---- */
@@ -182,10 +254,13 @@ int main(int argc, char **argv) {
     nornd_peer_t peers[RAFT_MAX_NODES];
     int n_peers = 0;
     uint16_t listen_port = 0;
+    int use_agent = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--identity") == 0 && i + 1 < argc)
             idpath = argv[++i];
+        else if (strcmp(argv[i], "--agent") == 0)
+            use_agent = 1; /* sign handshakes via ssh-agent (FEAT-028) */
         else if (strcmp(argv[i], "--socket") == 0 && i + 1 < argc)
             sockpath = argv[++i];
         else if (strcmp(argv[i], "--class") == 0 && i + 1 < argc)
@@ -206,11 +281,13 @@ int main(int argc, char **argv) {
             n_peers++;
         } else {
             fprintf(stderr,
-                    "usage: nornd [--identity PATH] [--socket PATH] "
+                    "usage: nornd [--identity PATH] [--agent] [--socket PATH] "
                     "[--class server|workstation|laptop|mobile]\n"
                     "             [--data-dir PATH] [--foreground] "
                     "[--listen-port PORT]\n"
-                    "             [--peer <64-hex-pubkey>[@host:port]] ...\n");
+                    "             [--peer <64-hex-pubkey>[@host:port]] ...\n"
+                    "  --agent  take the node public key from <identity>.pub and "
+                    "sign via ssh-agent\n");
             return 2;
         }
     }
@@ -219,7 +296,34 @@ int main(int argc, char **argv) {
 
     keypair_t kp;
     char err[128];
-    if (nornd_identity_load_file(idpath, &kp, err, sizeof(err)) != 0) {
+    agent_signer_t agentsig;
+    memset(&agentsig, 0, sizeof(agentsig));
+    if (use_agent) {
+        /* Identity public key from `<idpath>.pub`; the secret stays in the agent.
+         * `kp.secret_key` is a placeholder — agent_sign_cb does all signing. */
+        char pubpath[640];
+        char line[512];
+        size_t ln = 0;
+        snprintf(pubpath, sizeof(pubpath), "%s.pub", idpath);
+        FILE *pf = fopen(pubpath, "rb");
+        if (pf) {
+            ln = fread(line, 1, sizeof(line) - 1, pf);
+            fclose(pf);
+        }
+        if (!pf ||
+            nornd_identity_parse_pubkey_line(line, ln, agentsig.pub) != 0) {
+            fprintf(stderr,
+                    "nornd: --agent needs %s with an ssh-ed25519 public key\n",
+                    pubpath);
+            return 1;
+        }
+        if (!getenv("SSH_AUTH_SOCK")) {
+            fprintf(stderr, "nornd: --agent set but SSH_AUTH_SOCK is unset\n");
+            return 1;
+        }
+        memcpy(kp.public_key, agentsig.pub, 32);
+        memset(kp.secret_key, 0, sizeof(kp.secret_key));
+    } else if (nornd_identity_load_file(idpath, &kp, err, sizeof(err)) != 0) {
         fprintf(stderr, "nornd: identity %s: %s\n", idpath, err);
         return 1;
     }
@@ -232,6 +336,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "nornd: failed to create norn client\n");
         return 1;
     }
+    /* Route handshake signing through ssh-agent when so configured. */
+    if (use_agent) norn_set_signer(client, agent_sign_cb, &agentsig);
 
     /* Multi-node frame transport over norn sessions (single-node: no peers). */
     nornd_transport_t *xport =
