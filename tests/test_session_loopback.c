@@ -43,6 +43,14 @@ static void connect_to(int fd, uint16_t port) {
     assert(connect(fd, (struct sockaddr *)&a, sizeof(a)) == 0);
 }
 
+/* External handshake signer (ssh-agent stand-in): signs with the raw key in ud.
+ * Proves the session layer authenticates via norn_session_set_signer without the
+ * secret living in session->self_secret. */
+static int ext_signer(void *ud, unsigned char sig[64], const unsigned char *msg,
+                      size_t msglen) {
+    return bf_sign(sig, msg, msglen, (const unsigned char *)ud);
+}
+
 static norn_stream_t *g_accepted;
 static void on_accept(norn_stream_t *s, void *ud) {
     (void)ud;
@@ -132,6 +140,43 @@ int main(void) {
     int rn = norn_stream_read(g_accepted, got, sizeof(got));
     assert(rn == (int)strlen(msg));
     assert(memcmp(got, msg, (size_t)rn) == 0);
+
+    /* FEAT-028: the same 3-message handshake authenticated through an external
+     * signer (the secret never enters session->self_secret). Both ends install a
+     * signer over a *placeholder* secret-in-self_secret and a real key via the
+     * signer; the handshake must still establish and bind true identities. */
+    {
+        norn_session_t *c = norn_session_new(client, NULL);
+        norn_session_t *d = norn_session_new(client, NULL);
+        assert(c && d);
+        c->is_initiator = 1;
+        d->is_initiator = 0;
+        c->state = NORN_SESSION_CONNECTING;
+        d->state = NORN_SESSION_CONNECTING;
+        /* self_secret left zeroed; only the public key + signer are real. */
+        unsigned char zero[64];
+        memset(zero, 0, sizeof(zero));
+        assert(norn_session_set_identity(c, ka.public_key, zero) == 0);
+        assert(norn_session_set_identity(d, kb.public_key, zero) == 0);
+        norn_session_set_signer(c, ext_signer, ka.secret_key);
+        norn_session_set_signer(d, ext_signer, kb.secret_key);
+
+        unsigned char i2[512], r2[512], c2[512];
+        int il2 = norn_session_build_init(c, i2, sizeof(i2));
+        assert(il2 > 0);
+        int rl2 = norn_session_accept_init(d, i2, (size_t)il2, r2, sizeof(r2));
+        assert(rl2 > 0);
+        int cl2 = norn_session_confirm_resp(c, r2, (size_t)rl2, c2, sizeof(c2));
+        assert(cl2 > 0);
+        assert(norn_session_finish_confirm(d, c2, (size_t)cl2) == 0);
+        assert(d->state == NORN_SESSION_ESTABLISHED);
+        /* each side authenticated the other's true identity via the signer */
+        unsigned char seen[64];
+        assert(norn_session_get_peer(d, seen) == 0);
+        assert(memcmp(seen, ka.public_key, 32) == 0);
+        norn_session_free(c);
+        norn_session_free(d);
+    }
 
     norn_session_free(a);
     norn_session_free(b);

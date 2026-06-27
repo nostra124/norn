@@ -35,6 +35,8 @@ struct norn_client {
     norn_transaction_state_t txn;
     unsigned char self_pub[NORN_PUBKEY_BYTES];
     unsigned char self_sec[NORN_SECRETKEY_BYTES];
+    norn_sign_fn signer;      /* external handshake signer, or NULL (FEAT-028) */
+    void *signer_ud;
     norn_config_t cfg;
     int initialized;
     
