@@ -145,7 +145,7 @@ seams remain:
 | Ticket | Remaining work | Status |
 |--------|----------------|--------|
 | FEAT-028 | ssh-agent signer (file parser already done) | open |
-| FEAT-030 | `watch` event stream + `bep44` verb namespacing | open |
+| FEAT-030 | `watch` event stream + `bep44` verb namespacing | done |
 | FEAT-031 | `authorized-keys` enumeration (needs KV prefix-scan) | open |
 | FEAT-033 | Node-served KV: file-backed store + peer dial transport (stream codec done) | open |
 
@@ -222,7 +222,7 @@ v0.12.0 (nornd + norn IPC CLI) [core done; tails open]
 ├── FEAT-027: IPC bencode codec [done]
 ├── FEAT-028: SSH identity [file done / agent open]
 ├── FEAT-029: nornd daemon [done: single + multi-node]
-├── FEAT-030: norn CLI client [cluster/keys done / watch+bep44 open]
+├── FEAT-030: norn CLI client [cluster/keys done / watch+bep44 done]
 ├── FEAT-031: fleet key directory [done / authorized-keys open]
 ├── FEAT-033: node-served KV [stream codec done / file store + dial open]
 └── FEAT-032: packaging (svc units) [done]

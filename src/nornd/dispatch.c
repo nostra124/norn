@@ -140,3 +140,25 @@ void nornd_dispatch(const nornd_backend_t *be, const nornd_ipc_req_t *req,
     }
     fail(resp, "unknown op");
 }
+
+void nornd_watch_event(nornd_ipc_resp_t *resp, norn_kv_event_t ev,
+                       const unsigned char *key, size_t klen,
+                       const unsigned char *val, size_t vlen) {
+    memset(resp, 0, sizeof(*resp));
+    resp->ok = 1;
+    const char *kind = ev == NORN_KV_EV_DEL ? "del" : "put";
+    size_t kl = strlen(kind);
+    memcpy(resp->items[0].data, kind, kl);
+    resp->items[0].len = kl;
+    if (klen > NORND_IPC_MAX_ITEM) klen = NORND_IPC_MAX_ITEM;
+    memcpy(resp->items[1].data, key, klen);
+    resp->items[1].len = klen;
+    resp->n_items = 2;
+    /* DEL carries no value; a PUT value that would overflow the field is
+     * dropped (the watcher still learns the key changed). */
+    if (ev == NORN_KV_EV_PUT && vlen <= NORND_IPC_MAX_VAL) {
+        memcpy(resp->val, val, vlen);
+        resp->vlen = vlen;
+        resp->has_val = 1;
+    }
+}
