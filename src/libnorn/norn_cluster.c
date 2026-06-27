@@ -389,6 +389,12 @@ int norn_cluster_kv_watch(norn_cluster_t *cl, const unsigned char *prefix, size_
     return norn_kv_watch(cl->kv, prefix, plen, fn, ud);
 }
 
+int norn_cluster_kv_scan(norn_cluster_t *cl, const unsigned char *prefix, size_t plen,
+                         norn_kv_scan_fn fn, void *ud) {
+    if (!cl) return -1;
+    return norn_kv_scan(cl->kv, prefix, plen, fn, ud);
+}
+
 /* ---- introspection ---- */
 
 int norn_cluster_is_leader(const norn_cluster_t *cl) {

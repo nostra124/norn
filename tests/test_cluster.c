@@ -519,6 +519,40 @@ static void test_arg_corners(void) {
     norn_cluster_free(cl);
 }
 
+static int g_scan_hits;
+static void on_scan(void *ud, const unsigned char *key, size_t klen,
+                    const unsigned char *val, size_t vlen) {
+    (void)ud; (void)key; (void)klen; (void)val; (void)vlen;
+    g_scan_hits++;
+}
+
+static void test_kv_scan(void) {
+    norn_node_class_t cls[] = {NORN_NODE_SERVER, NORN_NODE_SERVER, NORN_NODE_SERVER};
+    cluster(3, cls);
+    steps(60);
+    cnode_t *l = leader();
+    norn_cluster_kv_put(l->cl, (const unsigned char *)"peer/aa/ssh", 11,
+                        (const unsigned char *)"1", 1);
+    norn_cluster_kv_put(l->cl, (const unsigned char *)"peer/bb/ssh", 11,
+                        (const unsigned char *)"2", 1);
+    norn_cluster_kv_put(l->cl, (const unsigned char *)"misc", 4,
+                        (const unsigned char *)"3", 1);
+    steps(30);
+
+    g_scan_hits = 0;
+    assert(norn_cluster_kv_scan(l->cl, (const unsigned char *)"peer/", 5,
+                                on_scan, NULL) == 2);
+    assert(g_scan_hits == 2);
+
+    /* empty prefix enumerates everything applied */
+    assert(norn_cluster_kv_scan(l->cl, NULL, 0, on_scan, NULL) == 3);
+
+    /* bad args */
+    assert(norn_cluster_kv_scan(NULL, (const unsigned char *)"p", 1, on_scan, NULL) == -1);
+
+    cluster_free();
+}
+
 int main(void) {
     test_elect_and_replicate();
     test_cas();
@@ -529,6 +563,7 @@ int main(void) {
     test_bootstrap_helper();
     test_config_defaults_and_eligibility();
     test_watch();
+    test_kv_scan();
     test_input_robustness();
     test_null_paths();
     test_codec_robustness();
