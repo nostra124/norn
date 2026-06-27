@@ -76,3 +76,13 @@ for (int i = 0; i < n; i++) norn_cluster_add_member(cl, keys[i], NORN_NODE_SERVE
 | Bootstrap | public routers | your `boot_*` nodes |
 | Announces on mainline | yes | **no** |
 | Use for | open apps, wide reach | closed fleets, packs/clans |
+
+## Verification
+
+`tests/test_overlay_net.c` forms a 3-node private overlay over loopback (no
+public DHT) from a single bootstrap node and checks that the fleet converges,
+that members resolve each other by their pubkey-derived DHT ids, and that every
+routing table stays fleet-only (public routers are never contacted under
+`private_mode`). The remaining acceptance — a NAT'd member reachable via
+rendezvous/relay *inside* the overlay — rides FEAT-022 (open) and is a real
+network (PIT) check.
