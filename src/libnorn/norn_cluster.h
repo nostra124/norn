@@ -115,6 +115,10 @@ int norn_cluster_kv_get(norn_cluster_t *cl, const unsigned char *key, size_t kle
 /** Register a prefix watch on applied changes. */
 int norn_cluster_kv_watch(norn_cluster_t *cl, const unsigned char *prefix, size_t plen,
                           norn_kv_watch_fn fn, void *ud);
+/** Visit every key with the given prefix (empty = all) in the local replica.
+ *  Read-only scan. Returns the number visited, or -1 on error. */
+int norn_cluster_kv_list(const norn_cluster_t *cl, const unsigned char *prefix, size_t plen,
+                         norn_kv_visit_fn fn, void *ud);
 
 /* === Introspection === */
 

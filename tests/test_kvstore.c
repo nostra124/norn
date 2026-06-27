@@ -331,8 +331,51 @@ static void test_branch_corners(void) {
     norn_kv_free(kv);
 }
 
+struct visited {
+    int n;
+};
+static void count_visit(void *ud, const unsigned char *key, size_t klen,
+                        const unsigned char *val, size_t vlen) {
+    (void)key;
+    (void)klen;
+    (void)val;
+    (void)vlen;
+    ((struct visited *)ud)->n++;
+}
+
+static void test_foreach(void) {
+    norn_kv_t *kv = norn_kv_new(8); /* leaves unused slots → exercises the skip */
+    assert(put(kv, "a", "1") == 1);
+    assert(put(kv, "ab", "2") == 1);
+    assert(put(kv, "b", "3") == 1);
+
+    struct visited v;
+    v.n = 0;
+    assert(norn_kv_foreach(kv, NULL, 0, count_visit, &v) == 3); /* empty prefix → all */
+    assert(v.n == 3);
+    v.n = 0;
+    assert(norn_kv_foreach(kv, U("a"), 1, count_visit, &v) == 2); /* a, ab; "b" mismatch skipped */
+    assert(v.n == 2);
+    v.n = 0;
+    assert(norn_kv_foreach(kv, U("ab"), 2, count_visit, &v) == 1); /* ab; "a"/"b" klen<plen skipped */
+    assert(v.n == 1);
+    v.n = 0;
+    assert(norn_kv_foreach(kv, U("z"), 1, count_visit, &v) == 0); /* no match */
+    assert(v.n == 0);
+
+    /* bad args */
+    unsigned char bigp[NORN_KV_MAX_KEY + 1];
+    memset(bigp, 'x', sizeof(bigp));
+    assert(norn_kv_foreach(NULL, U("a"), 1, count_visit, &v) == -1);
+    assert(norn_kv_foreach(kv, U("a"), 1, NULL, &v) == -1);
+    assert(norn_kv_foreach(kv, bigp, sizeof(bigp), count_visit, &v) == -1);
+    assert(norn_kv_foreach(kv, NULL, 1, count_visit, &v) == -1); /* plen && !prefix */
+    norn_kv_free(kv);
+}
+
 int main(void) {
     test_put_get_del();
+    test_foreach();
     test_cas();
     test_watches();
     test_snapshot_restore();

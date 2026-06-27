@@ -123,6 +123,15 @@ static int kv_is(norn_cluster_t *cl, const char *k, const char *v) {
     return n == (int)strlen(v) && memcmp(out, v, n) == 0;
 }
 
+static void count_visit(void *ud, const unsigned char *key, size_t klen,
+                        const unsigned char *val, size_t vlen) {
+    (void)key;
+    (void)klen;
+    (void)val;
+    (void)vlen;
+    (*(int *)ud)++;
+}
+
 /* ---- tests ---- */
 
 static void test_elect_and_replicate(void) {
@@ -139,6 +148,12 @@ static void test_elect_and_replicate(void) {
     steps(20);
     for (int i = 0; i < g_n; i++)
         assert(kv_is(g_nodes[i].cl, "k", "v1"));
+
+    /* prefix list sees the replicated key on every node. */
+    int seen = 0;
+    assert(norn_cluster_kv_list(g_nodes[1].cl, (const unsigned char *)"k", 1,
+                                count_visit, &seen) == 1);
+    assert(seen == 1);
 
     /* delete replicates too */
     assert(norn_cluster_kv_del(l->cl, (const unsigned char *)"k", 1) == 0);
@@ -365,6 +380,7 @@ static void test_null_paths(void) {
     assert(norn_cluster_kv_put(NULL, pub, 1, pub, 1) == -1);
     assert(norn_cluster_kv_del(NULL, pub, 1) == -1);
     assert(norn_cluster_kv_cas(NULL, pub, 1, pub, 1, pub, 1) == -1);
+    assert(norn_cluster_kv_list(NULL, pub, 1, count_visit, NULL) == -1);
     assert(norn_cluster_kv_get(NULL, pub, 1, NULL, 0) == -1);
     assert(norn_cluster_kv_watch(NULL, pub, 1, on_change, NULL) == -1);
     assert(norn_cluster_is_leader(NULL) == 0);
