@@ -60,19 +60,20 @@
 | FEAT-014 | Parameterise Kademlia ID width | high | FEAT-013 | done |
 | FEAT-015 | De-application-ise idexch | high | FEAT-013 | done |
 
-### 🟡 v0.8.0 — Dial & Session Orchestration
-**Status:** CORE DONE (2026-06-24) — **two optional tails open (see Catch-up Backlog)**
+### 🟢 v0.8.0 — Dial & Session Orchestration
+**Status:** CORE DONE (2026-06-24) — optional tails **deferred post-1.0**
 
 | Ticket | Description | Priority | Depends On | Status |
 |--------|-------------|----------|-----------|--------|
 | FEAT-016 | norn_dial(pubkey) → session | high | FEAT-013, FEAT-015 | done |
-| FEAT-017 | Harmonised NAT traversal | high | FEAT-013, FEAT-016 | **partial** |
-| FEAT-021 | UPnP/NAT-PMP automatic port forwarding | low | FEAT-017 | **open (optional)** |
-| FEAT-022 | Multi-hop relay path integration | low | FEAT-017 | **open (optional)** |
+| FEAT-017 | Harmonised NAT traversal | high | FEAT-013, FEAT-016 | core done (hole-punch) |
+| FEAT-021 | UPnP/NAT-PMP automatic port forwarding | low | FEAT-017 | **deferred → post-1.0** |
+| FEAT-022 | Multi-hop relay path integration | low | FEAT-017 | **deferred → post-1.0** |
 
-Core dial + hole-punch are complete. FEAT-021/022 are optional enhancements for
-restrictive NATs; they remain open and are tracked in the Catch-up Backlog so the
-milestone is honestly "core done, tails open" rather than silently complete.
+Core dial + rendezvous hole-punch (FEAT-023) are complete. FEAT-021/022 are
+optional NAT-traversal enhancements for restrictive networks and are **formally
+deferred past 1.0** (see Catch-up Backlog) — they need real router / multi-hop
+topology and are PIT-only, so they don't gate 1.0.
 
 ### ✅ v0.9.0 — Tunnel & Bindings
 **Status:** DONE — norn-forward (client+server) + Rust crate (PIT for live two-peer round-trips)
@@ -118,14 +119,24 @@ member reachable via in-fleet rendezvous/relay; zero public-DHT traffic;
 `docs/PRIVATE-OVERLAY.md`. Network validation via PIT. (See
 `.repo/project/issues/MILESTONE-0.10.0.md`.)
 
-### 2. v0.8.0 optional tails
+### 2. v0.8.0 optional tails — **DECISION: deferred to post-1.0**
 | Ticket | Description | Status |
 |--------|-------------|--------|
-| FEAT-021 | UPnP/NAT-PMP automatic port forwarding | open (optional) |
-| FEAT-022 | Multi-hop relay path integration | open (optional) |
+| FEAT-021 | UPnP/NAT-PMP automatic port forwarding | **deferred → post-1.0** |
+| FEAT-022 | Multi-hop relay path integration | **deferred → post-1.0** |
 
-Decide explicitly per ticket: **implement** or **formally defer past 1.0**. Do
-not leave them implicitly half-open.
+Both are optional NAT-traversal **enhancements**, not 1.0 blockers — core
+traversal (rendezvous hole-punch, FEAT-023) already works. They also can't be
+verified deterministically by the unit/CI methodology: FEAT-021 requires a real
+UPnP/NAT-PMP gateway, and FEAT-022 requires real multi-hop relay topology (both
+PIT-only). To keep the march to the stabilization gates honest rather than ship
+untestable router/multi-hop code, both are **formally deferred past 1.0** (no
+longer half-open). Tracked in their tickets; revisit after GA.
+
+Consequence: **FEAT-020 acceptance #2** (a NAT'd member reachable via
+rendezvous/relay inside the overlay) depends on FEAT-022 and therefore also
+defers post-1.0. v0.10.0 ships its **acceptance #1** (overlay formation +
+pubkey resolution + no public-DHT pollution, integration-tested) for 1.0.
 
 ### 3. v0.12.0 tails (daemon/CLI seams)
 The pure cores and single- *and* multi-node operation shipped; these network-bound
@@ -189,11 +200,11 @@ v0.7.0 (Crypto Foundation)         [DONE]
 ├── FEAT-014: Kademlia ID width ──┐
 └── FEAT-015: idexch de-app ──────┤
                                   │
-v0.8.0 (Dial & Session)  [CORE DONE; tails open]
+v0.8.0 (Dial & Session)  [CORE DONE; tails deferred post-1.0]
 ├── FEAT-016: norn_dial ──────────┤
 ├── FEAT-017: NAT traversal ──────┤
-├── FEAT-021: UPnP/NAT-PMP  (open) │
-└── FEAT-022: multi-hop relay (open)
+├── FEAT-021: UPnP/NAT-PMP  (deferred post-1.0)
+└── FEAT-022: multi-hop relay (deferred post-1.0)
                                   │
 v0.9.0 (Tunnel & Bindings) [DONE]  │
 ├── FEAT-018: norn-forward ───────┤
@@ -230,15 +241,16 @@ Stabilization -> 1.0
 |--------|-------|
 | Version (VERSION file) | 0.12.0 |
 | Fully-completed milestones | 9 (v0.2.0–v0.7.0, v0.9.0, v0.11.0) |
-| Partially-complete (tails open) | 2 (v0.8.0, v0.12.0) |
-| Skipped — catch-up required | 1 (v0.10.0) |
+| v0.10.0 (acceptance #1) | ✅ done — overlay forms, integration-tested |
+| v0.8.0 tails (FEAT-021/022) | deferred → post-1.0 (optional, PIT-only) |
+| Partially-complete (tails open) | 1 (v0.12.0) |
 | Planned stabilization milestones | 3 (v0.13.0, v0.14.0, v1.0.0) |
 | Coverage (tracked sources) | 100% line+branch, gate blocking |
 
 ### Sequence to 1.0 (do not jump)
-1. **v0.10.0** Private Overlay (FEAT-020) — the skipped milestone
-2. **v0.8.0** tails (FEAT-021/022) — implement or formally defer
-3. **v0.12.0** tails (FEAT-028/030/031/033)
+1. ~~**v0.10.0** Private Overlay (FEAT-020)~~ — ✅ done (acceptance #1; #2 defers with FEAT-022)
+2. ~~**v0.8.0** tails (FEAT-021/022)~~ — **decided: deferred post-1.0** (optional, PIT-only)
+3. **v0.12.0** tails (FEAT-028/030/031/033) ← **next**
 4. **v0.13.0** — Bug Bash (Alpha — capture)
 5. **v0.14.0** — Bug Bash (Beta — fix + harden)
 6. **v1.0.0** — GA
