@@ -119,7 +119,7 @@ dist_systemduser_DATA = contrib/systemd/user/nornd.socket contrib/systemd/user/n
 launchddir = $(prefix)/lib/launchd
 dist_launchd_DATA = contrib/launchd/io.norn.nornd.plist contrib/launchd/io.norn.nornd.user.plist
 
-check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_forward test_raft test_kvstore test_cluster test_overlay test_transport test_transport_udp test_transport_tcp test_idexch test_attr test_net test_suite test_norn_kad test_norn_idexch test_norn_session test_session_loopback test_session_accept test_rendezvous test_relay test_nornd_ipc test_nornd_identity test_nornd_dispatch test_nornd_client test_nornd_keydir test_nornd_served_proto test_nornd_peers
+check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_forward test_raft test_kvstore test_cluster test_overlay test_overlay_net test_transport test_transport_udp test_transport_tcp test_idexch test_attr test_net test_suite test_norn_kad test_norn_idexch test_norn_session test_session_loopback test_session_accept test_rendezvous test_relay test_nornd_ipc test_nornd_identity test_nornd_dispatch test_nornd_client test_nornd_keydir test_nornd_served_proto test_nornd_peers
 
 test_norn_SOURCES = tests/test_norn.c
 test_norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
@@ -220,6 +220,10 @@ test_cluster_LDADD = libnorn.la $(SODIUM_LIBS)
 test_overlay_SOURCES = tests/test_overlay.c
 test_overlay_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_overlay_LDADD = libnorn.la $(SODIUM_LIBS)
+
+test_overlay_net_SOURCES = tests/test_overlay_net.c
+test_overlay_net_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
+test_overlay_net_LDADD = libnorn.la $(SODIUM_LIBS)
 
 test_transport_SOURCES = tests/test_transport.c
 test_transport_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
