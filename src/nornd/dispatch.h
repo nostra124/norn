@@ -13,6 +13,7 @@
 
 #include <stddef.h>
 #include "ipc.h"
+#include "norn_kvstore.h" /* norn_kv_event_t */
 
 #define NORND_PUBKEY 32
 
@@ -42,5 +43,19 @@ typedef struct {
  */
 void nornd_dispatch(const nornd_backend_t *be, const nornd_ipc_req_t *req,
                     nornd_ipc_resp_t *resp);
+
+/**
+ * Build a `watch` event frame for a committed change. The daemon registers a
+ * cluster watch and, on each change matching a client's subscribed prefix,
+ * calls this then encodes/streams `resp` to that client (see client.c for the
+ * text rendering; an empty `resp` with `n_items==0` is the subscription ack).
+ *
+ * Encoding: `items[0]` = kind (`"put"`/`"del"`), `items[1]` = key, and for a
+ * PUT the new value goes in `val`. Over-long key/value are truncated to the
+ * IPC field capacity.
+ */
+void nornd_watch_event(nornd_ipc_resp_t *resp, norn_kv_event_t ev,
+                       const unsigned char *key, size_t klen,
+                       const unsigned char *val, size_t vlen);
 
 #endif /* NORND_DISPATCH_H */
