@@ -331,6 +331,66 @@ static void test_branch_corners(void) {
     norn_kv_free(kv);
 }
 
+/* --- norn_kv_scan --- */
+typedef struct {
+    int n;
+    char last_key[64];
+    char last_val[64];
+} scan_acc_t;
+
+static void scan_cb(void *ud, const unsigned char *key, size_t klen,
+                    const unsigned char *val, size_t vlen) {
+    scan_acc_t *a = ud;
+    a->n++;
+    if (klen < sizeof(a->last_key)) { memcpy(a->last_key, key, klen); a->last_key[klen] = 0; }
+    if (vlen < sizeof(a->last_val)) { memcpy(a->last_val, val, vlen); a->last_val[vlen] = 0; }
+}
+
+static void test_scan(void) {
+    norn_kv_t *kv = norn_kv_new(8); /* cap 8 > entries → unused slots exercise !used */
+    assert(put(kv, "peer/aa/ssh", "k-aa") == 1);
+    assert(put(kv, "peer/bb/ssh", "k-bb") == 1);
+    assert(put(kv, "peer/aa/gpg", "g-aa") == 1);
+    assert(put(kv, "other", "x") == 1);
+    assert(put(kv, "p", "short") == 1); /* short key for the klen<plen branch */
+
+    scan_acc_t a;
+
+    /* prefix matches a subset (matching + non-matching + the klen<plen "p") */
+    memset(&a, 0, sizeof a);
+    assert(norn_kv_scan(kv, U("peer/aa/"), 8, scan_cb, &a) == 2);
+    assert(a.n == 2);
+
+    /* broader prefix */
+    memset(&a, 0, sizeof a);
+    assert(norn_kv_scan(kv, U("peer/"), 5, scan_cb, &a) == 3);
+
+    /* exact single match — also confirms value is delivered */
+    memset(&a, 0, sizeof a);
+    assert(norn_kv_scan(kv, U("peer/bb/ssh"), 11, scan_cb, &a) == 1);
+    assert(strcmp(a.last_key, "peer/bb/ssh") == 0 && strcmp(a.last_val, "k-bb") == 0);
+
+    /* no match: keys of sufficient length but differing (memcmp != 0 branch) */
+    memset(&a, 0, sizeof a);
+    assert(norn_kv_scan(kv, U("zzz"), 3, scan_cb, &a) == 0 && a.n == 0);
+
+    /* prefix longer than a stored key ("p") → that entry's klen < plen */
+    memset(&a, 0, sizeof a);
+    assert(norn_kv_scan(kv, U("pX"), 2, scan_cb, &a) == 0);
+
+    /* empty prefix matches every used entry (plen == 0, prefix NULL ok) */
+    memset(&a, 0, sizeof a);
+    assert(norn_kv_scan(kv, NULL, 0, scan_cb, &a) == 5);
+
+    /* bad args */
+    assert(norn_kv_scan(NULL, U("p"), 1, scan_cb, &a) == -1);
+    assert(norn_kv_scan(kv, U("p"), 1, NULL, &a) == -1);
+    assert(norn_kv_scan(kv, NULL, 1, scan_cb, &a) == -1); /* plen>0, prefix NULL */
+
+    norn_kv_free(kv);
+    printf("  test_scan: OK\n");
+}
+
 int main(void) {
     test_put_get_del();
     test_cas();
@@ -340,6 +400,7 @@ int main(void) {
     test_apply_malformed();
     test_null_and_lifecycle();
     test_branch_corners();
+    test_scan();
     printf("test_kvstore: all passed\n");
     return 0;
 }

@@ -85,6 +85,20 @@ int norn_kv_get(const norn_kv_t *kv, const unsigned char *key, size_t klen,
 /** Number of keys currently stored. */
 int norn_kv_count(const norn_kv_t *kv);
 
+/* === Enumeration === */
+
+/** Callback for norn_kv_scan: invoked once per matching entry. The key/val
+ *  pointers are valid only for the duration of the call. */
+typedef void (*norn_kv_scan_fn)(void *ud, const unsigned char *key, size_t klen,
+                                const unsigned char *val, size_t vlen);
+
+/** Enumerate every key whose leading `plen` bytes equal `prefix` (an empty
+ *  prefix, plen == 0, matches all keys), invoking `fn` for each. Returns the
+ *  number of matches, or -1 on bad args (NULL kv/fn, or NULL prefix with
+ *  plen > 0). Iteration order is unspecified. */
+int norn_kv_scan(const norn_kv_t *kv, const unsigned char *prefix, size_t plen,
+                 norn_kv_scan_fn fn, void *ud);
+
 /* === Watches === */
 
 /** Register a prefix watch. An empty prefix matches all keys. Returns 0 on

@@ -115,6 +115,10 @@ int norn_cluster_kv_get(norn_cluster_t *cl, const unsigned char *key, size_t kle
 /** Register a prefix watch on applied changes. */
 int norn_cluster_kv_watch(norn_cluster_t *cl, const unsigned char *prefix, size_t plen,
                           norn_kv_watch_fn fn, void *ud);
+/** Enumerate replicated keys under `prefix` (empty matches all) — see
+ *  norn_kv_scan. Returns the match count, or -1 on bad args. */
+int norn_cluster_kv_scan(norn_cluster_t *cl, const unsigned char *prefix, size_t plen,
+                         norn_kv_scan_fn fn, void *ud);
 
 /* === Introspection === */
 
