@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h> /* mkdtemp (declared here on macOS/BSD) */
 
 #include "served.h"
 
