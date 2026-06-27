@@ -1,6 +1,16 @@
 # FEAT-021 UPnP/NAT-PMP Automatic Port Forwarding
 
-## Status: INCOMPLETE (API defined, implementation missing)
+## Status: DEFERRED → post-1.0 (decided 2026-06-27)
+
+**Decision:** formally deferred past the 1.0 release. An *optional* NAT-traversal
+enhancement — core traversal (rendezvous hole-punch, FEAT-023) already covers
+1.0. A real implementation drives a live UPnP/NAT-PMP gateway (SSDP M-SEARCH,
+SOAP AddPortMapping, NAT-PMP to :5351), which the unit/CI methodology cannot
+verify (no router in CI) — it is PIT-only. Parked until after GA to keep the
+march to the stabilization gates honest rather than ship untestable router code.
+The `norn_upnp.h` API is reserved; `norn_upnp.c` stubs remain returning -1.
+
+## (original) Status: INCOMPLETE (API defined, implementation missing)
 
 ## Description
 
