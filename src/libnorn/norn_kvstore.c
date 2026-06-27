@@ -216,6 +216,21 @@ int norn_kv_get(const norn_kv_t *kv, const unsigned char *key, size_t klen,
 
 int norn_kv_count(const norn_kv_t *kv) { return kv ? kv->count : -1; }
 
+int norn_kv_foreach(const norn_kv_t *kv, const unsigned char *prefix, size_t plen,
+                    norn_kv_visit_fn fn, void *ud) {
+    if (!kv || !fn || plen > NORN_KV_MAX_KEY) return -1;
+    if (plen && !prefix) return -1;
+    int n = 0;
+    for (int i = 0; i < kv->cap; i++) {
+        const kv_entry_t *e = &kv->entries[i];
+        if (!e->used) continue;
+        if (plen && (e->klen < plen || memcmp(e->key, prefix, plen) != 0)) continue;
+        fn(ud, e->key, e->klen, e->val, e->vlen);
+        n++;
+    }
+    return n;
+}
+
 /* ---- watches ---- */
 
 int norn_kv_watch(norn_kv_t *kv, const unsigned char *prefix, size_t plen,

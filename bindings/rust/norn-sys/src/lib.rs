@@ -113,6 +113,15 @@ pub struct norn_cluster_io_t {
     pub ctx: *mut c_void,
 }
 
+/// Read-only KV visit callback for `norn_cluster_kv_list` / `norn_kv_foreach`.
+pub type norn_kv_visit_fn = unsafe extern "C" fn(
+    ud: *mut c_void,
+    key: *const u8,
+    klen: usize,
+    val: *const u8,
+    vlen: usize,
+);
+
 #[repr(C)]
 pub struct norn_cluster_config_t {
     pub self_class: c_int,
@@ -244,4 +253,11 @@ extern "C" {
     pub fn norn_cluster_member_count(cl: *const norn_cluster) -> c_int;
     pub fn norn_cluster_members(cl: *const norn_cluster, out: *mut u8, max: c_int) -> c_int;
     pub fn norn_cluster_is_voter(cl: *const norn_cluster, pubkey: *const u8) -> c_int;
+    pub fn norn_cluster_kv_list(
+        cl: *const norn_cluster,
+        prefix: *const u8,
+        plen: usize,
+        visit: Option<norn_kv_visit_fn>,
+        ud: *mut c_void,
+    ) -> c_int;
 }
