@@ -1,6 +1,20 @@
 # FEAT-022 Multi-Hop Relay Paths
 
-## Status: INCOMPLETE (API defined, implementation missing)
+## Status: DEFERRED → post-1.0 (decided 2026-06-27)
+
+**Decision:** formally deferred past the 1.0 release. The relay **wire protocol +
+session management are complete** (`norn_relay.c`); what remains — DHT path
+discovery, the chained RelayCreate/Forward/Accept connection, relay forwarding
+(`handle_forward` TODO), and dial-state-machine integration — is the *final
+fallback* in the connection ladder and needs real multi-hop relay topology to
+verify (PIT-only). Core NAT traversal (hole-punch) already covers 1.0, so this
+optional fallback is parked until after GA rather than shipped half-implemented.
+
+**Knock-on:** FEAT-020 (private overlay) acceptance #2 — a NAT'd member reachable
+via rendezvous/relay inside the overlay — depends on this and therefore also
+defers post-1.0. v0.10.0 ships acceptance #1 for 1.0.
+
+## (original) Status: INCOMPLETE (API defined, implementation missing)
 
 ## Description
 

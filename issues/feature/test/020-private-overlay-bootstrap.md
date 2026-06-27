@@ -8,7 +8,7 @@ estimate_time: 90-180min
 phase: test
 status: in_progress
 depends_on: [FEAT-014, FEAT-016]
-blocks_acceptance_2_on: [FEAT-022]
+acceptance_2_deferred_post_1_0_with: [FEAT-022]
 milestone: MILESTONE-0.10.0
 spawned_from: ~
 ---
@@ -63,7 +63,9 @@ wyrd's private packs/clans.
   stays **fleet-only** (public routers are never contacted under `private_mode`
   — `mainline_bootstrap` skips them — so they never enter the table). A private
   node with no fleet peers initiates nothing (no public fallback).
-- ⏳ **Acceptance #2 — a NAT'd member reachable via rendezvous/relay inside the
+- ⏸️ **Acceptance #2 — a NAT'd member reachable via rendezvous/relay inside the
   overlay** — rides FEAT-017's relay path, whose multi-hop integration is
-  **FEAT-022 (still open)**, and needs real NAT topology. This is a PIT item and
-  is what keeps FEAT-020 from `done`; it unblocks once FEAT-022 lands.
+  **FEAT-022, now formally deferred → post-1.0** (optional, PIT-only). Acceptance
+  #2 therefore also defers post-1.0. For 1.0, v0.10.0 ships **acceptance #1**
+  (overlay formation + pubkey resolution + no public-DHT pollution,
+  integration-tested in `tests/test_overlay_net.c`).
