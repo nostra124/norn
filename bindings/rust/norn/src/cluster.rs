@@ -177,6 +177,39 @@ impl Cluster {
         Some(buf)
     }
 
+    /// Every `(key, value)` pair whose key starts with `prefix` (empty = all) in
+    /// the local replica — a read-only scan. The basis for the attention-queue
+    /// style listings dvalin's coordinator needs.
+    pub fn list(&self, prefix: &[u8]) -> Vec<(Vec<u8>, Vec<u8>)> {
+        let mut out: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
+        unsafe extern "C" fn visit(
+            ud: *mut c_void,
+            key: *const u8,
+            klen: usize,
+            val: *const u8,
+            vlen: usize,
+        ) {
+            let out = &mut *(ud as *mut Vec<(Vec<u8>, Vec<u8>)>);
+            let k = std::slice::from_raw_parts(key, klen).to_vec();
+            let v = if val.is_null() || vlen == 0 {
+                Vec::new()
+            } else {
+                std::slice::from_raw_parts(val, vlen).to_vec()
+            };
+            out.push((k, v));
+        }
+        unsafe {
+            sys::norn_cluster_kv_list(
+                self.raw,
+                prefix.as_ptr(),
+                prefix.len(),
+                Some(visit),
+                (&mut out as *mut Vec<(Vec<u8>, Vec<u8>)>) as *mut c_void,
+            );
+        }
+        out
+    }
+
     /// Whether this node is the current leader.
     pub fn is_leader(&self) -> bool {
         unsafe { sys::norn_cluster_is_leader(self.raw) != 0 }
@@ -321,6 +354,37 @@ mod tests {
             cl.tick(t);
         }
         assert_eq!(cl.get(b"claim").as_deref(), Some(&b"node-2"[..]));
+    }
+
+    #[test]
+    fn list_returns_keys_by_prefix() {
+        let pk = [5u8; PUBKEY_BYTES];
+        let mut cl = Cluster::new(&pk, NodeClass::Server, |_, _| {}).unwrap();
+        let mut t = 0u64;
+        for _ in 0..200 {
+            t += 20;
+            cl.tick(t);
+            if cl.is_leader() {
+                break;
+            }
+        }
+        assert!(cl.is_leader());
+        cl.put(b"run/1/status", b"running").unwrap();
+        cl.put(b"run/2/status", b"done").unwrap();
+        cl.put(b"other", b"x").unwrap();
+        for _ in 0..60 {
+            t += 20;
+            cl.tick(t);
+        }
+        let mut runs = cl.list(b"run/");
+        runs.sort();
+        assert_eq!(runs.len(), 2);
+        assert_eq!(runs[0].0, b"run/1/status");
+        assert_eq!(runs[0].1, b"running");
+        // empty prefix → everything (3 keys).
+        assert_eq!(cl.list(b"").len(), 3);
+        // no match → empty.
+        assert!(cl.list(b"zzz").is_empty());
     }
 
     #[test]
