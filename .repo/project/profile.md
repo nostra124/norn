@@ -65,6 +65,23 @@ Issue IDs follow the pattern `FEAT-NNN` (features) or `BUG-NNN` (bugs), **withou
 
 Milestones are version-based: `MILESTONE-X.Y.Z.md` files under `.repo/project/issues/`. Each milestone lists tickets in a table.
 
+**The milestone identifier is ONLY the numeric version `vX.Y.Z` — nothing else.**
+
+- The version string carries **no release-qualifier suffix**. Never write
+  `MILESTONE-1.0.0-alpha.md`, and never version a milestone `v1.0.0-alpha`,
+  `…-beta`, `…-rc1`, etc. (The `-dev` marker in the `VERSION` file is an
+  in-development flag, **not** a milestone identifier — don't conflate them.)
+- Release names like **Alpha / Beta / RC** are milestone **titles/themes**, not
+  part of the version. A named pre-release maps to a specific numeric version.
+- **Current mapping toward 1.0** (each is a normal numbered milestone whose
+  *title* is the bug-bash name):
+  - **Alpha** (bug bash) = **`v0.13.0`**
+  - **Beta** (bug bash) = **`v0.14.0`**
+  - **GA** = **`v1.0.0`**
+- **Milestones are strictly sequential — do not skip or jump ahead.** Close the
+  current milestone (and any open tails) before opening the next. See the
+  ordering rule and Catch-up Backlog at the top of `ROADMAP.md`.
+
 ### Ticket phases
 
 - Features: `open/`, `design/`, `build/`, `test/`, `done/`
