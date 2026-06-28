@@ -82,3 +82,17 @@ teardown_file() {
         run pkg-config --cflags norn
     [ "$status" -eq 0 ]
 }
+
+@test "debian preinst creates the norn system user" {
+    SRC="$(norn_src)"
+    [ -f "$SRC/debian/norn.preinst" ]
+    grep -q 'adduser.*--system.*--group.*norn' "$SRC/debian/norn.preinst"
+}
+
+@test "debian packaging: systemd units reference the norn user" {
+    SRC="$(norn_src)"
+    grep -q '^User=norn$' "$SRC/contrib/systemd/nornd.service"
+    grep -q '^Group=norn$' "$SRC/contrib/systemd/nornd.service"
+    grep -q 'SocketUser=norn' "$SRC/contrib/systemd/nornd.socket"
+    grep -q 'SocketGroup=norn' "$SRC/contrib/systemd/nornd.socket"
+}

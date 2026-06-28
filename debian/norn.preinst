@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    install|upgrade)
+        adduser --system --group --quiet --no-create-home norn 2>/dev/null || true
+        ;;
+esac
+
+exit 0

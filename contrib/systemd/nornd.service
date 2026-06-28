@@ -7,10 +7,9 @@ Requires=nornd.socket
 
 [Service]
 Type=notify
-# Identity = the host SSH key (already trusted via known_hosts). Override with
-# /etc/norn/nornd.toml or an --identity flag here if you prefer a dedicated key.
+# Identity auto-generated at /var/lib/nornd/identity on first run. Override
+# with --identity PATH for a specific key.
 ExecStart=/usr/bin/nornd --foreground \
-    --identity /etc/ssh/ssh_host_ed25519_key \
     --socket /run/nornd/nornd.sock \
     --data-dir /var/lib/nornd \
     --class server
@@ -20,9 +19,9 @@ RestartSec=2
 # Run unprivileged as the dedicated 'norn' user (created by the package).
 User=norn
 Group=norn
-# The host key is root:root 0600; the package grants the norn user read access
-# via a supplementary group or an ACL on /etc/ssh/ssh_host_ed25519_key.
-SupplementaryGroups=ssh_keys
+# Nornd auto-generates an ed25519 identity at /var/lib/nornd/identity on first
+# run (default_identity() falls back to /var/lib/nornd/ when HOME is
+# /nonexistent). The StateDirectory directive ensures the dir is writable.
 
 # State + sandboxing.
 StateDirectory=nornd
