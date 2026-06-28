@@ -14,10 +14,8 @@ class Norn < Formula
   homepage "https://github.com/nostra124/norn"
   license "MIT"
 
-  # No tagged release yet, so this formula builds from git (`brew install
-  # --HEAD norn`). When v0.12.0 is tagged, add the stable stanza:
-  #   url "https://github.com/nostra124/norn/archive/refs/tags/v0.12.0.tar.gz"
-  #   sha256 "<shasum -a 256 of that tarball>"
+  url "https://github.com/nostra124/norn/archive/refs/tags/v0.12.0.tar.gz"
+  sha256 "8aa1cc3c10a7702b644a10f3f6118d20eb02a16a8e3c6d2e874c42518801a460"
   head "https://github.com/nostra124/norn.git", branch: "master"
 
   depends_on "autoconf" => :build
