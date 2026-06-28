@@ -37,6 +37,9 @@ static void test_build_basic(void) {
     char *status[] = {"status"};
     assert(nornd_client_build_req(1, status, &r, err, sizeof(err)) == 0);
     assert(strcmp(r.op, "status") == 0);
+    char *authkeys[] = {"authkeys"};
+    assert(nornd_client_build_req(1, authkeys, &r, err, sizeof(err)) == 0);
+    assert(strcmp(r.op, "authkeys") == 0);
 }
 
 static void test_build_errors(void) {
@@ -181,7 +184,54 @@ static void test_format(void) {
     out[n] = '\0';
     assert(strstr(out, "role: follower\n"));
 
-    /* put/del/cas/watch ack */
+    /* watch: subscription ack (no items) prints OK */
+    memset(&resp, 0, sizeof(resp));
+    resp.ok = 1;
+    rq = req_op("watch");
+    assert(nornd_client_format(&rq, &resp, out, sizeof(out), &n) == 0);
+    assert(memcmp(out, "OK\n", 3) == 0);
+
+    /* watch: a PUT event prints "<kind> <key> <value>" */
+    memset(&resp, 0, sizeof(resp));
+    resp.ok = 1;
+    resp.n_items = 2;
+    memcpy(resp.items[0].data, "put", 3);
+    resp.items[0].len = 3;
+    memcpy(resp.items[1].data, "foo", 3);
+    resp.items[1].len = 3;
+    resp.has_val = 1;
+    memcpy(resp.val, "bar", 3);
+    resp.vlen = 3;
+    assert(nornd_client_format(&rq, &resp, out, sizeof(out), &n) == 0);
+    out[n] = '\0';
+    assert(strcmp(out, "put foo bar\n") == 0);
+
+    /* watch: a DEL event has no value → "<kind> <key>" */
+    memset(&resp, 0, sizeof(resp));
+    resp.ok = 1;
+    resp.n_items = 2;
+    memcpy(resp.items[0].data, "del", 3);
+    resp.items[0].len = 3;
+    memcpy(resp.items[1].data, "foo", 3);
+    resp.items[1].len = 3;
+    assert(nornd_client_format(&rq, &resp, out, sizeof(out), &n) == 0);
+    out[n] = '\0';
+    assert(strcmp(out, "del foo\n") == 0);
+
+    /* authkeys → one verbatim line per item */
+    memset(&resp, 0, sizeof(resp));
+    resp.ok = 1;
+    resp.n_items = 2;
+    memcpy(resp.items[0].data, "ssh-ed25519 AAAA a", 18);
+    resp.items[0].len = 18;
+    memcpy(resp.items[1].data, "ssh-ed25519 BBBB b", 18);
+    resp.items[1].len = 18;
+    rq = req_op("authkeys");
+    assert(nornd_client_format(&rq, &resp, out, sizeof(out), &n) == 0);
+    out[n] = '\0';
+    assert(strcmp(out, "ssh-ed25519 AAAA a\nssh-ed25519 BBBB b\n") == 0);
+
+    /* put/del/cas ack */
     memset(&resp, 0, sizeof(resp));
     resp.ok = 1;
     rq = req_op("put");
