@@ -549,6 +549,35 @@ static void test_get_bootstrap_nodes(void) {
     printf("  test_get_bootstrap_nodes: OK\n");
 }
 
+static void test_bootstrap_local(void) {
+    printf("  test_bootstrap_local: ");
+    
+    net_t net;
+    net_init(&net, 0);
+    
+    mainline_state_t state;
+    unsigned char key[32];
+    crypto_sign_keypair(key, (unsigned char[64]){0});
+    mainline_init(&state, &net, key);
+    
+    int ret = mainline_bootstrap(&state);
+    assert(ret == 0);
+    assert(state.last_bootstrap > 0);
+    
+    mainline_cleanup(&state);
+    net_cleanup(&net);
+    printf("OK\n");
+}
+
+static void test_bootstrap_local_null(void) {
+    printf("  test_bootstrap_local_null: ");
+    
+    int ret = mainline_bootstrap(NULL);
+    assert(ret == -1);
+    
+    printf("OK\n");
+}
+
 int main(void) {
     printf("=== test_mainline.c ===\n");
     
@@ -575,6 +604,8 @@ int main(void) {
     test_peer_cache_save_load();
     test_set_logger();
     test_add_bootstrap();
+    test_bootstrap_local();
+    test_bootstrap_local_null();
     test_set_private();
     test_set_read_only();
     test_needs_bootstrap();

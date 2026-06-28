@@ -1,9 +1,11 @@
 #include "norn.h"
+#include "norn_session.h"
 #include <sodium.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 
 static void test_new_free(void) {
     unsigned char pk[32], sk[64];
@@ -357,6 +359,86 @@ static void test_discover(void) {
     printf("  test_discover: OK\n");
 }
 
+static void on_accept_stub2(norn_session_t *session, void *ud) {
+    (void)session;
+    (void)ud;
+}
+
+static void test_listen_async(void) {
+    printf("  test_listen_async: ");
+    
+    unsigned char pk[32], sk[64];
+    crypto_sign_keypair(pk, sk);
+    
+    norn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    
+    norn_client_t *client = norn_new(pk, sk, &cfg);
+    assert(client != NULL);
+    
+    int ret = norn_listen_async(client, 0, NULL, on_accept_stub2, NULL);
+    assert(ret == 0);
+    
+    norn_free(client);
+    printf("OK\n");
+}
+
+static void test_save_load_dht_nodes(void) {
+    printf("  test_save_load_dht_nodes: ");
+    
+    unsigned char pk[32], sk[64];
+    crypto_sign_keypair(pk, sk);
+    
+    norn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    
+    norn_client_t *client = norn_new(pk, sk, &cfg);
+    assert(client != NULL);
+    
+    const char *path = "/tmp/norn_test_nodes.XXXXXX";
+    char tmpfile[64];
+    strncpy(tmpfile, path, sizeof(tmpfile) - 1);
+    tmpfile[sizeof(tmpfile) - 1] = '\0';
+    int fd = mkstemp(tmpfile);
+    assert(fd >= 0);
+    close(fd);
+    
+    int ret = norn_save_dht_nodes(client, tmpfile);
+    assert(ret >= 0);
+    
+    ret = norn_load_dht_nodes(client, tmpfile);
+    assert(ret >= 0);
+    
+    unlink(tmpfile);
+    norn_free(client);
+    printf("OK\n");
+}
+
+static void test_save_load_dht_nodes_null(void) {
+    printf("  test_save_load_dht_nodes_null: ");
+    
+    int ret = norn_save_dht_nodes(NULL, "/tmp/test");
+    assert(ret == -1);
+    
+    unsigned char pk[32], sk[64];
+    crypto_sign_keypair(pk, sk);
+    
+    norn_client_t *client = norn_new(pk, sk, NULL);
+    assert(client != NULL);
+    
+    ret = norn_save_dht_nodes(client, NULL);
+    assert(ret == -1);
+    
+    ret = norn_load_dht_nodes(NULL, "/tmp/test");
+    assert(ret == -1);
+    
+    ret = norn_load_dht_nodes(client, NULL);
+    assert(ret == -1);
+    
+    norn_free(client);
+    printf("OK\n");
+}
+
 int main(void) {
     if (sodium_init() < 0) {
         fprintf(stderr, "Failed to initialize libsodium\n");
@@ -387,6 +469,9 @@ int main(void) {
     test_get_immutable();
     test_announce();
     test_discover();
+    test_listen_async();
+    test_save_load_dht_nodes();
+    test_save_load_dht_nodes_null();
     
     printf("test_norn: OK\n");
     return 0;

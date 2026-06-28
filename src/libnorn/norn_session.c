@@ -538,6 +538,21 @@ int norn_listen_async(norn_client_t *client,
     client->listen_user_data = user_data;
     client->listen_suite = suite ? suite : norn_suite_sodium();
     
+    /* Bootstrap to the well-known Mainline DHT routers (router.bittorrent.com,
+     * router.utorrent.com, dht.transmissionbt.com) so the node joins the global
+     * DHT network immediately. These hosts are hard-coded in mainline_init() and
+     * are always available unless private_mode is set in norn_config_t. The
+     * bootstrap is async — norn_tick() in the event loop drives it. */
+    norn_bootstrap(client);
+
+    /* Announce this node via Bonjour/mDNS and discover other local norn nodes,
+     * so that nodes on the same LAN find each other automatically. Best-effort:
+     * if Avahi is not running, this silently fails. */
+    if (!client->bonjour) {
+        client->bonjour = norn_bonjour_new(client, ntohs(port),
+                                            client->self_pub);
+    }
+
     return 0;
 }
 

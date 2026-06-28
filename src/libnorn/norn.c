@@ -324,6 +324,14 @@ static void mainline_tag_ro(mainline_state_t *state, bencode_value_t *dict) {
 int mainline_bootstrap(mainline_state_t *state) {
     if (!state) return -1;
 
+    /* Local bootstrap: try the system nornd on 127.0.0.1:6881 first so
+     * user-mode instances discover the local daemon immediately. Harmless
+     * self-query when the daemon itself is on that port. */
+    {
+        uint32_t local_ip = htonl(0x7F000001); /* 127.0.0.1 */
+        mainline_find_node(state, state->self_id, local_ip, 6881);
+    }
+
     /* Your own nodes (private overlay seeds). */
     for (int i = 0; i < state->boot_count; i++) {
         mainline_find_node(state, state->self_id, state->boot_ips[i], state->boot_ports[i]);

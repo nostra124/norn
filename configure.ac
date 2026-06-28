@@ -18,6 +18,12 @@ LT_INIT
 # Checks for libraries.
 PKG_CHECK_MODULES([SODIUM], [libsodium >= 1.0.0])
 
+# Optional Bonjour/mDNS support via Avahi
+PKG_CHECK_MODULES([AVAHI], [avahi-client >= 0.6], [have_avahi=yes], [have_avahi=no])
+AS_IF([test "x$have_avahi" = "xyes"], [
+    AC_DEFINE([HAVE_AVAHI], [1], [Define if Avahi is available for Bonjour])
+])
+
 # Checks for header files.
 AC_CHECK_HEADERS([stdint.h stdlib.h string.h])
 

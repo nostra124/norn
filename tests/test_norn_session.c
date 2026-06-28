@@ -9,6 +9,7 @@
 #include "norn_session.h"
 #include "norn_suite.h"
 #include "channel.h"
+#include "norn.h"
 #include <sodium.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -123,6 +124,39 @@ static void test_handshake_wrong_key(void) {
     printf("OK (covered by test_channel)\n");
 }
 
+static void on_accept_stub(norn_session_t *session, void *ud) {
+    (void)session;
+    (void)ud;
+}
+
+static void test_listen_async_bootstrap(void) {
+    printf("  test_listen_async_bootstrap: ");
+    
+    unsigned char pk[32], sk[64];
+    crypto_sign_keypair(pk, sk);
+    
+    norn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    
+    norn_client_t *client = norn_new(pk, sk, &cfg);
+    assert(client != NULL);
+    
+    int ret = norn_listen_async(client, 0, NULL, on_accept_stub, NULL);
+    assert(ret == 0);
+    
+    norn_free(client);
+    printf("OK\n");
+}
+
+static void test_listen_async_null(void) {
+    printf("  test_listen_async_null: ");
+    
+    int ret = norn_listen_async(NULL, 0, NULL, NULL, NULL);
+    assert(ret == -1);
+    
+    printf("OK\n");
+}
+
 int main(void) {
     if (sodium_init() < 0) {
         fprintf(stderr, "Failed to initialize libsodium\n");
@@ -138,6 +172,8 @@ int main(void) {
     test_stream_on_closed_session();
     test_handshake_init_resp_confirm();
     test_handshake_wrong_key();
+    test_listen_async_bootstrap();
+    test_listen_async_null();
     
     printf("test_norn_session: OK\n");
     return 0;

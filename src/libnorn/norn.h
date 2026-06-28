@@ -108,6 +108,8 @@ typedef struct {
     const uint16_t *boot_ports;            /**< Bootstrap peer ports (network byte order), NULL for default */
     int boot_count;                        /**< Number of bootstrap peers */
     
+    uint16_t local_port;                   /**< Local nornd port for bootstrap (0 = default 6881) */
+    
     void (*log_func)(const char *fmt, ...); /**< Logging callback, NULL for stderr */
 } norn_config_t;
 
@@ -586,5 +588,64 @@ int norn_encode_mutable(const norn_mutable_t *rec,
  */
 int norn_decode_mutable(const unsigned char *buf, size_t len,
                          norn_mutable_t *rec);
+
+/* === DHT state persistence === */
+
+/**
+ * @brief Save the DHT routing table to a binary file
+ *
+ * Persists the known good Kademlia nodes so they can be reloaded on
+ * restart, avoiding a full re-bootstrap. Format: magic(4) + version(4)
+ * + count(4) + {id(20) + ip(4) + port(2)}*count.
+ *
+ * @param client Client handle
+ * @param path   File path to write to
+ * @return Number of nodes saved, or -1 on error
+ *
+ * @note NULL-safe: Returns -1 if client or path is NULL
+ */
+int norn_save_dht_nodes(norn_client_t *client, const char *path);
+
+/**
+ * @brief Load the DHT routing table from a binary file
+ *
+ * Restores nodes previously saved with norn_save_dht_nodes(). The loaded
+ * nodes are merged into the client's routing table up to MAINLINE_MAX_NODES.
+ *
+ * @param client Client handle
+ * @param path   File path to read from
+ * @return Number of nodes loaded, or -1 on error
+ *
+ * @note NULL-safe: Returns -1 if client or path is NULL
+ */
+int norn_load_dht_nodes(norn_client_t *client, const char *path);
+
+/**
+ * @brief Save the peer cache to a binary file
+ *
+ * Persists the endpoint cache (account->ip:port mappings) for warm
+ * restart. Format: magic(4) + version(4) + count(4) + {key(20) + ip(4)
+ * + port(2) + timestamp(8)}*count.
+ *
+ * @param client Client handle
+ * @param path   File path to write to
+ * @return Number of entries saved, or -1 on error
+ *
+ * @note NULL-safe: Returns -1 if client or path is NULL
+ */
+int norn_save_peer_cache(norn_client_t *client, const char *path);
+
+/**
+ * @brief Load the peer cache from a binary file
+ *
+ * Restores entries previously saved with norn_save_peer_cache().
+ *
+ * @param client Client handle
+ * @param path   File path to read from
+ * @return Number of entries loaded, or -1 on error
+ *
+ * @note NULL-safe: Returns -1 if client or path is NULL
+ */
+int norn_load_peer_cache(norn_client_t *client, const char *path);
 
 #endif /* NORN_H */
