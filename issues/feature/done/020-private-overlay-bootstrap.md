@@ -5,8 +5,9 @@ priority: medium
 complexity: M
 estimate_tokens: 60k-120k
 estimate_time: 90-180min
-phase: test
-status: in_progress
+phase: done
+status: done
+status_note: 1.0 scope (acceptance #1) complete and integration-tested in tests/test_overlay_net.c; acceptance #2 deferred post-1.0 with FEAT-022
 depends_on: [FEAT-014, FEAT-016]
 acceptance_2_deferred_post_1_0_with: [FEAT-022]
 milestone: MILESTONE-0.10.0
