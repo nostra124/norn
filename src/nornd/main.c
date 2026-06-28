@@ -242,8 +242,50 @@ static const char *default_identity(char *buf, size_t cap) {
         struct passwd *pw = getpwuid(getuid());
         home = pw ? pw->pw_dir : "/root";
     }
-    snprintf(buf, cap, "%s/.ssh/id_ed25519", home);
+    /* System users (e.g. the norn daemon) often have no real home directory.
+     * Fall back to a path under the StateDirectory (/var/lib/nornd) which is
+     * writable even with ProtectSystem=strict. */
+    if (strcmp(home, "/nonexistent") == 0 || strcmp(home, "/") == 0)
+        snprintf(buf, cap, "/var/lib/nornd/identity");
+    else
+        snprintf(buf, cap, "%s/.ssh/id_ed25519", home);
     return buf;
+}
+
+/* Auto-generate an ed25519 SSH identity at path when no --identity is given and
+ * the default path does not yet exist. Uses ssh-keygen (OpenSSH PEM format). */
+static int auto_generate_identity(const char *path, char *err, size_t errcap) {
+    /* Create parent directory ~/.ssh with appropriate permissions. */
+    char dir[512];
+    size_t n = strlen(path);
+    if (n >= sizeof(dir)) {
+        snprintf(err, errcap, "identity path too long");
+        return -1;
+    }
+    memcpy(dir, path, n + 1);
+    char *slash = strrchr(dir, '/');
+    if (!slash) {
+        snprintf(err, errcap, "identity path has no parent directory");
+        return -1;
+    }
+    *slash = '\0';
+    if (mkdir(dir, 0700) != 0 && errno != EEXIST) {
+        snprintf(err, errcap, "mkdir %s: %s", dir, strerror(errno));
+        return -1;
+    }
+    char cmd[1024];
+    int r = snprintf(cmd, sizeof(cmd),
+                     "ssh-keygen -t ed25519 -N \"\" -f '%s' >/dev/null 2>&1", path);
+    if ((size_t)r >= sizeof(cmd)) {
+        snprintf(err, errcap, "command too long");
+        return -1;
+    }
+    int rc = system(cmd);
+    if (rc != 0) {
+        snprintf(err, errcap, "ssh-keygen failed (exit %d)", rc);
+        return -1;
+    }
+    return 0;
 }
 
 static const char *default_socket(char *buf, size_t cap) {
@@ -384,8 +426,23 @@ int main(int argc, char **argv) {
             return 2;
         }
     }
+    int idpath_explicit = idpath != NULL;
     if (!idpath) idpath = default_identity(idbuf, sizeof(idbuf));
     if (!sockpath) sockpath = default_socket(sockbuf, sizeof(sockbuf));
+
+    /* Auto-generate an ed25519 identity when the default path is used and the
+     * file does not already exist (first run). Explicit --identity failures are
+     * still surfaced as errors. */
+    if (!idpath_explicit && access(idpath, F_OK) != 0) {
+        char gen_err[128];
+        if (auto_generate_identity(idpath, gen_err, sizeof(gen_err)) != 0) {
+            fprintf(stderr, "nornd: no identity at %s and auto-generation "
+                            "failed: %s\n", idpath, gen_err);
+            fprintf(stderr, "nornd: run 'ssh-keygen -t ed25519 -f %s' or "
+                            "specify --identity\n", idpath);
+            return 1;
+        }
+    }
 
     keypair_t kp;
     char err[128];
