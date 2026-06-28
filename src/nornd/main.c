@@ -22,6 +22,9 @@
 #include "norn_cluster.h"
 #include "norn_raft.h"
 #include "peers.h"
+#include "served.h"
+#include "served_conn.h"
+#include "store.h"
 #include "transport.h"
 
 #include <errno.h>
@@ -147,6 +150,33 @@ static int be_members(void *c, unsigned char out[][NORND_PUBKEY], int max) {
 static int be_scan(void *c, const unsigned char *prefix, size_t plen,
                    norn_kv_visit_fn fn, void *ud) {
     return norn_cluster_kv_list((norn_cluster_t *)c, prefix, plen, fn, ud);
+}
+
+/* ---- node-served KV host (FEAT-033) ----
+ *
+ * A peer dials this node and opens a NORN_SVC_SERVED_KV stream; we serve GET/LIST
+ * from the replicated cluster KV and CAT from the file-backed object store. Each
+ * inbound served stream gets a serve-conn, driven each poll iteration. */
+#define MAX_SERVE 32
+typedef struct {
+    nornd_served_backend_t be;
+    nornd_serve_conn_t conns[MAX_SERVE];
+    int n;
+} serve_host_t;
+
+static void on_served_accept(norn_stream_t *stream, void *ud) {
+    serve_host_t *h = ud;
+    if (h->n >= MAX_SERVE) return; /* table full — drop */
+    nornd_serve_conn_init(&h->conns[h->n++], stream);
+}
+
+static void serve_host_pump(serve_host_t *h) {
+    for (int i = 0; i < h->n;) {
+        if (nornd_serve_conn_pump(&h->conns[i], &h->be))
+            h->conns[i] = h->conns[--h->n]; /* finished — reclaim the slot */
+        else
+            i++;
+    }
 }
 
 /* ---- watch subscriptions (FEAT-030 event stream) ----
@@ -312,6 +342,7 @@ static norn_node_class_t parse_class(const char *s) {
 int main(int argc, char **argv) {
     char idbuf[600], sockbuf[600];
     const char *idpath = NULL, *sockpath = NULL;
+    const char *data_dir = NULL;
     norn_node_class_t cls = NORN_NODE_SERVER;
     nornd_peer_t peers[RAFT_MAX_NODES];
     int n_peers = 0;
@@ -328,7 +359,7 @@ int main(int argc, char **argv) {
         else if (strcmp(argv[i], "--class") == 0 && i + 1 < argc)
             cls = parse_class(argv[++i]);
         else if (strcmp(argv[i], "--data-dir") == 0 && i + 1 < argc)
-            ++i; /* accepted for the service units; state dir is reserved */
+            data_dir = argv[++i]; /* object store for node-served CAT (FEAT-033) */
         else if (strcmp(argv[i], "--foreground") == 0)
             ; /* we never daemonize; accepted for Type=notify units */
         else if (strcmp(argv[i], "--listen-port") == 0 && i + 1 < argc)
@@ -456,6 +487,35 @@ int main(int argc, char **argv) {
     norn_cluster_kv_watch(cl, (const unsigned char *)"", 0, on_kv_change,
                           &watches);
 
+    /* Node-served KV (FEAT-033): host GET/LIST from the cluster KV and CAT from a
+     * file-backed object store under <data-dir>/objects, served to peers that
+     * dial NORN_SVC_SERVED_KV. Best-effort: if the store dir can't be created we
+     * simply don't advertise served content. */
+    serve_host_t serve;
+    memset(&serve, 0, sizeof(serve));
+    static nornd_store_t serve_store;
+    {
+        char objdir[640];
+        const char *base = data_dir;
+        char homebuf[600];
+        if (!base) {
+            const char *home = getenv("HOME");
+            if (!home) home = "/tmp";
+            snprintf(homebuf, sizeof(homebuf), "%s/.norn", home);
+            base = homebuf;
+        }
+        mkdir(base, 0700); /* ensure the parent exists before the object dir */
+        snprintf(objdir, sizeof(objdir), "%s/objects", base);
+        if (nornd_store_init(&serve_store, objdir) == 0) {
+            serve.be.ctx = cl;
+            serve.be.get = be_get;
+            serve.be.list = be_scan;
+            serve.be.store = &serve_store;
+            norn_register_stream_service(client, NORN_SVC_SERVED_KV,
+                                         on_served_accept, &serve);
+        }
+    }
+
     /* Read our SSH public-key line (`<identity>.pub`) to publish into the fleet
      * key directory once we can lead. Optional: skip if it isn't there. */
     char sshline[512];
@@ -505,6 +565,7 @@ int main(int argc, char **argv) {
         int rc = poll(pfds, np, 10);
         norn_tick(client);
         nornd_transport_poll(xport); /* drain peer frames into the cluster */
+        serve_host_pump(&serve);     /* drive node-served KV streams (FEAT-033) */
         norn_cluster_tick(cl, now_ms());
 
         /* Once we can lead, publish our SSH public key to the directory. */
