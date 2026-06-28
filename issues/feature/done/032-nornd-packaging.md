@@ -6,7 +6,7 @@ complexity: M
 estimate_tokens: 40k-90k
 estimate_time: 60-150min
 phase: planned
-status: open
+status: done
 depends_on: [FEAT-029]
 milestone: MILESTONE-0.12.0
 spawned_from: ~
