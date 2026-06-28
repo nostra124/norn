@@ -32,6 +32,8 @@ struct norn_session {
     unsigned char peer_pubkey[64];  /* Max size for any suite */
     unsigned char self_pubkey[32];   /* Our identity public key */
     unsigned char self_secret[64];   /* Our identity secret key */
+    channel_signer_fn signer;        /* external handshake signer, or NULL (FEAT-028) */
+    void *signer_ud;
     
     /* Stream multiplexing */
     streammux_t *mux;
@@ -85,6 +87,11 @@ norn_session_t *norn_session_new(norn_client_t *client,
 int norn_session_set_identity(norn_session_t *session,
                                const unsigned char *pubkey,
                                const unsigned char *secret);
+
+/* Internal helper - route handshake signing through an external signer (FEAT-028).
+ * fn=NULL reverts to signing with self_secret. */
+void norn_session_set_signer(norn_session_t *session, channel_signer_fn fn,
+                             void *ud);
 
 /* Internal - process handshake packet (called from norn_tick) */
 int norn_session_process_packet(norn_session_t *session,

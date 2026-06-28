@@ -118,10 +118,17 @@ int norn_session_set_identity(norn_session_t *session,
                               const unsigned char *pubkey,
                               const unsigned char *secret) {
     if (!session || !pubkey || !secret) return -1;
-    
+
     memcpy(session->self_pubkey, pubkey, session->suite->pubkey_len);
     memcpy(session->self_secret, secret, session->suite->secret_len);
     return 0;
+}
+
+void norn_session_set_signer(norn_session_t *session, channel_signer_fn fn,
+                             void *ud) {
+    if (!session) return;
+    session->signer = fn;
+    session->signer_ud = ud;
 }
 
 /* === Async Dial API === */
@@ -385,6 +392,7 @@ int norn_dial_direct_async(norn_client_t *client,
     /* Identity is the client's own keypair, so the peer authenticates us as the
      * node it expects (e.g. a cluster member) — not a throwaway key. */
     norn_session_set_identity(session, client->self_pub, client->self_sec);
+    norn_session_set_signer(session, client->signer, client->signer_ud);
     memcpy(session->peer_pubkey, pubkey, session->suite->pubkey_len);
     
     session->peer_ip = endpoint->ip;
@@ -694,6 +702,7 @@ static void accept_or_route(norn_client_t *client, const unsigned char *buf,
     s->peer_ip = ip;
     s->peer_port = port;
     norn_session_set_identity(s, client->self_pub, client->self_sec);
+    norn_session_set_signer(s, client->signer, client->signer_ud);
     if (channel_gen_ephemeral(&s->channel) != 0 ||
         norn_client_add_session(client, s) != 0) {
         norn_session_free(s);
@@ -876,14 +885,16 @@ int norn_session_accept_init(norn_session_t *session,
     if (session->state != NORN_SESSION_CONNECTING) return -1;
     
     unsigned char peer_pubkey[32];
-    int len = channel_hs_accept(&session->channel,
-                                session->self_pubkey, session->self_secret,
-                                init_msg, init_len,
-                                peer_pubkey,
-                                out, outcap);
-    
+    int len = session->signer
+        ? channel_hs_accept_signed(&session->channel, session->self_pubkey,
+                                   session->signer, session->signer_ud,
+                                   init_msg, init_len, peer_pubkey, out, outcap)
+        : channel_hs_accept(&session->channel, session->self_pubkey,
+                            session->self_secret, init_msg, init_len,
+                            peer_pubkey, out, outcap);
+
     if (len < 0) return -1;
-    
+
     memcpy(session->peer_pubkey, peer_pubkey, 32);
     return len;
 }
@@ -898,14 +909,16 @@ int norn_session_confirm_resp(norn_session_t *session,
     if (session->state != NORN_SESSION_CONNECTING) return -1;
     
     unsigned char peer_pubkey[32];
-    int len = channel_hs_confirm(&session->channel,
-                                 session->self_pubkey, session->self_secret,
-                                 resp_msg, resp_len,
-                                 peer_pubkey,
-                                 out, outcap);
-    
+    int len = session->signer
+        ? channel_hs_confirm_signed(&session->channel, session->self_pubkey,
+                                    session->signer, session->signer_ud,
+                                    resp_msg, resp_len, peer_pubkey, out, outcap)
+        : channel_hs_confirm(&session->channel, session->self_pubkey,
+                             session->self_secret, resp_msg, resp_len,
+                             peer_pubkey, out, outcap);
+
     if (len < 0) return -1;
-    
+
     memcpy(session->peer_pubkey, peer_pubkey, 32);
     session->state = NORN_SESSION_ESTABLISHED;
     return len;

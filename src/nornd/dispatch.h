@@ -13,7 +13,7 @@
 
 #include <stddef.h>
 #include "ipc.h"
-#include "norn_kvstore.h" /* norn_kv_event_t */
+#include "norn_kvstore.h" /* norn_kv_event_t, norn_kv_visit_fn */
 
 #define NORND_PUBKEY 32
 
@@ -34,6 +34,10 @@ typedef struct {
     const unsigned char *(*leader)(void *ctx);
     /** Copy up to `max` member pubkeys into `out`; return count written. */
     int (*members)(void *ctx, unsigned char out[][NORND_PUBKEY], int max);
+    /** Visit every replicated key under `prefix` (read-only); see
+     *  norn_cluster_kv_list. Returns count visited, or -1. */
+    int (*scan)(void *ctx, const unsigned char *prefix, size_t plen,
+                norn_kv_visit_fn fn, void *ud);
 } nornd_backend_t;
 
 /**

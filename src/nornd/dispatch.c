@@ -38,6 +38,19 @@ static int fill_members(const nornd_backend_t *be, nornd_ipc_resp_t *r) {
     return n;
 }
 
+/* Collect each `peer/<id>/ssh` value as one response item — the fleet's
+ * authorized_keys lines. Keydir layout: src/nornd/keydir.h. */
+static void authkeys_visit(void *ud, const unsigned char *key, size_t klen,
+                           const unsigned char *val, size_t vlen) {
+    nornd_ipc_resp_t *r = ud;
+    int is_ssh = klen >= 4 && memcmp(key + klen - 4, "/ssh", 4) == 0;
+    if (is_ssh && r->n_items < NORND_IPC_MAX_ITEMS && vlen <= NORND_IPC_MAX_ITEM) {
+        memcpy(r->items[r->n_items].data, val, vlen);
+        r->items[r->n_items].len = vlen;
+        r->n_items++;
+    }
+}
+
 void nornd_dispatch(const nornd_backend_t *be, const nornd_ipc_req_t *req,
                     nornd_ipc_resp_t *resp) {
     memset(resp, 0, sizeof(*resp));
@@ -136,6 +149,12 @@ void nornd_dispatch(const nornd_backend_t *be, const nornd_ipc_req_t *req,
     if (strcmp(op, "watch") == 0) {
         /* Validate; the daemon turns this into a streaming subscription. */
         ok_empty(resp);
+        return;
+    }
+    if (strcmp(op, "authkeys") == 0) {
+        /* Enumerate the fleet's published SSH keys into the item list. */
+        be->scan(be->ctx, (const unsigned char *)"peer/", 5, authkeys_visit, resp);
+        resp->ok = 1;
         return;
     }
     fail(resp, "unknown op");
