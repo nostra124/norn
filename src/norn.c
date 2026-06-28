@@ -14,6 +14,7 @@
 #include "libnorn/log.h"
 #include "nornd/cli_cluster.h"
 #include "nornd/cli_keys.h"
+#include "nornd/cli_node.h"
 
 #define DEFAULT_PORT 6881
 #define DEFAULT_TIMEOUT 5000
@@ -42,6 +43,8 @@ static void usage(FILE *out) {
     fprintf(out, "                      (watch streams 'put <key> <value>' / 'del <key>' lines)\n");
     fprintf(out, "  keys <nodeid>       Resolve a peer's SSH + GPG public keys\n");
     fprintf(out, "  authorized-keys     Print every fleet member's SSH key (authorized_keys)\n");
+    fprintf(out, "  node <pubkey[@host:port]> <get|cat|list> [arg]\n");
+    fprintf(out, "                      Fetch content directly from a peer (served-KV)\n");
     fprintf(out, "  version             Print version\n");
     fprintf(out, "\n");
     fprintf(out, "Options:\n");
@@ -152,7 +155,8 @@ static int do_keygen(int argc, char **argv) {
     
     int opt;
     char *key_path = NULL;
-    
+    int owned = 0; /* 1 only when key_path is heap-owned (get_default_key_path) */
+
     optind = 2;
     
     while ((opt = getopt_long(argc, argv, "+k:h", long_options, NULL)) != -1) {
@@ -188,17 +192,18 @@ static int do_keygen(int argc, char **argv) {
     if (!key_path) {
         key_path = get_default_key_path();
         if (!key_path) return 1;
+        owned = 1;
     }
-    
+
     if (access(key_path, F_OK) == 0) {
         fprintf(stderr, "ERROR: Key file already exists: %s\n", key_path);
         fprintf(stderr, "HINT: Remove the file or use --key to specify a different path\n");
-        if (!getenv("NORN_KEY") && !key_file) free(key_path);
+        if (owned) free(key_path);
         return 1;
     }
     
     if (create_key_dir(key_path) != 0) {
-        if (!getenv("NORN_KEY") && !key_file) free(key_path);
+        if (owned) free(key_path);
         return 1;
     }
     
@@ -208,14 +213,14 @@ static int do_keygen(int argc, char **argv) {
     FILE *f = fopen(key_path, "wb");
     if (!f) {
         fprintf(stderr, "ERROR: Failed to create key file %s: %s\n", key_path, strerror(errno));
-        if (!getenv("NORN_KEY") && !key_file) free(key_path);
+        if (owned) free(key_path);
         return 1;
     }
     
     if (fwrite(&kp, sizeof(kp), 1, f) != 1) {
         fprintf(stderr, "ERROR: Failed to write key file %s\n", key_path);
         fclose(f);
-        if (!getenv("NORN_KEY") && !key_file) free(key_path);
+        if (owned) free(key_path);
         return 1;
     }
     
@@ -227,7 +232,7 @@ static int do_keygen(int argc, char **argv) {
     }
     printf("\n");
     
-    if (!getenv("NORN_KEY") && !key_file) free(key_path);
+    if (owned) free(key_path);
     return 0;
 }
 
@@ -635,6 +640,9 @@ int main(int argc, char **argv) {
         return nornd_cli_cluster(argc - optind - 1, argv + optind + 1);
     } else if (strcmp(cmd, "keys") == 0) {
         return nornd_cli_keys(argc - optind - 1, argv + optind + 1);
+    } else if (strcmp(cmd, "node") == 0) {
+        /* Fetch content directly from a peer over a served-KV stream. */
+        return nornd_cli_node(argc - optind - 1, argv + optind + 1);
     } else if (strcmp(cmd, "authorized-keys") == 0) {
         /* Enumerate every fleet member's published SSH key as an
          * authorized_keys file. Reuses the cluster IPC client (op "authkeys"). */

@@ -65,7 +65,7 @@ static void on_out_session(norn_session_t *session, norn_session_state_t state,
     if (state == NORN_SESSION_ESTABLISHED) {
         op->established = 1;
         if (!op->stream)
-            norn_stream_open_async(session, on_out_stream, op);
+            norn_stream_open_svc(session, NORN_SVC_RAFT, on_out_stream, op);
     } else if (state == NORN_SESSION_CLOSING || state == NORN_SESSION_CLOSED) {
         op->established = 0;
         op->session = NULL;
@@ -95,30 +95,46 @@ static void dial_peer(out_peer_t *op) {
 
 /* ---- inbound ---- */
 
-static void on_inbound_stream(norn_stream_t *stream, void *ud) {
-    in_conn_t *ic = ud;
+/* Inbound Raft stream (NORN_SVC_RAFT), dispatched from the client's service
+ * registry — so cluster consensus shares the one session/port with served-KV and
+ * consumer protocols, demultiplexed by service id (no collision). One in_conn per
+ * peer session, allocated on its first Raft stream. */
+static void on_raft_stream(norn_stream_t *stream, void *ud) {
+    nornd_transport_t *t = ud;
+    norn_session_t *session = norn_stream_session(stream);
+    if (!session) return;
+    in_conn_t *ic = NULL;
+    for (int i = 0; i < MAX_INBOUND; i++)
+        if (t->inbound[i].active && t->inbound[i].session == session) {
+            ic = &t->inbound[i];
+            break;
+        }
+    if (!ic) {
+        for (int i = 0; i < MAX_INBOUND; i++)
+            if (!t->inbound[i].active) {
+                ic = &t->inbound[i];
+                break;
+            }
+        if (!ic) return; /* table full — drop */
+        memset(ic, 0, sizeof(*ic));
+        ic->active = 1;
+        ic->session = session;
+    }
     ic->stream = stream;
     nornd_framer_reset(&ic->framer);
     /* The session is ESTABLISHED by the time a stream opens, so the peer's
      * static pubkey (learned in the handshake) is now available — this is the
      * cluster member id we attribute inbound frames to. */
-    norn_session_get_peer(ic->session, ic->peer);
+    norn_session_get_peer(session, ic->peer);
 }
 
+/* Session-accept callback: required so the listener actually admits inbound
+ * peer sessions (a NULL callback makes accept_or_route drop new peers). The
+ * per-session in_conn is created lazily when the peer's first Raft stream
+ * arrives (on_raft_stream), so this only needs to exist. */
 static void on_accept(norn_session_t *session, void *ud) {
-    nornd_transport_t *t = ud;
-    in_conn_t *ic = NULL;
-    for (int i = 0; i < MAX_INBOUND; i++) {
-        if (!t->inbound[i].active) {
-            ic = &t->inbound[i];
-            break;
-        }
-    }
-    if (!ic) return; /* table full — drop */
-    memset(ic, 0, sizeof(*ic));
-    ic->active = 1;
-    ic->session = session;
-    norn_session_set_accept_stream(session, on_inbound_stream, ic);
+    (void)session;
+    (void)ud;
 }
 
 /* ---- lifecycle ---- */
@@ -139,6 +155,9 @@ nornd_transport_t *nornd_transport_new(norn_client_t *client,
         t->peers[i].spec = peers[i];
         dial_peer(&t->peers[i]);
     }
+    /* Inbound Raft streams arrive via the client-wide service registry; the
+     * accept callback just admits the peer session. */
+    norn_register_stream_service(client, NORN_SVC_RAFT, on_raft_stream, t);
     norn_listen_async(client, htons(listen_port), NULL, on_accept, t);
     return t;
 }

@@ -74,6 +74,26 @@ typedef struct norn_client norn_client_t;
 typedef struct norn_record norn_record_t;
 
 /**
+ * @brief Application-protocol id multiplexed over a single norn session.
+ *
+ * A norn node runs several application protocols (cluster consensus, node-served
+ * KV, tunnels, consumer apps) concurrently over ONE UDP port and ONE session.
+ * Every stream and datagram is tagged with a `norn_service_t` so the session
+ * routes it to the right protocol handler without collision — a "port number"
+ * scoped to the encrypted session, not the socket. The low range is reserved for
+ * libnorn/nornd; consumers allocate from NORN_SVC_USER_BASE upward.
+ */
+typedef uint16_t norn_service_t;
+#define NORN_SVC_DEFAULT    0x0000  /* legacy single-protocol streams (tunnels) */
+#define NORN_SVC_RAFT       0x0001  /* nornd cluster consensus frames */
+#define NORN_SVC_SERVED_KV  0x0002  /* nornd node-served KV (GET/CAT/LIST) */
+#define NORN_SVC_TUNNEL     0x0003  /* norn-forward stream tunnel */
+#define NORN_SVC_USER_BASE  0x0100  /* consumers allocate service ids from here */
+
+/** Max distinct services multiplexed concurrently over one session. */
+#define NORN_MAX_SERVICES   8
+
+/**
  * @brief Client configuration
  * 
  * Passed to norn_new() to configure the DHT client. All pointers are borrowed

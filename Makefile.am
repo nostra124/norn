@@ -49,15 +49,16 @@ libnorn_la_LIBADD = $(SODIUM_LIBS)
 # (not part of the library). Convenience lib so the daemon and its tests share
 # the same object code.
 noinst_LTLIBRARIES = libnornd.la
-libnornd_la_SOURCES = src/nornd/ipc.c src/nornd/identity.c src/nornd/dispatch.c src/nornd/client.c src/nornd/cli_cluster.c src/nornd/cli_keys.c src/nornd/keydir.c src/nornd/served_proto.c src/nornd/store.c src/nornd/served.c src/nornd/agent.c src/nornd/peers.c src/nornd/transport.c
+libnornd_la_SOURCES = src/nornd/ipc.c src/nornd/identity.c src/nornd/dispatch.c src/nornd/client.c src/nornd/cli_cluster.c src/nornd/cli_keys.c src/nornd/cli_node.c src/nornd/keydir.c src/nornd/served_proto.c src/nornd/store.c src/nornd/served.c src/nornd/served_conn.c src/nornd/agent.c src/nornd/peers.c src/nornd/transport.c
 libnornd_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 
 # Internal headers: not installed, but must ship in the tarball (they're
 # #included by the sources) so a VPATH/dist build can find them.
 noinst_HEADERS = src/nornd/ipc.h src/nornd/identity.h src/nornd/dispatch.h \
                  src/nornd/client.h src/nornd/cli_cluster.h src/nornd/cli_keys.h \
+                 src/nornd/cli_node.h \
                  src/nornd/keydir.h src/nornd/served_proto.h src/nornd/store.h \
-                 src/nornd/served.h src/nornd/agent.h \
+                 src/nornd/served.h src/nornd/served_conn.h src/nornd/agent.h \
                  src/nornd/peers.h src/nornd/transport.h \
                  src/libnorn/norn_internal.h src/libnorn/norn_session_internal.h \
                  src/libnorn/norn_endpoint_cache.h src/libnorn/norn_upnp.h
@@ -120,7 +121,7 @@ dist_systemduser_DATA = contrib/systemd/user/nornd.socket contrib/systemd/user/n
 launchddir = $(prefix)/lib/launchd
 dist_launchd_DATA = contrib/launchd/io.norn.nornd.plist contrib/launchd/io.norn.nornd.user.plist
 
-check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_forward test_raft test_kvstore test_cluster test_overlay test_overlay_net test_transport test_transport_udp test_transport_tcp test_idexch test_attr test_net test_suite test_norn_kad test_norn_idexch test_norn_session test_session_loopback test_session_accept test_rendezvous test_relay test_nornd_ipc test_nornd_identity test_nornd_dispatch test_nornd_client test_nornd_keydir test_nornd_served_proto test_nornd_peers test_nornd_store test_nornd_served test_nornd_agent
+check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_forward test_raft test_kvstore test_cluster test_overlay test_overlay_net test_transport test_transport_udp test_transport_tcp test_idexch test_attr test_net test_suite test_norn_kad test_norn_idexch test_norn_session test_session_loopback test_session_accept test_rendezvous test_relay test_nornd_ipc test_nornd_identity test_nornd_dispatch test_nornd_client test_nornd_keydir test_nornd_served_proto test_nornd_peers test_nornd_store test_nornd_served test_nornd_agent test_nornd_served_dial
 
 test_norn_SOURCES = tests/test_norn.c
 test_norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
@@ -321,6 +322,10 @@ test_nornd_served_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 test_nornd_agent_SOURCES = tests/test_nornd_agent.c
 test_nornd_agent_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 test_nornd_agent_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
+
+test_nornd_served_dial_SOURCES = tests/test_nornd_served_dial.c
+test_nornd_served_dial_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
+test_nornd_served_dial_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
 TESTS = $(check_PROGRAMS)
 

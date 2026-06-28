@@ -35,12 +35,20 @@ struct norn_session {
     channel_signer_fn signer;        /* external handshake signer, or NULL (FEAT-028) */
     void *signer_ud;
     
-    /* Stream multiplexing */
-    streammux_t *mux;
-    norn_stream_t **streams;           /* Array of open streams */
+    /* Application-protocol multiplexing (one UDP port, one session): each
+     * service id gets its own streammux (independent stream-id space + flow
+     * control), created lazily. Inbound app frames carry [kind][service] so the
+     * session routes streams/datagrams to the right service without collision. */
+    struct svc_mux {
+        int active;
+        norn_service_t service;
+        streammux_t *mux;
+        uint16_t next_stream_id;       /* odd initiator / even responder */
+        norn_session_t *session;       /* back-pointer for the send callback */
+    } svc[NORN_MAX_SERVICES];
+    norn_stream_t **streams;           /* open stream wrappers, keyed (service,id) */
     int stream_count;
     int stream_cap;
-    uint16_t next_stream_id;           /* Next stream ID to assign */
     
     /* Transport */
     int fd;                           /* UDP socket, -1 if not connected */
@@ -73,6 +81,8 @@ struct norn_session {
 /* Internal stream state */
 struct norn_stream {
     norn_session_t *session;
+    norn_service_t service;            /* application protocol this stream carries */
+    streammux_t *mux;                  /* the per-service mux it lives in */
     uint16_t stream_id;
     int closed;
     norn_stream_callback_t callback;
