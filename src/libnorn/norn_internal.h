@@ -77,7 +77,30 @@ struct norn_client {
         int active;
     } holepunch_pending[8];
     int holepunch_pending_count;
+
+    /* Application-protocol service registry (FEAT-033): inbound stream/datagram
+     * handlers keyed by service id, applied to every session. */
+    struct {
+        norn_service_t service;
+        void (*cb)(norn_stream_t *stream, void *ud);
+        void *ud;
+    } stream_svcs[NORN_MAX_SERVICES];
+    int stream_svc_count;
+    struct {
+        norn_service_t service;
+        norn_datagram_cb_t cb;
+        void *ud;
+    } dgram_svcs[NORN_MAX_SERVICES];
+    int dgram_svc_count;
 };
+
+/* Internal lookups used by the session router (defined in norn_impl.c). Return
+ * 0 and fill the cb+ud outputs if a handler is registered for `service`,
+ * else -1. */
+int norn_client_stream_svc(norn_client_t *client, norn_service_t service,
+                           void (**cb)(norn_stream_t *, void *), void **ud);
+int norn_client_dgram_svc(norn_client_t *client, norn_service_t service,
+                          norn_datagram_cb_t *cb, void **ud);
 
 /* FEAT-023: Internal helper for probe-to-session transition */
 int norn_session_from_probe(norn_client_t *client,

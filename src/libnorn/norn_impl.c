@@ -92,6 +92,72 @@ void norn_set_signer(norn_client_t *client, norn_sign_fn fn, void *ud) {
     client->signer_ud = ud;
 }
 
+/* === Application-protocol service registry (FEAT-033) === */
+
+int norn_register_stream_service(norn_client_t *client, norn_service_t service,
+                                 void (*cb)(norn_stream_t *stream, void *ud),
+                                 void *user_data) {
+    if (!client || !cb) return -1;
+    /* Replace an existing registration for the same service in place. */
+    for (int i = 0; i < client->stream_svc_count; i++) {
+        if (client->stream_svcs[i].service == service) {
+            client->stream_svcs[i].cb = cb;
+            client->stream_svcs[i].ud = user_data;
+            return 0;
+        }
+    }
+    if (client->stream_svc_count >= NORN_MAX_SERVICES) return -1;
+    int i = client->stream_svc_count++;
+    client->stream_svcs[i].service = service;
+    client->stream_svcs[i].cb = cb;
+    client->stream_svcs[i].ud = user_data;
+    return 0;
+}
+
+int norn_register_datagram_service(norn_client_t *client, norn_service_t service,
+                                   norn_datagram_cb_t cb, void *user_data) {
+    if (!client || !cb) return -1;
+    for (int i = 0; i < client->dgram_svc_count; i++) {
+        if (client->dgram_svcs[i].service == service) {
+            client->dgram_svcs[i].cb = cb;
+            client->dgram_svcs[i].ud = user_data;
+            return 0;
+        }
+    }
+    if (client->dgram_svc_count >= NORN_MAX_SERVICES) return -1;
+    int i = client->dgram_svc_count++;
+    client->dgram_svcs[i].service = service;
+    client->dgram_svcs[i].cb = cb;
+    client->dgram_svcs[i].ud = user_data;
+    return 0;
+}
+
+int norn_client_stream_svc(norn_client_t *client, norn_service_t service,
+                           void (**cb)(norn_stream_t *, void *), void **ud) {
+    if (!client) return -1;
+    for (int i = 0; i < client->stream_svc_count; i++) {
+        if (client->stream_svcs[i].service == service) {
+            *cb = client->stream_svcs[i].cb;
+            *ud = client->stream_svcs[i].ud;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int norn_client_dgram_svc(norn_client_t *client, norn_service_t service,
+                          norn_datagram_cb_t *cb, void **ud) {
+    if (!client) return -1;
+    for (int i = 0; i < client->dgram_svc_count; i++) {
+        if (client->dgram_svcs[i].service == service) {
+            *cb = client->dgram_svcs[i].cb;
+            *ud = client->dgram_svcs[i].ud;
+            return 0;
+        }
+    }
+    return -1;
+}
+
 void norn_free(norn_client_t *client) {
     if (!client) return;
     

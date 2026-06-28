@@ -352,6 +352,63 @@ norn_stream_t *norn_stream_open_async(norn_session_t *session,
                                       void *user_data);
 
 /**
+ * @brief Open a logical stream tagged with an application service (FEAT-033).
+ *
+ * Like norn_stream_open_async, but the stream is multiplexed under `service`
+ * (see norn_service_t). The peer surfaces it to whatever handler it registered
+ * for that service via norn_register_stream_service — so cluster Raft, node-served
+ * KV, tunnels and consumer protocols share one session/port without colliding.
+ * norn_stream_open_async is exactly this with service = NORN_SVC_DEFAULT.
+ */
+norn_stream_t *norn_stream_open_svc(norn_session_t *session,
+                                    norn_service_t service,
+                                    norn_stream_callback_t callback,
+                                    void *user_data);
+
+/**
+ * @brief Send one unreliable datagram tagged with a service (FEAT-033).
+ *
+ * Bypasses the reliable stream mux — delivered (best-effort, at most once) to the
+ * peer's registered datagram handler for `service`. For control/gossip/media that
+ * doesn't want head-of-line blocking. Returns 0 on success, -1 on error.
+ */
+int norn_session_send_datagram(norn_session_t *session, norn_service_t service,
+                               const unsigned char *data, size_t len);
+
+/**
+ * @brief The session a stream belongs to.
+ *
+ * Lets a service's inbound stream handler recover its session context (e.g. the
+ * peer's verified pubkey via norn_session_get_peer). Returns NULL if stream is
+ * NULL.
+ */
+norn_session_t *norn_stream_session(const norn_stream_t *stream);
+
+/** Inbound datagram handler (peer -> us) for a service. */
+typedef void (*norn_datagram_cb_t)(norn_session_t *session,
+                                   const unsigned char *data, size_t len,
+                                   void *user_data);
+
+/**
+ * @brief Register a client-wide handler for inbound streams of a service.
+ *
+ * Applies to every session the client opens or accepts: when a peer opens a
+ * stream tagged `service`, `cb` fires with the ready stream. This is how a node
+ * hosts multiple protocols over one port (e.g. nornd registers NORN_SVC_RAFT and
+ * NORN_SVC_SERVED_KV). Returns 0 on success, -1 on error / table full.
+ */
+int norn_register_stream_service(norn_client_t *client, norn_service_t service,
+                                 void (*cb)(norn_stream_t *stream, void *ud),
+                                 void *user_data);
+
+/**
+ * @brief Register a client-wide handler for inbound datagrams of a service.
+ * @return 0 on success, -1 on error / table full.
+ */
+int norn_register_datagram_service(norn_client_t *client, norn_service_t service,
+                                   norn_datagram_cb_t cb, void *user_data);
+
+/**
  * @brief Register a handler for inbound (peer-initiated) streams (FEAT-018).
  *
  * On an established session, when the peer opens a logical stream, `cb` is
