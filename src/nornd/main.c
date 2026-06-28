@@ -72,6 +72,10 @@ static const unsigned char *be_leader(void *c) {
 static int be_members(void *c, unsigned char out[][NORND_PUBKEY], int max) {
     return norn_cluster_members((norn_cluster_t *)c, out, max);
 }
+static int be_scan(void *c, const unsigned char *prefix, size_t plen,
+                   norn_kv_visit_fn fn, void *ud) {
+    return norn_cluster_kv_list((norn_cluster_t *)c, prefix, plen, fn, ud);
+}
 
 /* ---- watch subscriptions (FEAT-030 event stream) ----
  *
@@ -336,8 +340,8 @@ int main(int argc, char **argv) {
     signal(SIGTERM, on_signal);
     signal(SIGPIPE, SIG_IGN);
 
-    nornd_backend_t be = {cl,         be_put,    be_del,    be_get,
-                          be_is_leader, be_leader, be_members};
+    nornd_backend_t be = {cl,         be_put,    be_del,     be_get,
+                          be_is_leader, be_leader, be_members, be_scan};
 
     /* One cluster watch for the daemon's lifetime; on_kv_change fans applied
      * changes out to `watch` subscribers (empty prefix = every key). */

@@ -53,7 +53,7 @@ static int fget(void *c, const unsigned char *k, size_t kl, unsigned char *o,
     memcpy(o, MAP[i].val, MAP[i].vlen);
     return (int)MAP[i].vlen;
 }
-static nornd_backend_t BE = {NULL, fput, NULL, fget, NULL, NULL, NULL};
+static nornd_backend_t BE = {NULL, fput, NULL, fget, NULL, NULL, NULL, NULL};
 
 static const unsigned char ID[NORND_PUBKEY] = {0xde, 0xad, 0xbe, 0xef};
 
