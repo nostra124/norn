@@ -146,7 +146,7 @@ seams remain:
 |--------|----------------|--------|
 | FEAT-028 | ssh-agent signer (file parser already done) | open |
 | FEAT-030 | `watch` event stream + `bep44` verb namespacing | open |
-| FEAT-031 | `authorized-keys` enumeration (needs KV prefix-scan) | open |
+| FEAT-031 | `authorized-keys` enumeration (KV prefix-scan via `norn_cluster_kv_list`) | done |
 | FEAT-033 | Node-served KV: file-backed object store + serve handler done (codec done); norn-session dial transport is the remaining seam | partial |
 
 ---
@@ -223,7 +223,7 @@ v0.12.0 (nornd + norn IPC CLI) [core done; tails open]
 ├── FEAT-028: SSH identity [file done / agent open]
 ├── FEAT-029: nornd daemon [done: single + multi-node]
 ├── FEAT-030: norn CLI client [cluster/keys done / watch+bep44 open]
-├── FEAT-031: fleet key directory [done / authorized-keys open]
+├── FEAT-031: fleet key directory [done / authorized-keys done]
 ├── FEAT-033: node-served KV [codec + object store + serve handler done / session dial transport open]
 └── FEAT-032: packaging (svc units) [done]
                                   │
