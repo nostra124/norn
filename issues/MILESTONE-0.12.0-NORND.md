@@ -1,4 +1,4 @@
-# MILESTONE 0.12.0 — nornd DAEMON + norn IPC CLI
+# MILESTONE 0.12.0 — NORND DAEMON + norn IPC CLI (DONE)
 
 **Goal:** Ship the reference **norn node daemon (`nornd`)** and turn the `norn`
 CLI into a thin IPC client for it. nornd runs a norn node on top of libnorn,
@@ -43,13 +43,13 @@ DHT/overlay client).
 
 | id | title | status |
 |----|-------|--------|
-| FEAT-027 | IPC protocol codec — length-prefixed bencode request/response | [ ] planned |
-| FEAT-028 | SSH-key identity — OpenSSH ed25519 key file + ssh-agent signer | [ ] planned |
-| FEAT-029 | `nornd` daemon — node + cluster host + unix-socket IPC server | [ ] planned |
-| FEAT-030 | `norn` CLI refactor — thin IPC client, namespaced verbs | [ ] planned |
-| FEAT-031 | Fleet key directory — publish/resolve SSH + GPG pubkeys | [ ] planned |
-| FEAT-033 | Node-served KV — direct, streamed, pubkey-addressed content (`node`/`peer`) | [ ] planned |
-| FEAT-032 | Packaging — nornd as a user + system daemon (systemd + launchd, socket-activated) | [ ] planned |
+| FEAT-027 | IPC protocol codec — length-prefixed bencode request/response | [x] done |
+| FEAT-028 | SSH-key identity — OpenSSH ed25519 key file + ssh-agent signer | [x] done |
+| FEAT-029 | `nornd` daemon — node + cluster host + unix-socket IPC server | [x] done |
+| FEAT-030 | `norn` CLI refactor — thin IPC client, namespaced verbs | [x] done |
+| FEAT-031 | Fleet key directory — publish/resolve SSH + GPG pubkeys | [x] done |
+| FEAT-033 | Node-served KV — direct, streamed, pubkey-addressed content (`node`/`peer`) | [x] done |
+| FEAT-032 | Packaging — nornd as a user + system daemon (systemd + launchd, socket-activated) | [x] done |
 
 ## Suggested order
 

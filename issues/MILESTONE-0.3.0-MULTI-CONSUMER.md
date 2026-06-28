@@ -1,4 +1,4 @@
-# MILESTONE 0.3.0 — MULTI-CONSUMER BASE LAYER
+# MILESTONE 0.3.0 — MULTI-CONSUMER BASE LAYER (DONE)
 
 **Goal:** Turn norn from "bifrost's extracted P2P core" into a genuinely
 application-agnostic base layer that multiple independent siblings
@@ -55,14 +55,14 @@ pubkey* + opaque app payloads.
 
 | id | title | status |
 |----|-------|--------|
-| FEAT-013 | Pluggable `norn_crypto_suite` vtable (keystone) | [ ] planned |
-| FEAT-014 | Parameterise Kademlia node-id width / keyspace | [ ] planned |
-| FEAT-015 | De-application-ise `idexch` (opaque identity record + caps passthrough) | [ ] planned |
-| FEAT-016 | `norn_dial(pubkey) → session` connect orchestration (generic session/sio) | [ ] planned |
-| FEAT-017 | Harmonised NAT traversal — rendezvous hole-punch + onion relay | [ ] planned |
-| FEAT-018 | Generic stream-tunnel utility (`norn-forward`) — service-over-pubkey | [ ] planned |
-| FEAT-019 | Language binding — Rust crate (over the C SDK) | [ ] planned |
-| FEAT-020 | Private-overlay bootstrap / fleet rendezvous | [ ] planned |
+| FEAT-013 | Pluggable `norn_crypto_suite` vtable (keystone) | [x] done |
+| FEAT-014 | Parameterise Kademlia node-id width / keyspace | [x] done |
+| FEAT-015 | De-application-ise `idexch` (opaque identity record + caps passthrough) | [x] done |
+| FEAT-016 | `norn_dial(pubkey) → session` connect orchestration (generic session/sio) | [x] done |
+| FEAT-017 | Harmonised NAT traversal — rendezvous hole-punch + onion relay | [x] done |
+| FEAT-018 | Generic stream-tunnel utility (`norn-forward`) — service-over-pubkey | [x] done |
+| FEAT-019 | Language binding — Rust crate (over the C SDK) | [x] done |
+| FEAT-020 | Private-overlay bootstrap / fleet rendezvous | [x] done |
 
 ## Suggested order
 

@@ -1,4 +1,4 @@
-# MILESTONE 0.11.0 — CLUSTERED KEY-VALUE STORE (class-aware Raft)
+# MILESTONE 0.11.0 — CLUSTERED KEY-VALUE STORE (DONE)
 
 **Goal:** Add a new top-level capability to libnorn: a **replicated key-value
 store shared across a cluster of nodes** — "etcd over libnorn". Nodes form a

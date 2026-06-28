@@ -5,8 +5,8 @@ priority: medium
 complexity: L
 estimate_tokens: 90k-180k
 estimate_time: 150-300min
-phase: planned
-status: open
+phase: done
+status: done
 depends_on: [FEAT-024, FEAT-025]
 milestone: MILESTONE-0.11.0
 spawned_from: ~
