@@ -57,6 +57,24 @@ static void on_accept(norn_stream_t *s, void *ud) {
     g_accepted = s;
 }
 
+/* FEAT-033: per-service inbound handlers. Each records the stream it was handed
+ * into its own slot, so the test can prove streams of different services are
+ * demultiplexed without cross-talk. */
+static void on_svc_stream(norn_stream_t *s, void *ud) {
+    *(norn_stream_t **)ud = s;
+}
+static unsigned char g_dg[64];
+static size_t g_dglen;
+static void on_svc_dgram(norn_session_t *s, const unsigned char *d, size_t n,
+                         void *ud) {
+    (void)s;
+    (void)ud;
+    if (n <= sizeof(g_dg)) {
+        memcpy(g_dg, d, n);
+        g_dglen = n;
+    }
+}
+
 static void on_stream_ready(norn_stream_t *s, norn_stream_state_t st, void *ud) {
     (void)s;
     (void)st;
@@ -140,6 +158,42 @@ int main(void) {
     int rn = norn_stream_read(g_accepted, got, sizeof(got));
     assert(rn == (int)strlen(msg));
     assert(memcmp(got, msg, (size_t)rn) == 0);
+
+    /* FEAT-033: two application services + an unreliable datagram, all over the
+     * SAME a<->b session and the SAME socket pair, demultiplexed by service id
+     * with no cross-talk — the multi-protocol-over-one-port contract. */
+    {
+        norn_stream_t *raft_in = NULL, *kv_in = NULL;
+        g_dglen = 0;
+        assert(norn_register_stream_service(client, NORN_SVC_RAFT,
+                                            on_svc_stream, &raft_in) == 0);
+        assert(norn_register_stream_service(client, NORN_SVC_SERVED_KV,
+                                            on_svc_stream, &kv_in) == 0);
+        assert(norn_register_datagram_service(client, NORN_SVC_RAFT,
+                                              on_svc_dgram, NULL) == 0);
+
+        norn_stream_t *rs = norn_stream_open_svc(a, NORN_SVC_RAFT,
+                                                 on_stream_ready, NULL);
+        norn_stream_t *ks = norn_stream_open_svc(a, NORN_SVC_SERVED_KV,
+                                                 on_stream_ready, NULL);
+        assert(rs && ks);
+        assert(norn_stream_write(rs, (const unsigned char *)"raftdata", 8) > 0);
+        assert(norn_stream_write(ks, (const unsigned char *)"kvdata", 6) > 0);
+        assert(norn_session_send_datagram(a, NORN_SVC_RAFT,
+                                          (const unsigned char *)"DG", 2) == 0);
+        pump(a, b);
+
+        /* Each service's stream surfaced to its own handler — distinct streams. */
+        assert(raft_in && kv_in && raft_in != kv_in);
+        unsigned char rb[32];
+        assert(norn_stream_read(raft_in, rb, sizeof(rb)) == 8 &&
+               memcmp(rb, "raftdata", 8) == 0);
+        unsigned char kb[32];
+        assert(norn_stream_read(kv_in, kb, sizeof(kb)) == 6 &&
+               memcmp(kb, "kvdata", 6) == 0);
+        /* the unreliable datagram reached the datagram handler, not the mux */
+        assert(g_dglen == 2 && memcmp(g_dg, "DG", 2) == 0);
+    }
 
     /* FEAT-028: the same 3-message handshake authenticated through an external
      * signer (the secret never enters session->self_secret). Both ends install a

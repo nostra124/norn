@@ -43,18 +43,62 @@ static ssize_t session_dgram_send(norn_session_t *s, const unsigned char *buf,
     return sendto(s->fd, buf, len, 0, (struct sockaddr *)&a, sizeof(a));
 }
 
-/* Stream data plane (FEAT-016/018): the streammux emits id-framed segments
- * through this callback; we seal each as one datagram over the channel. The
- * peer's process_packet decrypts it back into a segment and feeds its mux. */
-static int session_mux_send(void *ctx, const unsigned char *seg, size_t len) {
-    norn_session_t *s = ctx;
-    if (s->fd < 0 || s->state != NORN_SESSION_ESTABLISHED) return 1; /* retry once ready */
+/* Application-frame header on the post-decrypt plaintext (FEAT-033): one byte of
+ * kind + a 2-byte service id, so reliable streams and unreliable datagrams of
+ * many app protocols share one session/port without collision. */
+#define APPFRAME_HDR   3
+#define APPKIND_STREAM 0
+#define APPKIND_DGRAM  1
+
+/* Seal `len` bytes of plaintext (already app-framed) and send as one datagram. */
+static int session_seal_send(norn_session_t *s, const unsigned char *frame,
+                             size_t len) {
     unsigned char out[2048];
-    if (len + CHANNEL_OVERHEAD > sizeof(out)) return 0; /* drop oversized (bounded MTU) */
-    int sl = channel_seal(&s->channel, seg, len, out, sizeof(out));
-    if (sl < 0) return 0;
+    if (len + CHANNEL_OVERHEAD > sizeof(out)) return -1;
+    int sl = channel_seal(&s->channel, frame, len, out, sizeof(out));
+    if (sl < 0) return -1;
     ssize_t sent = session_dgram_send(s, out, (size_t)sl);
-    return sent == sl ? 0 : 1;
+    return sent == sl ? 0 : -1;
+}
+
+/* Stream data plane (FEAT-016/018/033): a per-service streammux emits id-framed
+ * segments through this callback; we prepend [STREAM][service] and seal each as
+ * one datagram. The peer's process_packet decrypts it, reads the service, and
+ * feeds the matching per-service mux. ctx is the owning svc_mux entry. */
+static int session_mux_send(void *ctx, const unsigned char *seg, size_t len) {
+    struct svc_mux *sm = ctx;
+    norn_session_t *s = sm->session;
+    if (s->fd < 0 || s->state != NORN_SESSION_ESTABLISHED) return 1; /* retry once ready */
+    unsigned char frame[2048];
+    if (APPFRAME_HDR + len > sizeof(frame)) return 0; /* drop oversized (bounded MTU) */
+    frame[0] = APPKIND_STREAM;
+    frame[1] = (unsigned char)(sm->service >> 8);
+    frame[2] = (unsigned char)(sm->service & 0xff);
+    memcpy(frame + APPFRAME_HDR, seg, len);
+    return session_seal_send(s, frame, APPFRAME_HDR + len) == 0 ? 0 : 1;
+}
+
+/* Find (or, if `create`, lazily allocate) the per-service stream mux. Streams of
+ * different services live in separate muxes — separate id spaces and flow
+ * control — so they never collide. Returns NULL if the table is full or alloc
+ * fails. The odd/even stream-id base keeps the two ends from picking the same
+ * id within a service. */
+static struct svc_mux *session_get_svc(norn_session_t *s, norn_service_t service,
+                                       int create) {
+    int slot = -1;
+    for (int i = 0; i < NORN_MAX_SERVICES; i++) {
+        if (s->svc[i].active && s->svc[i].service == service) return &s->svc[i];
+        if (!s->svc[i].active && slot < 0) slot = i;
+    }
+    if (!create || slot < 0) return NULL;
+    struct svc_mux *sm = &s->svc[slot];
+    sm->session = s;
+    sm->service = service;
+    sm->next_stream_id = s->is_initiator ? 1 : 2; /* odd initiator / even responder */
+    sm->mux = streammux_new(session_mux_send, sm);
+    if (!sm->mux) return NULL;
+    sm->active = 1;
+    return sm;
 }
 
 /* Grow the session's stream-wrapper array by one slot if needed. */
@@ -68,19 +112,33 @@ static int session_streams_reserve(norn_session_t *s) {
     return 0;
 }
 
-/* On the first inbound segment for a peer-initiated stream id, create a wrapper
- * and notify the accept handler (the server side of a tunnel). */
-static void session_maybe_accept_stream(norn_session_t *s, uint16_t sid) {
+/* On the first inbound segment for a peer-initiated (service, stream id), create
+ * a wrapper and notify the right accept handler: service 0 keeps the legacy
+ * per-session callback (tunnels); other services dispatch via the client's
+ * service registry (cluster Raft, served-KV, consumer apps). */
+static void session_maybe_accept_stream(norn_session_t *s, norn_service_t service,
+                                        struct svc_mux *sm, uint16_t sid) {
     for (int i = 0; i < s->stream_count; i++)
-        if (s->streams[i] && s->streams[i]->stream_id == sid) return;
+        if (s->streams[i] && s->streams[i]->service == service &&
+            s->streams[i]->stream_id == sid)
+            return;
     if (session_streams_reserve(s) != 0) return;
     norn_stream_t *st = calloc(1, sizeof(*st));
     if (!st) return;
     st->stream_id = sid;
+    st->service = service;
+    st->mux = sm->mux;
     st->session = s;
     st->closed = 0;
     s->streams[s->stream_count++] = st;
-    if (s->accept_stream_cb) s->accept_stream_cb(st, s->accept_stream_ud);
+    if (service == NORN_SVC_DEFAULT && s->accept_stream_cb) {
+        s->accept_stream_cb(st, s->accept_stream_ud);
+        return;
+    }
+    void (*cb)(norn_stream_t *, void *) = NULL;
+    void *ud = NULL;
+    if (norn_client_stream_svc(s->client, service, &cb, &ud) == 0 && cb)
+        cb(st, ud);
 }
 
 norn_session_t *norn_session_new(norn_client_t *client,
@@ -94,23 +152,17 @@ norn_session_t *norn_session_new(norn_client_t *client,
     session->suite = suite ? suite : norn_suite_sodium();
     session->state = NORN_SESSION_CONNECTING;
     session->fd = -1;
-    session->next_stream_id = 1;  /* Initiator uses odd IDs */
-    
-    session->mux = streammux_new(session_mux_send, session);
-    if (!session->mux) {
-        free(session);
-        return NULL;
-    }
-    
+    /* Per-service muxes (session->svc[]) are created lazily on first stream of a
+     * service — see session_get_svc. */
+
     /* Initialize stream tracking */
     session->stream_cap = 16;
     session->streams = calloc(session->stream_cap, sizeof(*session->streams));
     if (!session->streams) {
-        streammux_free(session->mux);
         free(session);
         return NULL;
     }
-    
+
     return session;
 }
 
@@ -399,15 +451,15 @@ int norn_dial_direct_async(norn_client_t *client,
     session->peer_port = endpoint->port;
     
     if (channel_gen_ephemeral(&session->channel) != 0) {
-        streammux_free(session->mux);
+        free(session->streams);
         free(session);
         return -1;
     }
-    
+
     /* Create UDP socket */
     session->fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (session->fd < 0) {
-        streammux_free(session->mux);
+        free(session->streams);
         free(session);
         return -1;
     }
@@ -426,16 +478,16 @@ int norn_dial_direct_async(norn_client_t *client,
     if (connect(session->fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
         if (errno != EINPROGRESS) {
             close(session->fd);
-            streammux_free(session->mux);
+            free(session->streams);
             free(session);
             return -1;
         }
     }
-    
+
     /* Register with client */
     if (norn_client_add_session(client, session) != 0) {
         close(session->fd);
-        streammux_free(session->mux);
+        free(session->streams);
         free(session);
         return -1;
     }
@@ -530,16 +582,34 @@ int norn_session_process_packet(norn_session_t *session,
     if (session->peer_ip != 0 && session->peer_ip != from_ip) return -1;
     if (session->peer_port != 0 && session->peer_port != from_port) return -1;
 
-    /* Established: a datagram is a sealed stream-mux segment. Decrypt it,
-     * surface any newly peer-initiated stream, and feed the mux. */
+    /* Established: a datagram is a sealed app frame. Decrypt it, read the
+     * [kind][service] header, and route to the matching per-service mux (reliable
+     * stream) or the registered datagram handler (unreliable). */
     if (session->state == NORN_SESSION_ESTABLISHED) {
         unsigned char pt[2048];
         int pl = channel_open(&session->channel, data, len, pt, sizeof(pt));
-        if (pl < STREAMMUX_FRAME) return -1;
-        uint16_t sid = (uint16_t)(((uint16_t)pt[0] << 8) | pt[1]);
-        session_maybe_accept_stream(session, sid);
-        streammux_input(session->mux, pt, (size_t)pl, 0);
-        return 0;
+        if (pl < APPFRAME_HDR) return -1;
+        int kind = pt[0];
+        norn_service_t service = (norn_service_t)(((uint16_t)pt[1] << 8) | pt[2]);
+        const unsigned char *body = pt + APPFRAME_HDR;
+        size_t blen = (size_t)pl - APPFRAME_HDR;
+        if (kind == APPKIND_STREAM) {
+            if (blen < STREAMMUX_FRAME) return -1;
+            struct svc_mux *sm = session_get_svc(session, service, 1);
+            if (!sm) return -1;
+            uint16_t sid = (uint16_t)(((uint16_t)body[0] << 8) | body[1]);
+            session_maybe_accept_stream(session, service, sm, sid);
+            streammux_input(sm->mux, body, blen, 0);
+            return 0;
+        }
+        if (kind == APPKIND_DGRAM) {
+            norn_datagram_cb_t cb = NULL;
+            void *ud = NULL;
+            if (norn_client_dgram_svc(session->client, service, &cb, &ud) == 0 && cb)
+                cb(session, body, blen, ud);
+            return 0;
+        }
+        return -1; /* unknown app-frame kind */
     }
 
     if (session->state != NORN_SESSION_CONNECTING) return -1;
@@ -734,9 +804,12 @@ int norn_client_tick_sessions(norn_client_t *client) {
         /* Check timeouts */
         norn_session_check_timeout(session, now_ms);
 
-        /* Drive stream-mux timers (retransmit/flush) on established sessions. */
+        /* Drive every active per-service stream-mux's timers on established
+         * sessions (retransmit/flush). */
         if (session->state == NORN_SESSION_ESTABLISHED) {
-            streammux_tick(session->mux, now_ms);
+            for (int si = 0; si < NORN_MAX_SERVICES; si++)
+                if (session->svc[si].active)
+                    streammux_tick(session->svc[si].mux, now_ms);
         }
 
         /* Process incoming packets if fd is set. Drain all queued datagrams so a
@@ -847,11 +920,14 @@ void norn_session_free(norn_session_t *session) {
         }
         free(session->streams);
     }
-    
-    if (session->mux) {
-        streammux_free(session->mux);
+
+    /* Free every per-service stream mux. */
+    for (int i = 0; i < NORN_MAX_SERVICES; i++) {
+        if (session->svc[i].active) {
+            streammux_free(session->svc[i].mux);
+        }
     }
-    
+
     /* Remove from client's session list */
     if (session->client) {
         norn_client_remove_session(session->client, session);
@@ -1082,51 +1158,73 @@ int norn_resolve_endpoint_async(norn_client_t *client,
 
 /* === Stream Multiplexing (FEAT-018, stub) === */
 
-norn_stream_t *norn_stream_open_async(norn_session_t *session,
-                                      norn_stream_callback_t callback,
-                                      void *user_data) {
+norn_stream_t *norn_stream_open_svc(norn_session_t *session,
+                                    norn_service_t service,
+                                    norn_stream_callback_t callback,
+                                    void *user_data) {
     if (!session || !callback) return NULL;
     if (session->state != NORN_SESSION_ESTABLISHED) return NULL;
-    
+
+    struct svc_mux *sm = session_get_svc(session, service, 1);
+    if (!sm) return NULL;
+
     /* Allocate stream */
     norn_stream_t *stream = calloc(1, sizeof(*stream));
     if (!stream) return NULL;
-    
-    /* Assign stream ID (odd for initiator, even for responder) */
-    stream->stream_id = session->next_stream_id;
+
+    /* Assign stream ID (odd for initiator, even for responder), per service */
+    stream->stream_id = sm->next_stream_id;
+    stream->service = service;
+    stream->mux = sm->mux;
     stream->session = session;
     stream->callback = callback;
     stream->user_data = user_data;
     stream->closed = 0;
-    
-    session->next_stream_id += 2;  /* Odd/even pattern */
-    
-    /* Open stream in mux */
-    if (streammux_open(session->mux, stream->stream_id) != 0) {
+
+    sm->next_stream_id += 2;  /* Odd/even pattern */
+
+    /* Open stream in the service's mux */
+    if (streammux_open(sm->mux, stream->stream_id) != 0) {
         free(stream);
         return NULL;
     }
-    
+
     /* Add to session's stream list */
-    if (session->stream_count >= session->stream_cap) {
-        /* Grow array */
-        int new_cap = session->stream_cap * 2;
-        norn_stream_t **new_streams = realloc(session->streams,
-                                               new_cap * sizeof(*new_streams));
-        if (!new_streams) {
-            free(stream);
-            return NULL;
-        }
-        session->streams = new_streams;
-        session->stream_cap = new_cap;
+    if (session_streams_reserve(session) != 0) {
+        free(stream);
+        return NULL;
     }
-    
+
     session->streams[session->stream_count++] = stream;
-    
+
     /* Notify callback */
     callback(stream, NORN_STREAM_READY, user_data);
 
     return stream;
+}
+
+norn_stream_t *norn_stream_open_async(norn_session_t *session,
+                                      norn_stream_callback_t callback,
+                                      void *user_data) {
+    return norn_stream_open_svc(session, NORN_SVC_DEFAULT, callback, user_data);
+}
+
+norn_session_t *norn_stream_session(const norn_stream_t *stream) {
+    return stream ? stream->session : NULL;
+}
+
+/* Send one unreliable datagram tagged with a service (FEAT-033). */
+int norn_session_send_datagram(norn_session_t *session, norn_service_t service,
+                               const unsigned char *data, size_t len) {
+    if (!session || !data) return -1;
+    if (session->state != NORN_SESSION_ESTABLISHED) return -1;
+    unsigned char frame[2048];
+    if (APPFRAME_HDR + len > sizeof(frame)) return -1;
+    frame[0] = APPKIND_DGRAM;
+    frame[1] = (unsigned char)(service >> 8);
+    frame[2] = (unsigned char)(service & 0xff);
+    memcpy(frame + APPFRAME_HDR, data, len);
+    return session_seal_send(session, frame, APPFRAME_HDR + len);
 }
 
 int norn_session_set_accept_stream(norn_session_t *session,
@@ -1146,7 +1244,7 @@ int norn_stream_write(norn_stream_t *stream,
     
     uint32_t now_ms = 0;  /* TODO: Get actual time */
     
-    return streammux_write(stream->session->mux, stream->stream_id,
+    return streammux_write(stream->mux, stream->stream_id,
                           data, len, now_ms);
 }
 
@@ -1155,14 +1253,14 @@ int norn_stream_read(norn_stream_t *stream,
                      size_t cap) {
     if (!stream || !buf || cap == 0) return -1;
     
-    return streammux_read(stream->session->mux, stream->stream_id,
+    return streammux_read(stream->mux, stream->stream_id,
                          buf, cap);
 }
 
 size_t norn_stream_readable(const norn_stream_t *stream) {
     if (!stream) return 0;
     
-    return streammux_readable(stream->session->mux, stream->stream_id);
+    return streammux_readable(stream->mux, stream->stream_id);
 }
 
 int norn_stream_close(norn_stream_t *stream) {
@@ -1171,7 +1269,7 @@ int norn_stream_close(norn_stream_t *stream) {
     
     uint32_t now_ms = 0;  /* TODO: Get actual time */
     
-    streammux_finish(stream->session->mux, stream->stream_id, now_ms);
+    streammux_finish(stream->mux, stream->stream_id, now_ms);
     stream->closed = 1;
     
     /* Notify callback */
@@ -1199,7 +1297,7 @@ int norn_stream_reset(norn_stream_t *stream) {
 int norn_stream_peer_closed(const norn_stream_t *stream) {
     if (!stream) return 0;
     
-    return streammux_peer_finished(stream->session->mux, stream->stream_id);
+    return streammux_peer_finished(stream->mux, stream->stream_id);
 }
 
 /* === NAT Traversal (FEAT-017, stub) === */
