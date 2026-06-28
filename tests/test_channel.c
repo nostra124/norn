@@ -5,6 +5,21 @@
 #include <string.h>
 #include <assert.h>
 
+/* An external signer (ssh-agent stand-in) that signs with a raw key held in ud. */
+static int ext_signer(void *ud, unsigned char sig[CHANNEL_SIGBYTES],
+                      const unsigned char *msg, size_t msglen) {
+    return bf_sign(sig, msg, msglen, (const unsigned char *)ud);
+}
+/* A signer that always fails — models an unreachable agent. */
+static int failing_signer(void *ud, unsigned char sig[CHANNEL_SIGBYTES],
+                          const unsigned char *msg, size_t msglen) {
+    (void)ud;
+    (void)sig;
+    (void)msg;
+    (void)msglen;
+    return -1;
+}
+
 int main(void) {
     assert(crypto_init() == 0);
 
@@ -107,6 +122,68 @@ int main(void) {
         /* tampering → no channel authenticates it */
         s[30] ^= 0x10;
         assert(channel_open_any(set, 3, s, rl, o, sizeof(o)) == -1);
+    }
+
+    /* ---- external signer (FEAT-028): handshake authenticated without a raw
+     * secret in libnorn — the signer callback is the only thing that signs. ---- */
+    {
+        keypair_t si, sr;
+        assert(crypto_keypair_new(&si) == 0);
+        assert(crypto_keypair_new(&sr) == 0);
+        channel_t ei, er;
+        unsigned char ini[CHANNEL_INIT_LEN], rsp[CHANNEL_RESP_LEN],
+            cnf[CHANNEL_CONFIRM_LEN], sees_i[32], sees_r[32];
+
+        assert(channel_hs_build_init(&ei, si.public_key, ini, sizeof(ini)) ==
+               CHANNEL_INIT_LEN);
+        /* responder signs RESP via the external signer */
+        assert(channel_hs_accept_signed(&er, sr.public_key, ext_signer,
+                                        sr.secret_key, ini, sizeof(ini), sees_i,
+                                        rsp, sizeof(rsp)) == CHANNEL_RESP_LEN);
+        /* initiator signs CONFIRM via the external signer */
+        assert(channel_hs_confirm_signed(&ei, si.public_key, ext_signer,
+                                         si.secret_key, rsp, sizeof(rsp), sees_r,
+                                         cnf, sizeof(cnf)) == CHANNEL_CONFIRM_LEN);
+        /* the signer-authenticated handshake completes and binds true identities */
+        assert(channel_hs_finish(&er, sees_i, cnf, sizeof(cnf)) == 0);
+        assert(memcmp(sees_i, si.public_key, 32) == 0);
+        assert(memcmp(sees_r, sr.public_key, 32) == 0);
+        assert(memcmp(ei.tx_key, er.rx_key, 32) == 0);
+
+        /* a signer that fails aborts the responder's RESP */
+        channel_t fr;
+        unsigned char fin[CHANNEL_INIT_LEN], frsp[CHANNEL_RESP_LEN], ft[32];
+        assert(channel_hs_build_init(&ei, si.public_key, fin, sizeof(fin)) ==
+               CHANNEL_INIT_LEN);
+        assert(channel_hs_accept_signed(&fr, sr.public_key, failing_signer, NULL,
+                                        fin, sizeof(fin), ft, frsp,
+                                        sizeof(frsp)) == -1);
+        /* a signer that fails aborts CONFIRM *after* the RESP verifies (so the
+         * sign step is actually reached): build a valid RESP, then confirm with
+         * the failing signer. */
+        channel_t vi, vr;
+        unsigned char vin[CHANNEL_INIT_LEN], vrsp[CHANNEL_RESP_LEN],
+            vcnf[CHANNEL_CONFIRM_LEN], vt[32];
+        assert(channel_hs_build_init(&vi, si.public_key, vin, sizeof(vin)) ==
+               CHANNEL_INIT_LEN);
+        assert(channel_hs_accept(&vr, sr.public_key, sr.secret_key, vin,
+                                 sizeof(vin), vt, vrsp, sizeof(vrsp)) ==
+               CHANNEL_RESP_LEN);
+        assert(channel_hs_confirm_signed(&vi, si.public_key, failing_signer, NULL,
+                                         vrsp, sizeof(vrsp), vt, vcnf,
+                                         sizeof(vcnf)) == -1);
+
+        /* null signer / null secret are rejected by the new and wrapped APIs */
+        assert(channel_hs_accept_signed(&er, sr.public_key, NULL, NULL, ini,
+                                        sizeof(ini), sees_i, rsp,
+                                        sizeof(rsp)) == -1);
+        assert(channel_hs_confirm_signed(&ei, si.public_key, NULL, NULL, rsp,
+                                         sizeof(rsp), sees_r, cnf,
+                                         sizeof(cnf)) == -1);
+        assert(channel_hs_accept(&er, sr.public_key, NULL, ini, sizeof(ini),
+                                 sees_i, rsp, sizeof(rsp)) == -1);
+        assert(channel_hs_confirm(&ei, si.public_key, NULL, rsp, sizeof(rsp),
+                                  sees_r, cnf, sizeof(cnf)) == -1);
     }
 
     printf("test_channel: OK\n");

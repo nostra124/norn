@@ -139,13 +139,26 @@ int channel_hs_accept_0rtt(channel_t *c, const unsigned char *self_pub,
     return CHANNEL_RESP_LEN;
 }
 
-int channel_auth_sign(unsigned char *sig, const unsigned char *self_sk,
-                      const unsigned char *init_eph, const unsigned char *resp_eph) {
-    if (!sig || !self_sk || !init_eph || !resp_eph) return -1;
+/* Build the signed transcript (init_eph || resp_eph) and hand it to `sign`. */
+static int auth_sign_with(unsigned char *sig, channel_signer_fn sign, void *ud,
+                          const unsigned char *init_eph,
+                          const unsigned char *resp_eph) {
     unsigned char tr[64];
     memcpy(tr, init_eph, 32);
     memcpy(tr + 32, resp_eph, 32);
-    return bf_sign(sig, tr, sizeof(tr), self_sk);
+    return sign(ud, sig, tr, sizeof(tr));
+}
+
+/* Built-in signer: ed25519-sign with a raw secret key passed as `ud`. */
+static int secret_signer(void *ud, unsigned char sig[CHANNEL_SIGBYTES],
+                         const unsigned char *msg, size_t msglen) {
+    return bf_sign(sig, msg, msglen, (const unsigned char *)ud);
+}
+
+int channel_auth_sign(unsigned char *sig, const unsigned char *self_sk,
+                      const unsigned char *init_eph, const unsigned char *resp_eph) {
+    if (!sig || !self_sk || !init_eph || !resp_eph) return -1;
+    return auth_sign_with(sig, secret_signer, (void *)self_sk, init_eph, resp_eph);
 }
 
 int channel_auth_verify(const unsigned char *sig, const unsigned char *peer_pk,
@@ -214,12 +227,12 @@ int channel_hs_build_init(channel_t *c, const unsigned char *self_pub,
     return channel_hs_build_init_ex(c, self_pub, CHANNEL_MSG_INIT, out, outcap);
 }
 
-int channel_hs_accept(channel_t *c, const unsigned char *self_pub,
-                      const unsigned char *self_sk,
-                      const unsigned char *init_msg, size_t init_len,
-                      unsigned char *peer_pub_out,
-                      unsigned char *out, size_t outcap) {
-    if (!c || !self_pub || !self_sk || !init_msg || !peer_pub_out || !out) return -1;
+int channel_hs_accept_signed(channel_t *c, const unsigned char *self_pub,
+                             channel_signer_fn sign, void *sign_ud,
+                             const unsigned char *init_msg, size_t init_len,
+                             unsigned char *peer_pub_out,
+                             unsigned char *out, size_t outcap) {
+    if (!c || !self_pub || !sign || !init_msg || !peer_pub_out || !out) return -1;
     if (init_len != CHANNEL_INIT_LEN || outcap < CHANNEL_RESP_LEN) return -1;
     const unsigned char *p = init_msg;
     if (get_u32(p) != CHANNEL_MAGIC) return -1;
@@ -233,7 +246,9 @@ int channel_hs_accept(channel_t *c, const unsigned char *self_pub,
     if (channel_derive(c, init_eph, 0) != 0) return -1;  /* responder side */
 
     unsigned char sig[CHANNEL_SIGBYTES];
-    if (channel_auth_sign(sig, self_sk, init_eph, c->eph_pub) != 0) return -1;   /* LCOV_EXCL_BR_LINE: sign never fails */
+    /* The signer can fail (e.g. ssh-agent unreachable); the built-in raw-secret
+     * signer never does. */
+    if (auth_sign_with(sig, sign, sign_ud, init_eph, c->eph_pub) != 0) return -1;
 
     unsigned char *o = out;
     put_u32(o, CHANNEL_MAGIC); o += 4;
@@ -244,12 +259,22 @@ int channel_hs_accept(channel_t *c, const unsigned char *self_pub,
     return CHANNEL_RESP_LEN;
 }
 
-int channel_hs_confirm(channel_t *c, const unsigned char *self_pub,
-                       const unsigned char *self_sk,
-                       const unsigned char *resp_msg, size_t resp_len,
-                       unsigned char *peer_pub_out,
-                       unsigned char *out, size_t outcap) {
-    if (!c || !self_pub || !self_sk || !resp_msg || !peer_pub_out || !out) return -1;
+int channel_hs_accept(channel_t *c, const unsigned char *self_pub,
+                      const unsigned char *self_sk,
+                      const unsigned char *init_msg, size_t init_len,
+                      unsigned char *peer_pub_out,
+                      unsigned char *out, size_t outcap) {
+    if (!self_sk) return -1;
+    return channel_hs_accept_signed(c, self_pub, secret_signer, (void *)self_sk,
+                                    init_msg, init_len, peer_pub_out, out, outcap);
+}
+
+int channel_hs_confirm_signed(channel_t *c, const unsigned char *self_pub,
+                              channel_signer_fn sign, void *sign_ud,
+                              const unsigned char *resp_msg, size_t resp_len,
+                              unsigned char *peer_pub_out,
+                              unsigned char *out, size_t outcap) {
+    if (!c || !self_pub || !sign || !resp_msg || !peer_pub_out || !out) return -1;
     if (resp_len != CHANNEL_RESP_LEN || outcap < CHANNEL_CONFIRM_LEN) return -1;
     const unsigned char *p = resp_msg;
     if (get_u32(p) != CHANNEL_MAGIC) return -1;
@@ -264,7 +289,9 @@ int channel_hs_confirm(channel_t *c, const unsigned char *self_pub,
     if (channel_derive(c, resp_eph, 1) != 0) return -1;  /* LCOV_EXCL_BR_LINE: resp_eph already auth'd, derive ok */
 
     unsigned char sig[CHANNEL_SIGBYTES];
-    if (channel_auth_sign(sig, self_sk, c->eph_pub, resp_eph) != 0) return -1;   /* LCOV_EXCL_BR_LINE: sign never fails */
+    /* The signer can fail (e.g. ssh-agent unreachable); the built-in raw-secret
+     * signer never does. */
+    if (auth_sign_with(sig, sign, sign_ud, c->eph_pub, resp_eph) != 0) return -1;
 
     unsigned char *o = out;
     put_u32(o, CHANNEL_MAGIC); o += 4;
@@ -272,6 +299,16 @@ int channel_hs_confirm(channel_t *c, const unsigned char *self_pub,
     int sl = channel_seal(c, sig, CHANNEL_SIGBYTES, o, outcap - 5);
     if (sl != CHANNEL_SIGBYTES + CHANNEL_OVERHEAD) return -1;   /* LCOV_EXCL_BR_LINE: outcap≥CONFIRM_LEN ⇒ seal fits */
     return CHANNEL_CONFIRM_LEN;
+}
+
+int channel_hs_confirm(channel_t *c, const unsigned char *self_pub,
+                       const unsigned char *self_sk,
+                       const unsigned char *resp_msg, size_t resp_len,
+                       unsigned char *peer_pub_out,
+                       unsigned char *out, size_t outcap) {
+    if (!self_sk) return -1;
+    return channel_hs_confirm_signed(c, self_pub, secret_signer, (void *)self_sk,
+                                     resp_msg, resp_len, peer_pub_out, out, outcap);
 }
 
 int channel_hs_finish(channel_t *c, const unsigned char *init_pub,

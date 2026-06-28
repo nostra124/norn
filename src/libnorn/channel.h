@@ -61,6 +61,13 @@ void channel_derive_0rtt(channel_t *c, const unsigned char *init_eph,
 
 #define CHANNEL_SIGBYTES 64
 
+/* A handshake signer: produce the 64-byte ed25519 signature over `msg`. `ud` is
+ * caller context. Returns 0 on success, non-zero on failure. This lets an
+ * external keystore (e.g. ssh-agent) authenticate the handshake without ever
+ * exposing the secret key — the signer is the only thing that touches it. */
+typedef int (*channel_signer_fn)(void *ud, unsigned char sig[CHANNEL_SIGBYTES],
+                                 const unsigned char *msg, size_t msglen);
+
 /* Handshake auth: sign / verify a proof that binds the two ephemeral pubkeys to
  * an ed25519 identity. The transcript is init_eph(32) || resp_eph(32) (initiator's
  * ephemeral first), so both ends compute the same bytes after the exchange.
@@ -119,6 +126,16 @@ int channel_hs_accept(channel_t *c, const unsigned char *self_pub,
                       unsigned char *peer_pub_out,
                       unsigned char *out, size_t outcap);
 
+/* As channel_hs_accept, but the transcript is signed by `sign`(`sign_ud`)
+ * instead of a raw secret key — so the ed25519 secret can live in ssh-agent or
+ * another keystore. channel_hs_accept is the special case where `sign` is the
+ * built-in raw-secret signer. Returns -1 if the signer reports failure. */
+int channel_hs_accept_signed(channel_t *c, const unsigned char *self_pub,
+                             channel_signer_fn sign, void *sign_ud,
+                             const unsigned char *init_msg, size_t init_len,
+                             unsigned char *peer_pub_out,
+                             unsigned char *out, size_t outcap);
+
 /* ---- 0-RTT first flight (FEAT-075 3/n) -------------------------------------
  * On a reconnect to a peer for which a resumption PSK is cached, the initiator
  * seals idempotent early application data into the INIT itself (one message, zero
@@ -166,6 +183,15 @@ int channel_hs_confirm(channel_t *c, const unsigned char *self_pub,
                        const unsigned char *resp_msg, size_t resp_len,
                        unsigned char *peer_pub_out,
                        unsigned char *out, size_t outcap);
+
+/* As channel_hs_confirm, but the transcript is signed by `sign`(`sign_ud`)
+ * instead of a raw secret key. Returns -1 if the signer reports failure (or the
+ * responder's RESP signature fails to verify, as in channel_hs_confirm). */
+int channel_hs_confirm_signed(channel_t *c, const unsigned char *self_pub,
+                              channel_signer_fn sign, void *sign_ud,
+                              const unsigned char *resp_msg, size_t resp_len,
+                              unsigned char *peer_pub_out,
+                              unsigned char *out, size_t outcap);
 
 /* Responder: handle CONFIRM. Opens the sealed signature and verifies it against
  * the initiator's pub (from channel_hs_accept). Returns 0 if the initiator is
