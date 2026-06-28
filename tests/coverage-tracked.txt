@@ -37,5 +37,6 @@ src/nornd/keydir.c
 src/nornd/served_proto.c
 src/nornd/store.c
 src/nornd/served.c
+src/nornd/agent.c
 
 src/nornd/peers.c
