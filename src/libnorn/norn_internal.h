@@ -15,6 +15,7 @@
 #include "norn_nat.h"
 #include "norn_rendezvous.h"
 #include "norn_relay.h"
+#include "norn_bonjour.h"
 #include "net.h"
 #include "mainline.h"
 #include "norn_transaction.h"
@@ -67,6 +68,9 @@ struct norn_client {
     
     /* Relay service (FEAT-017) */
     norn_relay_t relay;               /* Relay forwarding state */
+
+    /* Bonjour/mDNS service announcement and discovery (FEAT-036) */
+    norn_bonjour_t *bonjour;
     
     /* Hole punch pending requests (FEAT-023) */
     struct {

@@ -37,13 +37,14 @@ libnorn_la_SOURCES = \
 	src/libnorn/norn_endpoint_cache.c \
 	src/libnorn/norn_nat.c \
 	src/libnorn/norn_rendezvous.c \
-	src/libnorn/norn_relay.c
+	src/libnorn/norn_relay.c \
+	src/libnorn/norn_bonjour.c
 
-libnorn_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
+libnorn_la_CFLAGS = $(SODIUM_CFLAGS) $(AVAHI_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 # Record libsodium as a dependency of the shared library itself, so dynamic
 # consumers (e.g. the Rust binding) don't have to re-link it explicitly and it
 # survives the linker's --as-needed pruning.
-libnorn_la_LIBADD = $(SODIUM_LIBS)
+libnorn_la_LIBADD = $(SODIUM_LIBS) $(AVAHI_LIBS)
 
 # nornd — reference node daemon + CLI, built as an application ON libnorn
 # (not part of the library). Convenience lib so the daemon and its tests share

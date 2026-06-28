@@ -388,7 +388,7 @@ int main(int argc, char **argv) {
     norn_node_class_t cls = NORN_NODE_SERVER;
     nornd_peer_t peers[RAFT_MAX_NODES];
     int n_peers = 0;
-    uint16_t listen_port = 0;
+    uint16_t listen_port = 6881;   /* default: standard Mainline DHT port */
     int use_agent = 0;
 
     for (int i = 1; i < argc; i++) {
@@ -498,14 +498,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    /* Bootstrap to the Mainline DHT so the node can discover peers, resolve
-     * pubkey-addressed sessions, and participate in the global DHT network.
-     * The bootstrap is async — norn_tick() in the event loop drives it. */
-    if (norn_bootstrap(client) != 0)
-        fprintf(stderr, "nornd: DHT bootstrap failed (will retry)\n");
-    else
-        fprintf(stderr, "nornd: bootstrapped to Mainline DHT\n");
-
     norn_cluster_io_t io = {nornd_transport_send, xport};
     norn_cluster_config_t ccfg;
     memset(&ccfg, 0, sizeof(ccfg));
@@ -559,6 +551,7 @@ int main(int argc, char **argv) {
     serve_host_t serve;
     memset(&serve, 0, sizeof(serve));
     static nornd_store_t serve_store;
+    char dht_nodes_path[640];
     {
         char objdir[640];
         const char *base = data_dir;
@@ -579,6 +572,16 @@ int main(int argc, char **argv) {
             norn_register_stream_service(client, NORN_SVC_SERVED_KV,
                                          on_served_accept, &serve);
         }
+        /* DHT routing-table persistence path. */
+        snprintf(dht_nodes_path, sizeof(dht_nodes_path), "%s/dht_nodes", base);
+    }
+    /* Load previously saved DHT routing-table nodes so we re-join the
+     * network faster than a full re-bootstrap. Best-effort: if the file
+     * doesn't exist (first start) or is corrupt, we simply start fresh. */
+    {
+        int loaded = norn_load_dht_nodes(client, dht_nodes_path);
+        if (loaded > 0)
+            fprintf(stderr, "nornd: loaded %d cached DHT nodes\n", loaded);
     }
 
     /* Read our SSH public-key line (`<identity>.pub`) to publish into the fleet
@@ -607,6 +610,7 @@ int main(int argc, char **argv) {
     int clients[MAX_CLIENTS];
     int nclients = 0;
     int nfd = norn_get_fd(client);
+    time_t last_dht_save = 0;         /* last time we persisted the routing table */
 
     while (!g_stop) {
         struct pollfd pfds[2 + MAX_CLIENTS];
@@ -632,6 +636,16 @@ int main(int argc, char **argv) {
         nornd_transport_poll(xport); /* drain peer frames into the cluster */
         serve_host_pump(&serve);     /* drive node-served KV streams (FEAT-033) */
         norn_cluster_tick(cl, now_ms());
+
+        /* Periodically persist the DHT routing table so we re-join faster
+         * after a restart. Every 300s (matching MAINLINE_BOOTSTRAP_INTERVAL). */
+        {
+            time_t now = time(NULL);
+            if (now - last_dht_save >= 300) {
+                int saved = norn_save_dht_nodes(client, dht_nodes_path);
+                if (saved > 0) last_dht_save = now;
+            }
+        }
 
         /* Once we can lead, publish our SSH public key to the directory. */
         if (!ssh_published && sshlen > 0 && norn_cluster_is_leader(cl)) {
@@ -670,6 +684,9 @@ int main(int argc, char **argv) {
     if (!activated) unlink(sockpath); /* systemd owns an activated socket */
     norn_cluster_free(cl);
     nornd_transport_free(xport);
+    /* Save routing table one final time so the most recent node set is
+     * available on next start. */
+    norn_save_dht_nodes(client, dht_nodes_path);
     norn_free(client);
     return 0;
 }

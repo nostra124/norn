@@ -161,6 +161,10 @@ int norn_client_dgram_svc(norn_client_t *client, norn_service_t service,
 void norn_free(norn_client_t *client) {
     if (!client) return;
     
+    /* Stop Bonjour/mDNS announcement and discovery */
+    norn_bonjour_free(client->bonjour);
+    client->bonjour = NULL;
+
     /* Close listener socket */
     if (client->listen_fd >= 0) {
         close(client->listen_fd);
@@ -194,6 +198,26 @@ int norn_get_id(const norn_client_t *client, unsigned char out[NORN_ID_BYTES]) {
 int norn_bootstrap(norn_client_t *client) {
     if (!client || !client->initialized) return -1;
     return mainline_bootstrap(&client->ml);
+}
+
+int norn_save_dht_nodes(norn_client_t *client, const char *path) {
+    if (!client || !path || !client->initialized) return -1;
+    return mainline_save_nodes(&client->ml, path);
+}
+
+int norn_load_dht_nodes(norn_client_t *client, const char *path) {
+    if (!client || !path || !client->initialized) return -1;
+    return mainline_load_nodes(&client->ml, path);
+}
+
+int norn_save_peer_cache(norn_client_t *client, const char *path) {
+    if (!client || !path || !client->initialized) return -1;
+    return -1; /* TODO: implement norn_endpoint_cache persistence */
+}
+
+int norn_load_peer_cache(norn_client_t *client, const char *path) {
+    if (!client || !path || !client->initialized) return -1;
+    return -1; /* TODO: implement norn_endpoint_cache persistence */
 }
 
 int norn_tick(norn_client_t *client) {
