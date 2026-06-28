@@ -502,9 +502,9 @@ int main(int argc, char **argv) {
             const char *home = getenv("HOME");
             if (!home) home = "/tmp";
             snprintf(homebuf, sizeof(homebuf), "%s/.norn", home);
-            mkdir(homebuf, 0700);
             base = homebuf;
         }
+        mkdir(base, 0700); /* ensure the parent exists before the object dir */
         snprintf(objdir, sizeof(objdir), "%s/objects", base);
         if (nornd_store_init(&serve_store, objdir) == 0) {
             serve.be.ctx = cl;
