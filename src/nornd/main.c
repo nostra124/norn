@@ -144,6 +144,65 @@ static const unsigned char *be_leader(void *c) {
 static int be_members(void *c, unsigned char out[][NORND_PUBKEY], int max) {
     return norn_cluster_members((norn_cluster_t *)c, out, max);
 }
+static int be_scan(void *c, const unsigned char *prefix, size_t plen,
+                   norn_kv_visit_fn fn, void *ud) {
+    return norn_cluster_kv_list((norn_cluster_t *)c, prefix, plen, fn, ud);
+}
+
+/* ---- watch subscriptions (FEAT-030 event stream) ----
+ *
+ * A `watch <prefix>` request turns its client socket into a subscriber. One
+ * cluster watch (empty prefix = all keys) is registered for the daemon's
+ * lifetime; on each applied change it fans out an encoded event frame to every
+ * subscriber whose prefix matches the key. Best-effort writes — dead sockets
+ * are reaped by the poll loop, which also drops their subscriptions. */
+typedef struct {
+    int fd;
+    unsigned char prefix[NORND_IPC_MAX_KEY];
+    size_t plen;
+} watch_sub_t;
+
+typedef struct {
+    watch_sub_t subs[MAX_CLIENTS];
+    int n;
+} watch_set_t;
+
+/* Drop every subscription for `fd` (idempotent; called on disconnect and
+ * before re-subscribing the same socket). */
+static void watch_drop(watch_set_t *ws, int fd) {
+    for (int i = 0; i < ws->n; i++) {
+        if (ws->subs[i].fd == fd) {
+            ws->subs[i] = ws->subs[--ws->n];
+            i--;
+        }
+    }
+}
+
+static void watch_add(watch_set_t *ws, int fd, const unsigned char *prefix,
+                      size_t plen) {
+    watch_drop(ws, fd);
+    if (ws->n >= MAX_CLIENTS) return;
+    watch_sub_t *s = &ws->subs[ws->n++];
+    s->fd = fd;
+    if (plen > sizeof(s->prefix)) plen = sizeof(s->prefix);
+    memcpy(s->prefix, prefix, plen);
+    s->plen = plen;
+}
+
+static void on_kv_change(void *ud, norn_kv_event_t ev, const unsigned char *key,
+                         size_t klen, const unsigned char *val, size_t vlen) {
+    watch_set_t *ws = ud;
+    nornd_ipc_resp_t resp;
+    nornd_watch_event(&resp, ev, key, klen, val, vlen);
+    unsigned char frame[NORND_IPC_MAX_BODY + 4];
+    int flen = nornd_ipc_encode_resp(&resp, frame, sizeof(frame));
+    if (flen < 0) return;
+    for (int i = 0; i < ws->n; i++) {
+        if (ws->subs[i].plen <= klen &&
+            memcmp(ws->subs[i].prefix, key, ws->subs[i].plen) == 0)
+            (void)send(ws->subs[i].fd, frame, (size_t)flen, MSG_NOSIGNAL);
+    }
+}
 
 /* ---- IPC socket ---- */
 
@@ -224,7 +283,7 @@ static int listen_unix(const char *path) {
 
 /* Read, decode, dispatch and reply to one ready client. Returns 0 to keep the
  * connection, -1 to drop it. */
-static int serve_client(int fd, const nornd_backend_t *be) {
+static int serve_client(int fd, const nornd_backend_t *be, watch_set_t *ws) {
     unsigned char buf[NORND_IPC_MAX_BODY + 4];
     ssize_t n = recv(fd, buf, sizeof(buf), 0);
     if (n <= 0) return -1;
@@ -237,6 +296,9 @@ static int serve_client(int fd, const nornd_backend_t *be) {
     int olen = nornd_ipc_encode_resp(&resp, out, sizeof(out));
     if (olen < 0) return -1;
     if (send(fd, out, (size_t)olen, MSG_NOSIGNAL) != olen) return -1;
+    /* A successful `watch <prefix>` turns this socket into an event stream. */
+    if (resp.ok && strcmp(req.op, "watch") == 0)
+        watch_add(ws, fd, req.key, req.klen);
     return 0;
 }
 
@@ -384,8 +446,15 @@ int main(int argc, char **argv) {
     signal(SIGTERM, on_signal);
     signal(SIGPIPE, SIG_IGN);
 
-    nornd_backend_t be = {cl,         be_put,    be_del,    be_get,
-                          be_is_leader, be_leader, be_members};
+    nornd_backend_t be = {cl,         be_put,    be_del,     be_get,
+                          be_is_leader, be_leader, be_members, be_scan};
+
+    /* One cluster watch for the daemon's lifetime; on_kv_change fans applied
+     * changes out to `watch` subscribers (empty prefix = every key). */
+    watch_set_t watches;
+    memset(&watches, 0, sizeof(watches));
+    norn_cluster_kv_watch(cl, (const unsigned char *)"", 0, on_kv_change,
+                          &watches);
 
     /* Read our SSH public-key line (`<identity>.pub`) to publish into the fleet
      * key directory once we can lead. Optional: skip if it isn't there. */
@@ -459,7 +528,8 @@ int main(int argc, char **argv) {
 
         for (int i = 0; i < nclients; i++) {
             if (pfds[cstart + i].revents & (POLLIN | POLLHUP | POLLERR)) {
-                if (serve_client(clients[i], &be) != 0) {
+                if (serve_client(clients[i], &be, &watches) != 0) {
+                    watch_drop(&watches, clients[i]);
                     close(clients[i]);
                     clients[i] = clients[--nclients];
                     i--;

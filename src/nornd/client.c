@@ -80,7 +80,7 @@ int nornd_client_build_req(int argc, char **argv, nornd_ipc_req_t *req,
         return 0;
     }
     if (strcmp(sub, "members") == 0 || strcmp(sub, "leader") == 0 ||
-        strcmp(sub, "status") == 0) {
+        strcmp(sub, "status") == 0 || strcmp(sub, "authkeys") == 0) {
         strcpy(req->op, sub);
         return 0;
     }
@@ -131,6 +131,12 @@ int nornd_client_format(const nornd_ipc_req_t *req, const nornd_ipc_resp_t *resp
             put_hex(&s, resp->items[i].data, resp->items[i].len);
             put_cstr(&s, "\n");
         }
+    } else if (strcmp(op, "authkeys") == 0) {
+        /* Each item is a verbatim authorized_keys line (ssh-ed25519 …). */
+        for (int i = 0; i < resp->n_items; i++) {
+            put_bytes(&s, resp->items[i].data, resp->items[i].len);
+            put_cstr(&s, "\n");
+        }
     } else if (strcmp(op, "status") == 0) {
         put_cstr(&s, resp->vlen > 0 && resp->val[0] == 1 ? "role: leader\n"
                                                          : "role: follower\n");
@@ -142,8 +148,23 @@ int nornd_client_format(const nornd_ipc_req_t *req, const nornd_ipc_resp_t *resp
         char line[32];
         snprintf(line, sizeof(line), "members: %d\n", resp->n_items);
         put_cstr(&s, line);
+    } else if (strcmp(op, "watch") == 0) {
+        /* The subscription ack carries no items; each later frame is a change
+         * event: items[0]=kind, items[1]=key, val=new value (PUT only). */
+        if (resp->n_items == 0) {
+            put_cstr(&s, "OK\n");
+        } else {
+            put_bytes(&s, resp->items[0].data, resp->items[0].len);
+            put_cstr(&s, " ");
+            put_bytes(&s, resp->items[1].data, resp->items[1].len);
+            if (resp->has_val) {
+                put_cstr(&s, " ");
+                put_bytes(&s, resp->val, resp->vlen);
+            }
+            put_cstr(&s, "\n");
+        }
     } else {
-        /* put/del/cas/watch acknowledgement */
+        /* put/del/cas acknowledgement */
         put_cstr(&s, "OK\n");
     }
     *outlen = s.len;

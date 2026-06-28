@@ -38,6 +38,19 @@ static int fill_members(const nornd_backend_t *be, nornd_ipc_resp_t *r) {
     return n;
 }
 
+/* Collect each `peer/<id>/ssh` value as one response item — the fleet's
+ * authorized_keys lines. Keydir layout: src/nornd/keydir.h. */
+static void authkeys_visit(void *ud, const unsigned char *key, size_t klen,
+                           const unsigned char *val, size_t vlen) {
+    nornd_ipc_resp_t *r = ud;
+    int is_ssh = klen >= 4 && memcmp(key + klen - 4, "/ssh", 4) == 0;
+    if (is_ssh && r->n_items < NORND_IPC_MAX_ITEMS && vlen <= NORND_IPC_MAX_ITEM) {
+        memcpy(r->items[r->n_items].data, val, vlen);
+        r->items[r->n_items].len = vlen;
+        r->n_items++;
+    }
+}
+
 void nornd_dispatch(const nornd_backend_t *be, const nornd_ipc_req_t *req,
                     nornd_ipc_resp_t *resp) {
     memset(resp, 0, sizeof(*resp));
@@ -138,5 +151,33 @@ void nornd_dispatch(const nornd_backend_t *be, const nornd_ipc_req_t *req,
         ok_empty(resp);
         return;
     }
+    if (strcmp(op, "authkeys") == 0) {
+        /* Enumerate the fleet's published SSH keys into the item list. */
+        be->scan(be->ctx, (const unsigned char *)"peer/", 5, authkeys_visit, resp);
+        resp->ok = 1;
+        return;
+    }
     fail(resp, "unknown op");
+}
+
+void nornd_watch_event(nornd_ipc_resp_t *resp, norn_kv_event_t ev,
+                       const unsigned char *key, size_t klen,
+                       const unsigned char *val, size_t vlen) {
+    memset(resp, 0, sizeof(*resp));
+    resp->ok = 1;
+    const char *kind = ev == NORN_KV_EV_DEL ? "del" : "put";
+    size_t kl = strlen(kind);
+    memcpy(resp->items[0].data, kind, kl);
+    resp->items[0].len = kl;
+    if (klen > NORND_IPC_MAX_ITEM) klen = NORND_IPC_MAX_ITEM;
+    memcpy(resp->items[1].data, key, klen);
+    resp->items[1].len = klen;
+    resp->n_items = 2;
+    /* DEL carries no value; a PUT value that would overflow the field is
+     * dropped (the watcher still learns the key changed). */
+    if (ev == NORN_KV_EV_PUT && vlen <= NORND_IPC_MAX_VAL) {
+        memcpy(resp->val, val, vlen);
+        resp->vlen = vlen;
+        resp->has_val = 1;
+    }
 }
