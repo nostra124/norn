@@ -498,6 +498,14 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    /* Bootstrap to the Mainline DHT so the node can discover peers, resolve
+     * pubkey-addressed sessions, and participate in the global DHT network.
+     * The bootstrap is async — norn_tick() in the event loop drives it. */
+    if (norn_bootstrap(client) != 0)
+        fprintf(stderr, "nornd: DHT bootstrap failed (will retry)\n");
+    else
+        fprintf(stderr, "nornd: bootstrapped to Mainline DHT\n");
+
     norn_cluster_io_t io = {nornd_transport_send, xport};
     norn_cluster_config_t ccfg;
     memset(&ccfg, 0, sizeof(ccfg));
