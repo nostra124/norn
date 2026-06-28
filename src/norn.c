@@ -34,11 +34,12 @@ static void usage(FILE *out) {
     fprintf(out, "\n");
     fprintf(out, "Commands:\n");
     fprintf(out, "  keygen              Generate ed25519 keypair\n");
-    fprintf(out, "  get <key>           Retrieve record from DHT\n");
-    fprintf(out, "  set <key> <value>   Store signed record to DHT\n");
+    fprintf(out, "  bep44 get <key>     Retrieve a signed record directly from the DHT\n");
+    fprintf(out, "  bep44 set <k> <v>   Store a signed record directly to the DHT\n");
     fprintf(out, "  daemon              Run as DHT daemon\n");
     fprintf(out, "  cluster <sub> ...   Talk to nornd's cluster KV store:\n");
     fprintf(out, "                        put|get|del|cas|watch|members|leader|status\n");
+    fprintf(out, "                      (watch streams 'put <key> <value>' / 'del <key>' lines)\n");
     fprintf(out, "  keys <nodeid>       Resolve a peer's SSH + GPG public keys\n");
     fprintf(out, "  authorized-keys     Print every fleet member's SSH key (authorized_keys)\n");
     fprintf(out, "  version             Print version\n");
@@ -97,39 +98,43 @@ static int create_key_dir(const char *key_path) {
 }
 
 static int load_keypair(unsigned char pubkey[32], unsigned char secret[64]) {
+    /* Only a path from get_default_key_path() is heap-owned here; `key_file`
+     * and a NORN_KEY value from getenv() are borrowed and must not be freed. */
     const char *path = key_file;
+    int owned = 0;
     if (!path) {
         path = getenv("NORN_KEY");
     }
     if (!path) {
         path = get_default_key_path();
         if (!path) return -1;
+        owned = 1;
     }
-    
+
     FILE *f = fopen(path, "r");
     if (!f) {
         fprintf(stderr, "ERROR: Failed to open key file %s: %s\n", path, strerror(errno));
         fprintf(stderr, "HINT: Run 'norn keygen' to create a keypair\n");
-        if (!key_file) free((char*)path);
+        if (owned) free((char*)path);
         return -1;
     }
-    
+
     keypair_t kp;
     memset(&kp, 0, sizeof(kp));
-    
+
     if (fread(&kp, sizeof(kp), 1, f) != 1) {
         fprintf(stderr, "ERROR: Failed to read key file %s\n", path);
         fclose(f);
-        if (!key_file) free((char*)path);
+        if (owned) free((char*)path);
         return -1;
     }
-    
+
     fclose(f);
-    
+
     memcpy(pubkey, kp.public_key, 32);
     memcpy(secret, kp.secret_key, 64);
-    
-    if (!key_file) free((char*)path);
+
+    if (owned) free((char*)path);
     return 0;
 }
 
@@ -408,6 +413,39 @@ static int do_set(int argc, char **argv) {
     return 0;
 }
 
+/* `norn bep44 <get|set> …` — namespaced direct-DHT BEP-44 verbs. Reuses the
+ * get/set handlers, which expect the verb at argv[1]; present them a shifted
+ * view that drops the "bep44" token. `argv[sub_idx]` is the sub-verb. */
+static int do_bep44(int argc, char **argv, int sub_idx) {
+    if (sub_idx >= argc) {
+        fprintf(stderr, "ERROR: Missing bep44 subcommand (get|set)\n");
+        return 1;
+    }
+    const char *sub = argv[sub_idx];
+    int n = argc - sub_idx + 1; /* prog + (verb..end) */
+    char **view = malloc(sizeof(char *) * (size_t)(n + 1));
+    if (!view) {
+        fprintf(stderr, "ERROR: Out of memory\n");
+        return 1;
+    }
+    view[0] = argv[0];
+    for (int i = sub_idx; i < argc; i++) view[1 + (i - sub_idx)] = argv[i];
+    view[n] = NULL;
+
+    int rc;
+    if (strcmp(sub, "get") == 0) {
+        rc = do_get(n, view);
+    } else if (strcmp(sub, "set") == 0) {
+        rc = do_set(n, view);
+    } else {
+        fprintf(stderr, "ERROR: Unknown bep44 subcommand: %s\n", sub);
+        fprintf(stderr, "Usage: %s bep44 <get|set> ...\n", prog_name);
+        rc = 1;
+    }
+    free(view);
+    return rc;
+}
+
 static int do_daemon(int argc, char **argv) {
     static struct option long_options[] = {
         {"key", required_argument, 0, 'k'},
@@ -583,10 +621,13 @@ int main(int argc, char **argv) {
         return do_version();
     } else if (strcmp(cmd, "keygen") == 0) {
         return do_keygen(argc, argv);
+    } else if (strcmp(cmd, "bep44") == 0) {
+        /* Namespaced direct-DHT verbs: norn bep44 <get|set> ... */
+        return do_bep44(argc, argv, optind + 1);
     } else if (strcmp(cmd, "get") == 0) {
-        return do_get(argc, argv);
+        return do_get(argc, argv); /* deprecated alias for `bep44 get` */
     } else if (strcmp(cmd, "set") == 0) {
-        return do_set(argc, argv);
+        return do_set(argc, argv); /* deprecated alias for `bep44 set` */
     } else if (strcmp(cmd, "daemon") == 0) {
         return do_daemon(argc, argv);
     } else if (strcmp(cmd, "cluster") == 0) {

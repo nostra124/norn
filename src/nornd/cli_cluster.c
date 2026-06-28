@@ -117,9 +117,13 @@ int nornd_cli_cluster(int argc, char **argv) {
     int flen = read_frame(fd, frame, sizeof(frame));
     if (flen > 0) {
         rc = print_resp(&req, frame, flen);
-        /* watch: keep printing streamed change frames until nornd closes. */
-        while (is_watch && (flen = read_frame(fd, frame, sizeof(frame))) > 0)
+        /* watch: keep printing streamed change frames until nornd closes.
+         * Flush each one so events surface live even when stdout is a pipe. */
+        if (is_watch) fflush(stdout);
+        while (is_watch && (flen = read_frame(fd, frame, sizeof(frame))) > 0) {
             print_resp(&req, frame, flen);
+            fflush(stdout);
+        }
     } else {
         fprintf(stderr, "norn: no response from nornd\n");
     }
