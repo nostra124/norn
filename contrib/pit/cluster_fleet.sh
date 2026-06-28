@@ -38,8 +38,8 @@ for ((i=0; i<N; i++)); do
         peers+=( --peer "${PUBS[$j]}@127.0.0.1:${PORTS[$j]}" )
     done
     "$NORND" --identity "$DIR/id$i" --socket "${SOCKS[$i]}" \
-        --listen-port "${PORTS[$i]}" --class server "${peers[@]}" \
-        >"$DIR/n$i.log" 2>&1 &
+        --listen-port "${PORTS[$i]}" --data-dir "$DIR/data$i" \
+        --class server "${peers[@]}" >"$DIR/n$i.log" 2>&1 &
     PIDS[$i]=$!
 done
 
@@ -76,4 +76,15 @@ for ((i=0; i<N; i++)); do
 done
 [ "$miss" -eq 0 ] || { echo "FAIL: $miss/$N nodes missing the replicated value"; exit 1; }
 
-echo "PASS: $N-node fleet — 1 leader, all see $N members, value replicated to all $N"
+# Served-KV dial: a separate client dials a random node over its one UDP port and
+# fetches the replicated key via NORN_SVC_SERVED_KV (proves served-KV coexists
+# with cluster Raft on the same session/port, across real processes at scale).
+"$NORN" keygen --key "$DIR/dialer.key" >/dev/null 2>&1
+d=$(( RANDOM % N ))
+echo "== norn node get fleet/key from node$d (served-KV dial) =="
+got=$(NORN_KEY="$DIR/dialer.key" "$NORN" node \
+        "${PUBS[$d]}@127.0.0.1:${PORTS[$d]}" get fleet/key 2>/dev/null)
+[ "$got" = "hello" ] || { echo "FAIL: served-KV get => '$got' (expected hello)"; exit 1; }
+echo "served-KV dial to node$d => '$got'"
+
+echo "PASS: $N-node fleet — 1 leader, all see $N members, replicated to all $N, served-KV dial ok"
