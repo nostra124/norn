@@ -86,6 +86,12 @@ norn_client_t *norn_new(const unsigned char *self_pub,
     return client;
 }
 
+void norn_set_signer(norn_client_t *client, norn_sign_fn fn, void *ud) {
+    if (!client) return;
+    client->signer = fn;
+    client->signer_ud = ud;
+}
+
 void norn_free(norn_client_t *client) {
     if (!client) return;
     

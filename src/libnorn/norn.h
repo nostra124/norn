@@ -169,6 +169,32 @@ norn_client_t *norn_new(const unsigned char *self_pub,
                         const norn_config_t *cfg);
 
 /**
+ * @brief Signer for an external identity keystore (e.g. ssh-agent).
+ *
+ * Produces the 64-byte ed25519 signature over `msg`. `ud` is caller context.
+ * Returns 0 on success, non-zero on failure.
+ */
+typedef int (*norn_sign_fn)(void *ud, unsigned char sig[64],
+                            const unsigned char *msg, size_t msglen);
+
+/**
+ * @brief Delegate session-handshake signing to an external keystore.
+ *
+ * By default a client signs its session handshakes with the secret key passed
+ * to norn_new(). Installing a signer routes signing through `fn` instead, so the
+ * raw ed25519 key never needs to live in this process — it can stay in ssh-agent
+ * or an HSM. The public key from norn_new() remains the node identity (peers
+ * verify against it), so when a signer is set the `self_sec` given to norn_new()
+ * may be a placeholder. Pass fn=NULL to revert to the built-in secret signer.
+ * Applies to sessions opened after the call.
+ *
+ * @param client Client handle (NULL-safe: does nothing)
+ * @param fn     Signer callback, or NULL to use the built-in secret signer
+ * @param ud     Opaque context passed to every `fn` invocation
+ */
+void norn_set_signer(norn_client_t *client, norn_sign_fn fn, void *ud);
+
+/**
  * @brief Destroy a DHT client
  * 
  * Releases all resources associated with the client. The client must not
