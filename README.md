@@ -17,7 +17,28 @@ plus a node daemon and a CLI on top.
 - **norn** — the CLI: direct DHT operations, plus a thin IPC client to `nornd`
   for the cluster store and the fleet key directory.
 
-## Building
+## Installation
+
+### Quick Install (all platforms)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/nostra124/norn/master/scripts/install.sh | sh
+```
+
+Installs to `/usr/local` by default. Options:
+
+```sh
+PREFIX=/usr VERSION=v0.12.0 curl -fsSL ... | sh
+```
+
+### macOS (Homebrew)
+
+```sh
+brew tap nostra124/norn
+brew install norn
+```
+
+### From Source
 
 ```sh
 autoreconf -fi
@@ -28,6 +49,15 @@ sudo make install   # installs libnorn, norn, nornd, man pages, service units
 ```
 
 Requires a C compiler, autotools, and **libsodium** (`libsodium-dev`).
+
+### Linux (Debian packages)
+
+Debian packages are available in the `debian/` directory:
+
+```sh
+dpkg-buildpackage -us -uc
+sudo dpkg -i ../libnorn_*.deb ../norn_*.deb
+```
 
 ## Usage
 
