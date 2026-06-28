@@ -2,15 +2,17 @@
 
 Private mesh formation for fleet deployment.
 
-## Status (2026-06-23)
+## Status (2026-06-28)
 
-**PLANNED** — Depends on v0.8.0 (FEAT-014, FEAT-016)
+**DONE for 1.0 (acceptance #1)** — acceptance #2 (NAT'd member via rendezvous/
+relay) deferred post-1.0 with FEAT-022. Config API + docs + formation are
+integration-tested (`tests/test_overlay_net.c`).
 
 ## Tickets
 
 | ID | Title | Priority | Depends On | Status |
 |----|-------|----------|------------|--------|
-| FEAT-020 | Private overlay bootstrap | medium | FEAT-014, FEAT-016 | open |
+| FEAT-020 | Private overlay bootstrap | medium | FEAT-014, FEAT-016 | done (1.0 scope) |
 
 ## Overview
 

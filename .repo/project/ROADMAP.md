@@ -1,11 +1,14 @@
 # norn Development Roadmap
 
 > **Ordering discipline (post-jump correction).** Milestones are sequential.
-> Work jumped ahead — v0.9 → v0.11 → v0.12 — while **v0.10.0 (Private Overlay)
-> was never completed** and several v0.8/v0.12 tails were left open. We do **not**
-> open a new milestone until the current one is genuinely closed. The
-> **Catch-up Backlog** below is the ordered debt to clear before the Alpha/Beta
-> stabilization track and 1.0. No feature work skips ahead of it.
+> Work jumped ahead — v0.9 → v0.11 → v0.12 — while **v0.10.0 (Private Overlay)**
+> and several v0.8/v0.12 tails were left open. We do **not** open a new milestone
+> until the current one is genuinely closed. The **Catch-up Backlog** below is the
+> ordered debt to clear before the Alpha/Beta stabilization track and 1.0.
+>
+> **Caught up so far:** v0.10.0 acceptance #1 (done, integration-tested),
+> v0.8.0 tails (deferred post-1.0), v0.12.0 FEAT-028/030/031 (done). The one
+> remaining open catch-up item is **FEAT-033's node-served-KV dial transport**.
 
 ## Completed Milestones
 
@@ -104,20 +107,25 @@ addressed by public key, that tolerates mostly-offline edge members.
 
 No new milestone opens until these close. Listed earliest-gap-first.
 
-### 1. v0.10.0 — Private Overlay  *(SKIPPED — highest-priority catch-up)*
-**Status:** OPEN — config API + docs exist; private-mesh formation unverified.
+### 1. v0.10.0 — Private Overlay  *(was SKIPPED — now caught up)*
+**Status:** DONE for 1.0 (acceptance #1) — acceptance #2 deferred post-1.0 with FEAT-022.
 
 | Ticket | Description | Depends On | Status |
 |--------|-------------|------------|--------|
-| FEAT-020 | Private overlay bootstrap | FEAT-014, FEAT-016, FEAT-017 | open |
+| FEAT-020 | Private overlay bootstrap | FEAT-014, FEAT-016, FEAT-017 | done (1.0 scope) |
 
 Closed fleets need pubkey-addressed connectivity with **no public mainline DHT
-announce**. `norn_config_t` already carries `private_mode` + `boot_*`; harden it
-into a first-class private-overlay story. Acceptance: ≥3 nodes form a private
-overlay from one bootstrap node; pubkey resolution via private Kademlia; a NAT'd
-member reachable via in-fleet rendezvous/relay; zero public-DHT traffic;
-`docs/PRIVATE-OVERLAY.md`. Network validation via PIT. (See
-`.repo/project/issues/MILESTONE-0.10.0.md`.)
+announce**. `norn_config_t` already carries `private_mode` + `boot_*`, hardened
+into a first-class private-overlay story (`norn_overlay.{c,h}`, 100% unit-tested;
+`docs/private-overlay.md`). **Acceptance #1 — overlay formation + pubkey
+resolution + zero public-DHT traffic — is verified deterministically by
+`tests/test_overlay_net.c`**: a 3-node fleet forms a private overlay from a
+single bootstrap node, members resolve each other by pubkey-derived DHT id (via
+referral beyond the seed), and routing tables stay fleet-only (public routers are
+never contacted under `private_mode`). **Acceptance #2** (a NAT'd member reachable
+via rendezvous/relay inside the overlay) rides FEAT-017's relay path, whose
+multi-hop integration is **FEAT-022 — formally deferred post-1.0** (PIT-only); so
+acceptance #2 defers with it. (See `.repo/project/issues/MILESTONE-0.10.0.md`.)
 
 ### 2. v0.8.0 optional tails — **DECISION: deferred to post-1.0**
 | Ticket | Description | Status |
