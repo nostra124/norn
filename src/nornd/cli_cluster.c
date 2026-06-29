@@ -29,7 +29,7 @@ static const char *socket_path(char *buf, size_t cap) {
     }
     const char *home = getenv("HOME");
     if (!home) home = "/tmp";
-    snprintf(buf, cap, "%s/.norn/nornd.sock", home);
+    snprintf(buf, cap, "%s/.config/norn/nornd.sock", home);
     return buf;
 }
 

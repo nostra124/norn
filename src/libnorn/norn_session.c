@@ -14,6 +14,7 @@
 #include "channel.h"
 #include "streammux.h"
 #include "mainline.h"
+#include "norn_upnp.h"
 #include "bep44.h"
 #include <stdlib.h>
 #include <string.h>
@@ -551,6 +552,26 @@ int norn_listen_async(norn_client_t *client,
     if (!client->bonjour) {
         client->bonjour = norn_bonjour_new(client, ntohs(port),
                                             client->self_pub);
+    }
+
+    /* NAT traversal: try NAT-PMP first, then UPnP, to map the UDP port on
+     * the router so the node is reachable from the public Internet. When the
+     * mapping succeeds the authoritative public endpoint is fed back into
+     * the DHT layer so the node can announce itself correctly. Best-effort:
+     * if neither NAT-PMP nor UPnP work the node operates behind NAT and
+     * relies on relay / hole-punching. */
+    {
+        norn_upnp_result_t nat;
+        memset(&nat, 0, sizeof(nat));
+        if (norn_auto_port_mapping(ntohs(port), "UDP", &nat) == 0 && nat.success) {
+            uint16_t local_port = ntohs(port);
+            net_set_mapped_endpoint(&client->net, nat.external_ip,
+                                     nat.external_port);
+            fprintf(stderr, "norn: NAT-PMP/UPnP mapped port %u -> %s:%u\n",
+                    (unsigned)local_port,
+                    inet_ntoa(*(struct in_addr*)&nat.external_ip),
+                    (unsigned)ntohs(nat.external_port));
+        }
     }
 
     return 0;

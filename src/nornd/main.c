@@ -14,6 +14,7 @@
  */
 
 #include "agent.h"
+#include "crypto.h"
 #include "dispatch.h"
 #include "identity.h"
 #include "ipc.h"
@@ -237,25 +238,30 @@ static void on_kv_change(void *ud, norn_kv_event_t ev, const unsigned char *key,
 /* ---- IPC socket ---- */
 
 static const char *default_identity(char *buf, size_t cap) {
-    const char *home = getenv("HOME");
-    if (!home) {
-        struct passwd *pw = getpwuid(getuid());
-        home = pw ? pw->pw_dir : "/root";
+    const char *config = getenv("XDG_CONFIG_HOME");
+    if (!config || !config[0]) {
+        const char *home = getenv("HOME");
+        if (!home) {
+            struct passwd *pw = getpwuid(getuid());
+            home = pw ? pw->pw_dir : "/root";
+        }
+        /* System users (e.g. the norn daemon) often have no real home directory.
+         * Fall back to a path under the StateDirectory (/var/lib/nornd) which is
+         * writable even with ProtectSystem=strict. */
+        if (strcmp(home, "/nonexistent") == 0 || strcmp(home, "/") == 0)
+            snprintf(buf, cap, "/var/lib/nornd/identity");
+        else
+            snprintf(buf, cap, "%s/.config/norn/identity", home);
+    } else {
+        snprintf(buf, cap, "%s/norn/identity", config);
     }
-    /* System users (e.g. the norn daemon) often have no real home directory.
-     * Fall back to a path under the StateDirectory (/var/lib/nornd) which is
-     * writable even with ProtectSystem=strict. */
-    if (strcmp(home, "/nonexistent") == 0 || strcmp(home, "/") == 0)
-        snprintf(buf, cap, "/var/lib/nornd/identity");
-    else
-        snprintf(buf, cap, "%s/.ssh/id_ed25519", home);
     return buf;
 }
 
-/* Auto-generate an ed25519 SSH identity at path when no --identity is given and
- * the default path does not yet exist. Uses ssh-keygen (OpenSSH PEM format). */
+/* Auto-generate a raw Ed25519 keypair at path when no --identity is given and
+ * the default path does not yet exist (first run). */
 static int auto_generate_identity(const char *path, char *err, size_t errcap) {
-    /* Create parent directory ~/.ssh with appropriate permissions. */
+    /* Create parent directory. */
     char dir[512];
     size_t n = strlen(path);
     if (n >= sizeof(dir)) {
@@ -273,16 +279,13 @@ static int auto_generate_identity(const char *path, char *err, size_t errcap) {
         snprintf(err, errcap, "mkdir %s: %s", dir, strerror(errno));
         return -1;
     }
-    char cmd[1024];
-    int r = snprintf(cmd, sizeof(cmd),
-                     "ssh-keygen -t ed25519 -N \"\" -f '%s' >/dev/null 2>&1", path);
-    if ((size_t)r >= sizeof(cmd)) {
-        snprintf(err, errcap, "command too long");
+    keypair_t kp;
+    if (crypto_keypair_new(&kp) != 0) {
+        snprintf(err, errcap, "crypto_keypair_new failed");
         return -1;
     }
-    int rc = system(cmd);
-    if (rc != 0) {
-        snprintf(err, errcap, "ssh-keygen failed (exit %d)", rc);
+    if (crypto_keypair_save(&kp, path) != 0) {
+        snprintf(err, errcap, "failed to write %s", path);
         return -1;
     }
     return 0;
@@ -297,7 +300,7 @@ static const char *default_socket(char *buf, size_t cap) {
     const char *home = getenv("HOME");
     if (!home) home = "/tmp";
     char dir[512];
-    snprintf(dir, sizeof(dir), "%s/.norn", home);
+    snprintf(dir, sizeof(dir), "%s/.config/norn", home);
     mkdir(dir, 0700);
     snprintf(buf, cap, "%s/nornd.sock", dir);
     return buf;
@@ -353,9 +356,20 @@ static int listen_unix(const char *path) {
     return fd;
 }
 
+/* Context threaded through to serve_client so node-stats & peers IPC handlers
+ * can access the norn_client (DHT routing table), backend (cluster state), and
+ * process metadata (PID, uptime). */
+typedef struct {
+    const nornd_backend_t *be;
+    watch_set_t *ws;
+    const keypair_t *kp;
+    norn_client_t *client;
+    time_t start_time;
+} serve_ctx_t;
+
 /* Read, decode, dispatch and reply to one ready client. Returns 0 to keep the
  * connection, -1 to drop it. */
-static int serve_client(int fd, const nornd_backend_t *be, watch_set_t *ws) {
+static int serve_client(int fd, serve_ctx_t *ctx) {
     unsigned char buf[NORND_IPC_MAX_BODY + 4];
     ssize_t n = recv(fd, buf, sizeof(buf), 0);
     if (n <= 0) return -1;
@@ -363,14 +377,58 @@ static int serve_client(int fd, const nornd_backend_t *be, watch_set_t *ws) {
     size_t consumed = 0;
     if (nornd_ipc_decode_req(buf, (size_t)n, &req, &consumed) != 0) return -1;
     nornd_ipc_resp_t resp;
-    nornd_dispatch(be, &req, &resp);
+    memset(&resp, 0, sizeof(resp));
+
+    /* Node identity queries and health check — handled before the cluster
+     * dispatch so they work regardless of cluster state. */
+    if (strcmp(req.op, "ping") == 0) {
+        resp.ok = 1;
+        memcpy(resp.val, "pong", 4);
+        resp.vlen = 4;
+        resp.has_val = 1;
+    } else if (strcmp(req.op, "node-public") == 0) {
+        resp.ok = 1;
+        resp.has_val = 1;
+        memcpy(resp.val, ctx->kp->public_key, 32);
+        resp.vlen = 32;
+    } else if (strcmp(req.op, "node-secret") == 0) {
+        resp.ok = 1;
+        resp.has_val = 1;
+        memcpy(resp.val, ctx->kp->secret_key, 64);
+        resp.vlen = 64;
+    } else if (strcmp(req.op, "node-stats") == 0) {
+        resp.ok = 1;
+        resp.has_val = 1;
+        pid_t pid = getpid();
+        time_t uptime = time(NULL) - ctx->start_time;
+        int dht_nodes = norn_routing_size(ctx->client);
+        int is_leader = ctx->be->is_leader(ctx->be->ctx) ? 1 : 0;
+        int n_members = 0;
+        {
+            unsigned char m[NORND_IPC_MAX_ITEMS][NORND_PUBKEY];
+            n_members = ctx->be->members(ctx->be->ctx, m, NORND_IPC_MAX_ITEMS);
+            if (n_members < 0) n_members = 0;
+        }
+        int n = snprintf((char *)resp.val, sizeof(resp.val),
+            "pid=%ld\nuptime=%ld\ndht_nodes=%d\nis_leader=%d\ncluster_members=%d\n",
+            (long)pid, (long)uptime, dht_nodes, is_leader, n_members);
+        if (n > 0) { resp.vlen = (size_t)n; }
+    } else if (strcmp(req.op, "peers") == 0) {
+        resp.ok = 1;
+        resp.has_val = 1;
+        int n = snprintf((char *)resp.val, sizeof(resp.val),
+            "dht_nodes=%d\n", norn_routing_size(ctx->client));
+        if (n > 0) { resp.vlen = (size_t)n; }
+    } else {
+        nornd_dispatch(ctx->be, &req, &resp);
+    }
     unsigned char out[NORND_IPC_MAX_BODY + 4];
     int olen = nornd_ipc_encode_resp(&resp, out, sizeof(out));
     if (olen < 0) return -1;
     if (send(fd, out, (size_t)olen, MSG_NOSIGNAL) != olen) return -1;
     /* A successful `watch <prefix>` turns this socket into an event stream. */
     if (resp.ok && strcmp(req.op, "watch") == 0)
-        watch_add(ws, fd, req.key, req.klen);
+        watch_add(ctx->ws, fd, req.key, req.klen);
     return 0;
 }
 
@@ -421,8 +479,8 @@ int main(int argc, char **argv) {
                     "             [--data-dir PATH] [--foreground] "
                     "[--listen-port PORT]\n"
                     "             [--peer <64-hex-pubkey>[@host:port]] ...\n"
-                    "  --agent  take the node public key from <identity>.pub and "
-                    "sign via ssh-agent\n");
+                    "  --agent  sign handshakes via ssh-agent (public key from "
+                    "<identity>.pub)\n");
             return 2;
         }
     }
@@ -436,16 +494,15 @@ int main(int argc, char **argv) {
     if (!idpath_explicit && access(idpath, F_OK) != 0) {
         char gen_err[128];
         if (auto_generate_identity(idpath, gen_err, sizeof(gen_err)) != 0) {
-            fprintf(stderr, "nornd: no identity at %s and auto-generation "
-                            "failed: %s\n", idpath, gen_err);
-            fprintf(stderr, "nornd: run 'ssh-keygen -t ed25519 -f %s' or "
-                            "specify --identity\n", idpath);
+        fprintf(stderr, "nornd: no identity at %s and auto-generation "
+                        "failed: %s\n", idpath, gen_err);
+            fprintf(stderr, "nornd: specify --identity or ensure ~/.config/norn"
+                            " is writable\n");
             return 1;
         }
     }
 
     keypair_t kp;
-    char err[128];
     agent_signer_t agentsig;
     memset(&agentsig, 0, sizeof(agentsig));
     if (use_agent) {
@@ -473,8 +530,8 @@ int main(int argc, char **argv) {
         }
         memcpy(kp.public_key, agentsig.pub, 32);
         memset(kp.secret_key, 0, sizeof(kp.secret_key));
-    } else if (nornd_identity_load_file(idpath, &kp, err, sizeof(err)) != 0) {
-        fprintf(stderr, "nornd: identity %s: %s\n", idpath, err);
+    } else if (crypto_keypair_load(&kp, idpath) != 0) {
+        fprintf(stderr, "nornd: failed to load identity from %s\n", idpath);
         return 1;
     }
 
@@ -544,6 +601,8 @@ int main(int argc, char **argv) {
     norn_cluster_kv_watch(cl, (const unsigned char *)"", 0, on_kv_change,
                           &watches);
 
+    serve_ctx_t srv = {&be, &watches, &kp, client, time(NULL)};
+
     /* Node-served KV (FEAT-033): host GET/LIST from the cluster KV and CAT from a
      * file-backed object store under <data-dir>/objects, served to peers that
      * dial NORN_SVC_SERVED_KV. Best-effort: if the store dir can't be created we
@@ -559,7 +618,7 @@ int main(int argc, char **argv) {
         if (!base) {
             const char *home = getenv("HOME");
             if (!home) home = "/tmp";
-            snprintf(homebuf, sizeof(homebuf), "%s/.norn", home);
+            snprintf(homebuf, sizeof(homebuf), "%s/.config/norn", home);
             base = homebuf;
         }
         mkdir(base, 0700); /* ensure the parent exists before the object dir */
@@ -583,25 +642,6 @@ int main(int argc, char **argv) {
         if (loaded > 0)
             fprintf(stderr, "nornd: loaded %d cached DHT nodes\n", loaded);
     }
-
-    /* Read our SSH public-key line (`<identity>.pub`) to publish into the fleet
-     * key directory once we can lead. Optional: skip if it isn't there. */
-    char sshline[512];
-    size_t sshlen = 0;
-    {
-        char pubpath[640];
-        snprintf(pubpath, sizeof(pubpath), "%s.pub", idpath);
-        FILE *pf = fopen(pubpath, "rb");
-        if (pf) {
-            sshlen = fread(sshline, 1, sizeof(sshline) - 1, pf);
-            fclose(pf);
-            while (sshlen > 0 &&
-                   (sshline[sshlen - 1] == '\n' || sshline[sshlen - 1] == '\r'))
-                sshlen--;
-            sshline[sshlen] = '\0';
-        }
-    }
-    int ssh_published = 0;
 
     fprintf(stderr, "nornd: serving %s (identity %s)\n",
             activated ? "socket-activated fd" : sockpath, idpath);
@@ -647,11 +687,6 @@ int main(int argc, char **argv) {
             }
         }
 
-        /* Once we can lead, publish our SSH public key to the directory. */
-        if (!ssh_published && sshlen > 0 && norn_cluster_is_leader(cl)) {
-            if (nornd_keydir_put_ssh(&be, kp.public_key, sshline) == 0)
-                ssh_published = 1;
-        }
         if (rc <= 0) continue;
 
         if (nfd >= 0 && (pfds[0].revents & POLLIN)) norn_tick(client);
@@ -668,7 +703,7 @@ int main(int argc, char **argv) {
 
         for (int i = 0; i < nclients; i++) {
             if (pfds[cstart + i].revents & (POLLIN | POLLHUP | POLLERR)) {
-                if (serve_client(clients[i], &be, &watches) != 0) {
+                if (serve_client(clients[i], &srv) != 0) {
                     watch_drop(&watches, clients[i]);
                     close(clients[i]);
                     clients[i] = clients[--nclients];

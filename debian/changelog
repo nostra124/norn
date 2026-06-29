@@ -1,3 +1,18 @@
+norn (0.12.1) unstable; urgency=medium
+
+  * UPnP/NAT-PMP auto port mapping with SSDP discovery and SOAP
+    AddPortMapping; tries NAT-PMP first, falls back to UPnP.
+  * NAT traversal integrated into norn_listen_async() — mapped external
+    endpoint is fed back to the DHT layer via net_set_mapped_endpoint().
+  * nornd now uses a dedicated Ed25519 identity at ~/.config/norn/identity
+    instead of ~/.ssh/id_ed25519; auto-generates on first start.
+  * norn node public / norn node secret — IPC verbs to query nornd's
+    in-memory keys over the Unix socket.
+  * norn --help wraps at terminal width (TIOCGWINSZ / COLUMNS / 80).
+  * norn_upnp.c added to the library build.
+
+ -- norn developers <noreply@example.com>  Mon, 29 Jun 2026 00:00:00 +0000
+
 norn (0.12.0) unstable; urgency=medium
 
   * Package the norn stack: libnorn (shared library), libnorn-dev

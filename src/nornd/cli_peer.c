@@ -1,13 +1,13 @@
 /**
- * @file cli_node.c
- * @brief `norn node …` peer content fetch (FEAT-033). See cli_node.h.
+ * @file cli_peer.c
+ * @brief `norn peer …` peer content fetch (FEAT-033). See cli_peer.h.
  *
  * A standalone async client: dial the peer, open one NORN_SVC_SERVED_KV stream,
  * send the request line, read the status line + body, print the body. Mirrors
  * the served-KV dial proven in tests/test_nornd_served_dial.c, over a real dial.
  */
 
-#include "cli_node.h"
+#include "cli_peer.h"
 
 #include "crypto.h"
 #include "norn.h"
@@ -77,7 +77,7 @@ static void pump_rx(node_ctx_t *c) {
         if (i >= c->rxn) return; /* status line not complete yet */
         if (nornd_served_parse_status((const char *)c->rx, i + 1, &c->ok,
                                       &c->blen, NULL, 0) != 0) {
-            fprintf(stderr, "norn node: malformed response\n");
+            fprintf(stderr, "norn peer: malformed response\n");
             c->done = 1;
             c->rc = 1;
             return;
@@ -105,19 +105,19 @@ static void pump_rx(node_ctx_t *c) {
     }
 }
 
-/* Load our CLI identity (raw keypair_t) from NORN_KEY or ~/.norn/key.pem. */
+/* Load our CLI identity (raw keypair_t) from NORN_KEY or ~/.config/norn/key.pem. */
 static int load_key(keypair_t *kp) {
     const char *path = getenv("NORN_KEY");
     char buf[600];
     if (!path) {
         const char *home = getenv("HOME");
         if (!home) return -1;
-        snprintf(buf, sizeof(buf), "%s/.norn/key.pem", home);
+        snprintf(buf, sizeof(buf), "%s/.config/norn/key.pem", home);
         path = buf;
     }
     FILE *f = fopen(path, "rb");
     if (!f) {
-        fprintf(stderr, "norn node: cannot open key %s (run 'norn keygen')\n", path);
+        fprintf(stderr, "norn peer: cannot open key %s (run 'norn keygen')\n", path);
         return -1;
     }
     int ok = fread(kp, sizeof(*kp), 1, f) == 1;
@@ -125,15 +125,15 @@ static int load_key(keypair_t *kp) {
     return ok ? 0 : -1;
 }
 
-int nornd_cli_node(int argc, char **argv) {
+int nornd_cli_peer(int argc, char **argv) {
     if (argc < 2) {
-        fprintf(stderr, "usage: norn node <pubkey[@host:port]> <get|cat|list> [arg]\n");
+        fprintf(stderr, "usage: norn peer <pubkey[@host:port]> <get|cat|list> [arg]\n");
         return 2;
     }
     /* Parse <pubkey>[@host:port]. */
     char spec[160];
     if (strlen(argv[0]) >= sizeof(spec)) {
-        fprintf(stderr, "norn node: peer spec too long\n");
+        fprintf(stderr, "norn peer: peer spec too long\n");
         return 2;
     }
     strcpy(spec, argv[0]);
@@ -153,7 +153,7 @@ int nornd_cli_node(int argc, char **argv) {
     }
     unsigned char peer[32];
     if (sodium_hex2bin(peer, sizeof(peer), spec, strlen(spec), NULL, NULL, NULL) != 0) {
-        fprintf(stderr, "norn node: bad 64-hex pubkey\n");
+        fprintf(stderr, "norn peer: bad 64-hex pubkey\n");
         return 2;
     }
 
@@ -162,7 +162,7 @@ int nornd_cli_node(int argc, char **argv) {
     else if (strcmp(argv[1], "cat") == 0) verb = NORND_SERVED_CAT;
     else if (strcmp(argv[1], "list") == 0) verb = NORND_SERVED_LIST;
     else {
-        fprintf(stderr, "norn node: unknown verb '%s' (get|cat|list)\n", argv[1]);
+        fprintf(stderr, "norn peer: unknown verb '%s' (get|cat|list)\n", argv[1]);
         return 2;
     }
     const char *arg = argc >= 3 ? argv[2] : "";
@@ -170,7 +170,7 @@ int nornd_cli_node(int argc, char **argv) {
     char reqline[NORND_SERVED_MAX_ARG + 8];
     int rlen = nornd_served_encode_req(verb, arg, reqline, sizeof(reqline));
     if (rlen < 0) {
-        fprintf(stderr, "norn node: bad request (missing/oversized arg?)\n");
+        fprintf(stderr, "norn peer: bad request (missing/oversized arg?)\n");
         return 2;
     }
 
@@ -197,7 +197,7 @@ int nornd_cli_node(int argc, char **argv) {
         norn_direct_endpoint_t ep;
         memset(&ep, 0, sizeof(ep));
         if (inet_pton(AF_INET, host, &ep.ip) != 1) {
-            fprintf(stderr, "norn node: bad host %s\n", host);
+            fprintf(stderr, "norn peer: bad host %s\n", host);
             norn_free(client);
             return 2;
         }
@@ -207,7 +207,7 @@ int nornd_cli_node(int argc, char **argv) {
         dialed = norn_dial_async(client, peer, NULL, on_session, &ctx);
     }
     if (dialed != 0) {
-        fprintf(stderr, "norn node: dial failed\n");
+        fprintf(stderr, "norn peer: dial failed\n");
         norn_free(client);
         return 1;
     }
@@ -221,7 +221,7 @@ int nornd_cli_node(int argc, char **argv) {
         struct timespec now;
         clock_gettime(CLOCK_MONOTONIC, &now);
         if ((now.tv_sec - t0.tv_sec) >= 10) {
-            fprintf(stderr, "norn node: timed out\n");
+            fprintf(stderr, "norn peer: timed out\n");
             ctx.rc = 1;
             break;
         }

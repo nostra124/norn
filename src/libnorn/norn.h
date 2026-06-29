@@ -589,6 +589,21 @@ int norn_encode_mutable(const norn_mutable_t *rec,
 int norn_decode_mutable(const unsigned char *buf, size_t len,
                          norn_mutable_t *rec);
 
+/* === DHT routing table === */
+
+/**
+ * @brief Get the number of nodes in the DHT routing table
+ *
+ * Returns the count of Kademlia nodes currently known in the
+ * routing table. This is the number of DHT peers we've discovered.
+ *
+ * @param client Client handle
+ * @return Node count, or -1 on error
+ *
+ * @note NULL-safe: Returns -1 if client is NULL
+ */
+int norn_routing_size(const norn_client_t *client);
+
 /* === DHT state persistence === */
 
 /**
