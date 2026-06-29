@@ -38,7 +38,8 @@ libnorn_la_SOURCES = \
 	src/libnorn/norn_nat.c \
 	src/libnorn/norn_rendezvous.c \
 	src/libnorn/norn_relay.c \
-	src/libnorn/norn_bonjour.c
+	src/libnorn/norn_bonjour.c \
+	src/libnorn/norn_upnp.c
 
 libnorn_la_CFLAGS = $(SODIUM_CFLAGS) $(AVAHI_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 # Record libsodium as a dependency of the shared library itself, so dynamic
@@ -50,14 +51,14 @@ libnorn_la_LIBADD = $(SODIUM_LIBS) $(AVAHI_LIBS)
 # (not part of the library). Convenience lib so the daemon and its tests share
 # the same object code.
 noinst_LTLIBRARIES = libnornd.la
-libnornd_la_SOURCES = src/nornd/ipc.c src/nornd/identity.c src/nornd/dispatch.c src/nornd/client.c src/nornd/cli_cluster.c src/nornd/cli_keys.c src/nornd/cli_node.c src/nornd/keydir.c src/nornd/served_proto.c src/nornd/store.c src/nornd/served.c src/nornd/served_conn.c src/nornd/agent.c src/nornd/peers.c src/nornd/transport.c
+libnornd_la_SOURCES = src/nornd/ipc.c src/nornd/identity.c src/nornd/dispatch.c src/nornd/client.c src/nornd/cli_cluster.c src/nornd/cli_keys.c src/nornd/cli_peer.c src/nornd/keydir.c src/nornd/served_proto.c src/nornd/store.c src/nornd/served.c src/nornd/served_conn.c src/nornd/agent.c src/nornd/peers.c src/nornd/transport.c
 libnornd_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 
 # Internal headers: not installed, but must ship in the tarball (they're
 # #included by the sources) so a VPATH/dist build can find them.
 noinst_HEADERS = src/nornd/ipc.h src/nornd/identity.h src/nornd/dispatch.h \
                  src/nornd/client.h src/nornd/cli_cluster.h src/nornd/cli_keys.h \
-                 src/nornd/cli_node.h \
+                 src/nornd/cli_peer.h \
                  src/nornd/keydir.h src/nornd/served_proto.h src/nornd/store.h \
                  src/nornd/served.h src/nornd/served_conn.h src/nornd/agent.h \
                  src/nornd/peers.h src/nornd/transport.h \

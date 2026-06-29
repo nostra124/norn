@@ -8,13 +8,16 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <sodium.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include "config.h"
 #include "libnorn/norn.h"
 #include "libnorn/crypto.h"
 #include "libnorn/log.h"
 #include "nornd/cli_cluster.h"
 #include "nornd/cli_keys.h"
-#include "nornd/cli_node.h"
+#include "nornd/cli_peer.h"
+#include "nornd/ipc.h"
 
 #define DEFAULT_PORT 6881
 #define DEFAULT_TIMEOUT 5000
@@ -26,43 +29,32 @@ static char *key_file = NULL;
 static int port = DEFAULT_PORT;
 static int timeout_ms = DEFAULT_TIMEOUT;
 static int log_level = LOG_INFO;
-static int read_only = 0;
 
 static void usage(FILE *out) {
     fprintf(out, "Usage: %s [OPTIONS] <command> [ARGS...]\n", prog_name);
-    fprintf(out, "\n");
-    fprintf(out, "Mainline DHT client for peer discovery and bootstrap.\n");
-    fprintf(out, "\n");
-    fprintf(out, "Commands:\n");
-    fprintf(out, "  keygen              Generate ed25519 keypair\n");
-    fprintf(out, "  bep44 get <key>     Retrieve a signed record directly from the DHT\n");
-    fprintf(out, "  bep44 set <k> <v>   Store a signed record directly to the DHT\n");
-    fprintf(out, "  daemon              Run as DHT daemon\n");
-    fprintf(out, "  cluster <sub> ...   Talk to nornd's cluster KV store:\n");
-    fprintf(out, "                        put|get|del|cas|watch|members|leader|status\n");
-    fprintf(out, "                      (watch streams 'put <key> <value>' / 'del <key>' lines)\n");
-    fprintf(out, "  keys <nodeid>       Resolve a peer's SSH + GPG public keys\n");
-    fprintf(out, "  authorized-keys     Print every fleet member's SSH key (authorized_keys)\n");
-    fprintf(out, "  node <pubkey[@host:port]> <get|cat|list> [arg]\n");
-    fprintf(out, "                      Fetch content directly from a peer (served-KV)\n");
-    fprintf(out, "  version             Print version\n");
-    fprintf(out, "\n");
+    fputc('\n', out);
+
     fprintf(out, "Options:\n");
-    fprintf(out, "  --key <path>         Key file (default: ~/.norn/key.pem)\n");
-    fprintf(out, "  --port <port>        DHT port (default: %d)\n", DEFAULT_PORT);
-    fprintf(out, "  --timeout <ms>       Query timeout (default: %d)\n", DEFAULT_TIMEOUT);
-    fprintf(out, "  --log-level <level>  Log level: debug, info, warn, error (default: info)\n");
-    fprintf(out, "  --read-only          Read-only mode (BEP-43)\n");
-    fprintf(out, "  --help               Show this help\n");
-    fprintf(out, "\n");
-    fprintf(out, "Environment:\n");
-    fprintf(out, "  NORN_KEY             Default key file path\n");
-    fprintf(out, "  NORN_PORT             Default DHT port\n");
-    fprintf(out, "\n");
-    fprintf(out, "Exit codes:\n");
-    fprintf(out, "  0  Success\n");
-    fprintf(out, "  1  Error\n");
-    fprintf(out, "  2  Network error\n");
+    fprintf(out, "  --key <path>       Ed25519 keypair (default: ~/.config/norn/key.pem)\n");
+    fprintf(out, "  --port <port>      DHT UDP port (default: 6881)\n");
+    fprintf(out, "  --timeout <ms>     Query timeout (default: 5000)\n");
+    fprintf(out, "  --log-level <lvl>  Log level: debug, info, warn, error\n");
+
+    fprintf(out, "  --help             Show this help\n");
+    fputc('\n', out);
+
+    fprintf(out, "Commands:\n");
+    static const char *cmds[][2] = {
+        {"node",       "Manage the local nornd daemon"},
+        {"peer",       "Interact with remote peers"},
+        {"bep44",      "DHT signed records"},
+        {"cluster",    "Cluster KV store"},
+        {"version",    "Print version"},
+    };
+    for (size_t i = 0; i < sizeof(cmds)/sizeof(cmds[0]); i++) {
+        fprintf(out, "  %-12s %s\n", cmds[i][0], cmds[i][1]);
+    }
+    fputc('\n', out);
 }
 
 static char *get_default_key_path(void) {
@@ -72,13 +64,13 @@ static char *get_default_key_path(void) {
         return NULL;
     }
     
-    char *path = malloc(strlen(home) + strlen("/.norn/key.pem") + 1);
+    char *path = malloc(strlen(home) + strlen("/.config/norn/key.pem") + 1);
     if (!path) {
         fprintf(stderr, "ERROR: Out of memory\n");
         return NULL;
     }
     
-    sprintf(path, "%s/.norn/key.pem", home);
+    sprintf(path, "%s/.config/norn/key.pem", home);
     return path;
 }
 
@@ -165,16 +157,8 @@ static int do_keygen(int argc, char **argv) {
                 key_path = optarg;
                 break;
             case 'h':
-                fprintf(stdout, "Usage: %s keygen [OPTIONS]\n", prog_name);
-                fprintf(stdout, "\n");
-                fprintf(stdout, "Generate ed25519 keypair and save to ~/.norn/key.pem\n");
-                fprintf(stdout, "\n");
-                fprintf(stdout, "Options:\n");
-                fprintf(stdout, "  --key <path>   Key file path (default: ~/.norn/key.pem)\n");
-                fprintf(stdout, "  --help         Show this help\n");
-                fprintf(stdout, "\n");
-                fprintf(stdout, "Environment:\n");
-                fprintf(stdout, "  NORN_KEY       Default key file path\n");
+                fprintf(stdout, "Usage: %s keygen [--key <path>]\n", prog_name);
+                fprintf(stdout, "\nGenerate an Ed25519 keypair and save to a file.\n");
                 return 0;
             default:
                 return 1;
@@ -234,6 +218,215 @@ static int do_keygen(int argc, char **argv) {
     
     if (owned) free(key_path);
     return 0;
+}
+
+/* IPC helpers: socket path, connect, round-trip one request. */
+static const char *nornd_socket_path(char *buf, size_t cap) {
+    const char *env = getenv("NORN_SOCK");
+    if (env && env[0]) return env;
+    const char *run = getenv("XDG_RUNTIME_DIR");
+    if (run && run[0]) {
+        snprintf(buf, cap, "%s/nornd.sock", run);
+        return buf;
+    }
+    const char *home = getenv("HOME");
+    if (!home) home = "/tmp";
+    snprintf(buf, cap, "%s/.config/norn/nornd.sock", home);
+    return buf;
+}
+
+static int ipc_connect(const char *path) {
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0) return -1;
+    struct sockaddr_un sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sun_family = AF_UNIX;
+    if (strlen(path) >= sizeof(sa.sun_path)) { close(fd); return -1; }
+    strcpy(sa.sun_path, path);
+    if (connect(fd, (struct sockaddr *)&sa, sizeof(sa)) != 0) { close(fd); return -1; }
+    return fd;
+}
+
+static int ipc_round_trip(const char *op, unsigned char *val, size_t *vlen,
+                          size_t cap) {
+    char pbuf[512];
+    const char *path = nornd_socket_path(pbuf, sizeof(pbuf));
+    int fd = ipc_connect(path);
+    if (fd < 0) {
+        fprintf(stderr, "norn: cannot reach nornd at %s. Is nornd running?\n", path);
+        return -1;
+    }
+    nornd_ipc_req_t req;
+    memset(&req, 0, sizeof(req));
+    strcpy(req.op, op);
+    unsigned char wire[256];
+    int wlen = nornd_ipc_encode_req(&req, wire, sizeof(wire));
+    if (wlen < 0 || write(fd, wire, (size_t)wlen) != wlen) {
+        close(fd);
+        return -1;
+    }
+    unsigned char frame[NORND_IPC_MAX_BODY + 4];
+    size_t got = 0;
+    while (got < 4) {
+        ssize_t n = read(fd, frame + got, 4 - got);
+        if (n <= 0) { close(fd); return -1; }
+        got += (size_t)n;
+    }
+    int64_t body = nornd_ipc_frame_len(frame, 4);
+    if (body < 0 || (size_t)body + 4 > sizeof(frame)) { close(fd); return -1; }
+    while (got < (size_t)body + 4) {
+        ssize_t n = read(fd, frame + got, (size_t)body + 4 - got);
+        if (n <= 0) { close(fd); return -1; }
+        got += (size_t)n;
+    }
+    close(fd);
+    nornd_ipc_resp_t resp;
+    size_t consumed = 0;
+    if (nornd_ipc_decode_resp(frame, got, &resp, &consumed) != 0) return -1;
+    if (!resp.ok) return -1;
+    size_t n = resp.vlen;
+    if (n > cap) n = cap;
+    memcpy(val, resp.val, n);
+    *vlen = n;
+    return 0;
+}
+
+static int do_node_secret(int argc, char **argv) {
+    static struct option long_opts[] = {
+        {"help", no_argument, 0, 'h'},
+        {0, 0, 0, 0}
+    };
+    int opt;
+    optind = 3;
+    while ((opt = getopt_long(argc, argv, "+h", long_opts, NULL)) != -1) {
+        switch (opt) {
+            case 'h':
+                printf("Usage: norn node secret\n"
+                       "\n"
+                       "Print the nornd node's Ed25519 secret key (64 hex bytes).\n"
+                       "Requires a running nornd daemon.\n");
+                return 0;
+            default:
+                return 1;
+        }
+    }
+    unsigned char val[64];
+    size_t vlen = 0;
+    if (ipc_round_trip("node-secret", val, &vlen, sizeof(val)) != 0) return 1;
+    if (vlen != 64) {
+        fprintf(stderr, "norn node secret: unexpected response length\n");
+        return 1;
+    }
+    for (size_t i = 0; i < 64; i++) printf("%02x", val[i]);
+    printf("\n");
+    return 0;
+}
+
+static int do_node_public(int argc, char **argv) {
+    static struct option long_opts[] = {
+        {"help", no_argument, 0, 'h'},
+        {0, 0, 0, 0}
+    };
+    int opt;
+    optind = 3;
+    while ((opt = getopt_long(argc, argv, "+h", long_opts, NULL)) != -1) {
+        switch (opt) {
+            case 'h':
+                printf("Usage: norn node public\n"
+                       "\n"
+                       "Print the nornd node's Ed25519 public key (32 hex bytes).\n"
+                       "Requires a running nornd daemon.\n");
+                return 0;
+            default:
+                return 1;
+        }
+    }
+    unsigned char val[32];
+    size_t vlen = 0;
+    if (ipc_round_trip("node-public", val, &vlen, sizeof(val)) != 0) return 1;
+    if (vlen != 32) {
+        fprintf(stderr, "norn node public: unexpected response length\n");
+        return 1;
+    }
+    for (size_t i = 0; i < 32; i++) printf("%02x", val[i]);
+    printf("\n");
+    return 0;
+}
+
+static int do_node_start(int argc, char **argv) {
+    (void)argc; (void)argv;
+    fprintf(stderr, "norn node start: not implemented (use systemd: systemctl --user start nornd)\n");
+    return 1;
+}
+
+static int do_node_restart(int argc, char **argv) {
+    (void)argc; (void)argv;
+    fprintf(stderr, "norn node restart: not implemented (use systemd: systemctl --user restart nornd)\n");
+    return 1;
+}
+
+static int do_node_status(int argc, char **argv) {
+    (void)argc; (void)argv;
+    unsigned char buf[4096];
+    size_t vlen = 0;
+    if (ipc_round_trip("node-stats", buf, &vlen, sizeof(buf)) != 0) {
+        fprintf(stderr, "nornd is not running\n");
+        return 1;
+    }
+    fwrite(buf, 1, vlen, stdout);
+    return 0;
+}
+
+static int do_node_log(int argc, char **argv) {
+    /* Default: 50 lines from the user nornd. Use --system for the system node. */
+    int system_node = 0;
+    int follow = 0;
+    int lines = 50;
+    /* Parse optional flags. */
+    for (int i = 3; i < argc; i++) {
+        if (strcmp(argv[i], "--system") == 0)
+            system_node = 1;
+        else if (strcmp(argv[i], "--follow") == 0 || strcmp(argv[i], "-f") == 0)
+            follow = 1;
+        else if (strcmp(argv[i], "-n") == 0 && i + 1 < argc)
+            lines = atoi(argv[++i]);
+        else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+            printf("Usage: norn node log [OPTIONS]\n"
+                   "\n"
+                   "Show nornd daemon logs.\n"
+                   "\n"
+                   "Options:\n"
+                   "  --system          System nornd (default: user)\n"
+                   "  -n <lines>        Number of lines (default: 50)\n"
+                   "  -f, --follow      Follow new log entries\n"
+                   "  --help            Show this help\n");
+            return 0;
+        } else {
+            fprintf(stderr, "norn node log: unknown option: %s\n", argv[i]);
+            return 1;
+        }
+    }
+    char lines_buf[16];
+    snprintf(lines_buf, sizeof(lines_buf), "%d", lines);
+    const char *journalctl_args[16];
+    int na = 0;
+    journalctl_args[na++] = "journalctl";
+    if (system_node)
+        journalctl_args[na++] = "-u";
+    else {
+        journalctl_args[na++] = "--user";
+        journalctl_args[na++] = "-u";
+    }
+    journalctl_args[na++] = "nornd";
+    journalctl_args[na++] = "-n";
+    journalctl_args[na++] = lines_buf;
+    if (follow)
+        journalctl_args[na++] = "--follow";
+    journalctl_args[na] = NULL;
+    execvp("journalctl", (char *const *)journalctl_args);
+    /* If execvp returns, an error occurred. */
+    fprintf(stderr, "norn node log: failed to run journalctl: %s\n", strerror(errno));
+    return 1;
 }
 
 static int do_get(int argc, char **argv) {
@@ -421,12 +614,23 @@ static int do_set(int argc, char **argv) {
 /* `norn bep44 <get|set> …` — namespaced direct-DHT BEP-44 verbs. Reuses the
  * get/set handlers, which expect the verb at argv[1]; present them a shifted
  * view that drops the "bep44" token. `argv[sub_idx]` is the sub-verb. */
+static void bep44_help(FILE *out, const char *prog) {
+    fprintf(out, "Usage: %s bep44 <get|set> [ARGS...]\n", prog);
+    fprintf(out, "\nSubcommands:\n"
+            "  get <key>          Retrieve a signed record from the DHT\n"
+            "  set <key> <value>  Store a signed record on the DHT\n");
+}
+
 static int do_bep44(int argc, char **argv, int sub_idx) {
     if (sub_idx >= argc) {
-        fprintf(stderr, "ERROR: Missing bep44 subcommand (get|set)\n");
+        bep44_help(stderr, prog_name);
         return 1;
     }
     const char *sub = argv[sub_idx];
+    if (strcmp(sub, "--help") == 0 || strcmp(sub, "-h") == 0 || strcmp(sub, "help") == 0) {
+        bep44_help(stdout, prog_name);
+        return 0;
+    }
     int n = argc - sub_idx + 1; /* prog + (verb..end) */
     char **view = malloc(sizeof(char *) * (size_t)(n + 1));
     if (!view) {
@@ -538,6 +742,59 @@ static int do_daemon(int argc, char **argv) {
     return 0;
 }
 
+/* `norn peer <list|connect|get|cat> …` */
+static int do_peer(int argc, char **argv, int optind) {
+    if (optind >= argc)
+        goto peer_help;
+    const char *sub = argv[optind];
+    int sub_argc = argc - optind;
+    char **sub_argv = argv + optind;
+
+    if (strcmp(sub, "list") == 0) {
+        unsigned char buf[4096];
+        size_t vlen = 0;
+        if (ipc_round_trip("peers", buf, &vlen, sizeof(buf)) != 0) {
+            fprintf(stderr, "nornd is not running\n");
+            return 1;
+        }
+        fwrite(buf, 1, vlen, stdout);
+        return 0;
+    } else if (strcmp(sub, "connect") == 0) {
+        if (sub_argc < 2) {
+            fprintf(stderr, "Usage: %s peer connect <pubkey[@host:port]>\n", prog_name);
+            return 1;
+        }
+        /* Delegate to nornd_cli_peer with a dummy "get" to exercise the dial. */
+        char *pv[] = {sub_argv[1], (char *)"get", (char *)""};
+        return nornd_cli_peer(3, pv);
+    } else if (strcmp(sub, "get") == 0 || strcmp(sub, "cat") == 0) {
+        if (sub_argc < 3) {
+            fprintf(stderr, "Usage: %s peer %s <pubkey[@host:port]> <arg>\n",
+                    prog_name, sub);
+            return 1;
+        }
+        char *pv[] = {sub_argv[1], (char *)sub, sub_argv[2]};
+        return nornd_cli_peer(3, pv);
+    } else if (strcmp(sub, "keys") == 0) {
+        return nornd_cli_keys(sub_argc - 1, sub_argv + 1);
+    } else if (strcmp(sub, "--help") == 0 || strcmp(sub, "-h") == 0 || strcmp(sub, "help") == 0) {
+        goto peer_help;
+    }
+    fprintf(stderr, "ERROR: Unknown peer subcommand: %s\n", sub);
+    return 1;
+
+peer_help:
+    fprintf(stdout, "Usage: %s peer <subcommand> [ARGS...]\n", prog_name);
+    fprintf(stdout, "\nSubcommands:\n");
+    fprintf(stdout, "  list                   List known peers\n");
+    fprintf(stdout, "  connect <pubkey[@h]>   Dial a remote peer\n");
+    fprintf(stdout, "  get <pubkey[@h]> <k>   Fetch a served-KV value\n");
+    fprintf(stdout, "  cat <pubkey[@h]> <h>   Fetch a served-KV blob\n");
+    fprintf(stdout, "  keys <nodeid>          Resolve peer's SSH + GPG keys\n");
+    fprintf(stdout, "\nSee `%s --help` for top-level options.\n", prog_name);
+    return optind < argc ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         usage(stderr);
@@ -556,14 +813,13 @@ int main(int argc, char **argv) {
         {"port", required_argument, 0, 'p'},
         {"timeout", required_argument, 0, 't'},
         {"log-level", required_argument, 0, 'l'},
-        {"read-only", no_argument, 0, 'r'},
         {"help", no_argument, 0, 'h'},
         {0, 0, 0, 0}
     };
     
     int opt;
     
-    while ((opt = getopt_long(argc, argv, "+k:p:t:l:rh", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "+k:p:t:l:h", long_options, NULL)) != -1) {
         switch (opt) {
             case 'k':
                 key_file = optarg;
@@ -596,9 +852,6 @@ int main(int argc, char **argv) {
                     fprintf(stderr, "Valid levels: debug, info, warn, error\n");
                     return 1;
                 }
-                break;
-            case 'r':
-                read_only = 1;
                 break;
             case 'h':
                 usage(stdout);
@@ -636,13 +889,62 @@ int main(int argc, char **argv) {
     } else if (strcmp(cmd, "daemon") == 0) {
         return do_daemon(argc, argv);
     } else if (strcmp(cmd, "cluster") == 0) {
-        /* Hand the remaining args (subcommand onward) to the IPC client. */
+        if (optind + 1 >= argc) {
+            fprintf(stdout, "Usage: %s cluster <subcommand> [ARGS...]\n", prog_name);
+            fprintf(stdout, "\nSubcommands:\n"
+                    "  put <key> <val>    Store a key-value pair\n"
+                    "  get <key>          Retrieve a value\n"
+                    "  del <key>          Delete a key\n"
+                    "  cas <k> <o> <n>    Compare-and-swap\n"
+                    "  watch <prefix>     Stream changes\n"
+                    "  members            List cluster members\n"
+                    "  leader             Show current leader\n"
+                    "  status             Cluster health\n");
+            return optind + 1 < argc ? 0 : 1;
+        }
         return nornd_cli_cluster(argc - optind - 1, argv + optind + 1);
     } else if (strcmp(cmd, "keys") == 0) {
+        if (optind + 1 >= argc) {
+            fprintf(stdout, "Usage: %s keys <nodeid-hex>\n", prog_name);
+            fprintf(stdout, "\nResolve a peer's SSH + GPG public keys.\n");
+            return 1;
+        }
         return nornd_cli_keys(argc - optind - 1, argv + optind + 1);
     } else if (strcmp(cmd, "node") == 0) {
-        /* Fetch content directly from a peer over a served-KV stream. */
-        return nornd_cli_node(argc - optind - 1, argv + optind + 1);
+        if (optind + 1 < argc) {
+            const char *sub = argv[optind + 1];
+            if (strcmp(sub, "--help") == 0 || strcmp(sub, "-h") == 0 || strcmp(sub, "help") == 0) {
+                goto node_help;
+            }
+            if (strcmp(sub, "start") == 0)
+                return do_node_start(argc, argv);
+            if (strcmp(sub, "restart") == 0)
+                return do_node_restart(argc, argv);
+            if (strcmp(sub, "status") == 0)
+                return do_node_status(argc, argv);
+            if (strcmp(sub, "log") == 0)
+                return do_node_log(argc, argv);
+            if (strcmp(sub, "public") == 0)
+                return do_node_public(argc, argv);
+            if (strcmp(sub, "secret") == 0)
+                return do_node_secret(argc, argv);
+            if (strcmp(sub, "keygen") == 0)
+                return do_keygen(argc, argv);
+        }
+node_help:
+        fprintf(stdout, "Usage: %s node <subcommand> [ARGS...]\n", prog_name);
+        fprintf(stdout, "\nSubcommands:\n"
+                "  start          Start the nornd daemon\n"
+                "  restart        Restart the nornd daemon\n"
+                "  status         Node status (recfile)\n"
+                "  log            View daemon logs\n"
+                "  public         Print node's Ed25519 public key\n"
+                "  secret         Print node's Ed25519 secret key\n"
+                "  keygen         Generate an Ed25519 keypair\n");
+        fprintf(stdout, "\nSee `%s --help` for top-level options.\n", prog_name);
+        return optind + 1 < argc ? 0 : 1;
+    } else if (strcmp(cmd, "peer") == 0) {
+        return do_peer(argc, argv, optind + 1);
     } else if (strcmp(cmd, "authorized-keys") == 0) {
         /* Enumerate every fleet member's published SSH key as an
          * authorized_keys file. Reuses the cluster IPC client (op "authkeys"). */

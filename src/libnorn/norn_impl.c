@@ -200,6 +200,14 @@ int norn_bootstrap(norn_client_t *client) {
     return mainline_bootstrap(&client->ml);
 }
 
+int norn_routing_size(const norn_client_t *client) {
+    if (!client) return -1;
+    /* norn_client_t is defined in norn_internal.h which casts correctly.
+     * mainline_get_node_count doesn't modify the state, so the const cast is safe. */
+    const struct norn_client *c = (const struct norn_client *)client;
+    return mainline_get_node_count((mainline_state_t *)&c->ml);
+}
+
 int norn_save_dht_nodes(norn_client_t *client, const char *path) {
     if (!client || !path || !client->initialized) return -1;
     return mainline_save_nodes(&client->ml, path);
