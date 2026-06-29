@@ -56,6 +56,18 @@ impl Keypair {
         Ok(Keypair(kp))
     }
 
+    /// Reconstruct a keypair from its raw 32-byte public + 64-byte secret key
+    /// (e.g. one persisted to disk). The inverse of [`public_key`](Keypair::public_key)
+    /// + [`secret_key`](Keypair::secret_key); lets an embedder give a node a
+    /// stable identity across restarts.
+    pub fn from_raw(public_key: [u8; 32], secret_key: [u8; 64]) -> Keypair {
+        unsafe { sys::crypto_init() };
+        Keypair(sys::keypair_t {
+            public_key,
+            secret_key,
+        })
+    }
+
     /// The 32-byte public key.
     pub fn public_key(&self) -> &[u8; 32] {
         &self.0.public_key
@@ -236,6 +248,18 @@ mod tests {
         let b = Keypair::generate().expect("keygen");
         assert_ne!(a.public_key(), &[0u8; 32]);
         assert_ne!(a.public_key(), b.public_key());
+    }
+
+    #[test]
+    fn keypair_round_trips_through_from_raw() {
+        let a = Keypair::generate().expect("keygen");
+        let restored = Keypair::from_raw(*a.public_key(), *a.secret_key());
+        assert_eq!(restored.public_key(), a.public_key());
+        assert_eq!(restored.secret_key(), a.secret_key());
+        // the reconstructed identity drives a client with the same DHT id.
+        let id_a = Client::new(&a).expect("client a").id();
+        let id_r = Client::new(&restored).expect("client r").id();
+        assert_eq!(id_a, id_r);
     }
 
     #[test]
