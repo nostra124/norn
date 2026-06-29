@@ -409,16 +409,16 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
             n_members = ctx->be->members(ctx->be->ctx, m, NORND_IPC_MAX_ITEMS);
             if (n_members < 0) n_members = 0;
         }
-        int n = snprintf((char *)resp.val, sizeof(resp.val),
+        int wn = snprintf((char *)resp.val, sizeof(resp.val),
             "pid=%ld\nuptime=%ld\ndht_nodes=%d\nis_leader=%d\ncluster_members=%d\n",
             (long)pid, (long)uptime, dht_nodes, is_leader, n_members);
-        if (n > 0) { resp.vlen = (size_t)n; }
+        if (wn > 0) { resp.vlen = (size_t)wn; }
     } else if (strcmp(req.op, "peers") == 0) {
         resp.ok = 1;
         resp.has_val = 1;
-        int n = snprintf((char *)resp.val, sizeof(resp.val),
+        int wn = snprintf((char *)resp.val, sizeof(resp.val),
             "dht_nodes=%d\n", norn_routing_size(ctx->client));
-        if (n > 0) { resp.vlen = (size_t)n; }
+        if (wn > 0) { resp.vlen = (size_t)wn; }
     } else {
         nornd_dispatch(ctx->be, &req, &resp);
     }

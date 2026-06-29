@@ -28,19 +28,20 @@ teardown_file() {
 # The build is shared across tests (setup_file), but key state is per-test:
 # reset it so "no key" tests aren't affected by an earlier keygen.
 setup() {
+    # Start each test from a clean key state. The default key lives at
+    # ~/.config/norn/key.pem; older trees used ~/.norn — clear both.
+    rm -rf "$HOME/.config/norn"
     rm -rf "$HOME/.norn"
     rm -f "$WORK_DIR"/*.pem
 }
 
-@test "norn --help shows all commands" {
+@test "norn --help shows all command groups" {
     run "$NORN_BIN" --help
     [ "$status" -eq 0 ]   # --help is a successful invocation
-    [[ "$output" == *"keygen"* ]]
-    [[ "$output" == *"get"* ]]
-    [[ "$output" == *"set"* ]]
-    [[ "$output" == *"daemon"* ]]
+    [[ "$output" == *"node"* ]]
+    [[ "$output" == *"peer"* ]]
+    [[ "$output" == *"bep44"* ]]
     [[ "$output" == *"cluster"* ]]
-    [[ "$output" == *"keys"* ]]
     [[ "$output" == *"version"* ]]
 }
 
@@ -53,21 +54,21 @@ setup() {
 
 @test "norn keygen creates key file" {
     # Remove existing key if present
-    rm -f "$WORK_DIR/.norn/key.pem"
+    rm -f "$WORK_DIR/.config/norn/key.pem"
 
     run "$NORN_BIN" keygen
     [ "$status" -eq 0 ]
 
     # Key file should exist
-    [ -f "$WORK_DIR/.norn/key.pem" ]
+    [ -f "$WORK_DIR/.config/norn/key.pem" ]
 
     # Key file should have correct permissions (0600)
-    perms=$(stat -c "%a" "$WORK_DIR/.norn/key.pem" 2>/dev/null || stat -f "%OLp" "$WORK_DIR/.norn/key.pem")
+    perms=$(stat -c "%a" "$WORK_DIR/.config/norn/key.pem" 2>/dev/null || stat -f "%OLp" "$WORK_DIR/.config/norn/key.pem")
     [ "$perms" = "600" ]
 }
 
 @test "norn keygen prints public key" {
-    rm -f "$WORK_DIR/.norn/key.pem"
+    rm -f "$WORK_DIR/.config/norn/key.pem"
 
     run "$NORN_BIN" keygen
     [ "$status" -eq 0 ]
@@ -77,7 +78,7 @@ setup() {
 }
 
 @test "norn keygen fails if key already exists" {
-    rm -f "$WORK_DIR/.norn/key.pem"
+    rm -f "$WORK_DIR/.config/norn/key.pem"
 
     # First keygen should succeed
     run "$NORN_BIN" keygen
@@ -124,22 +125,23 @@ setup() {
 }
 
 @test "norn set fails without key" {
-    run "$NORN_BIN" set test-key test-value
+    run "$NORN_BIN" set test-value
     [ "$status" -eq 1 ]
     [[ "$output" == *"key"* ]] || [[ "$output" == *"error"* ]]
 }
 
 @test "norn set fails without value" {
     "$NORN_BIN" keygen
-    run "$NORN_BIN" set test-key
+    run "$NORN_BIN" set
     [ "$status" -eq 1 ]
-    [[ "$output" == *"value"* ]] || [[ "$output" == *"usage"* ]]
+    [[ "$output" == *"value"* ]] || [[ "$output" == *"Usage"* ]]
 }
 
-@test "norn daemon --help shows daemon options" {
-    run "$NORN_BIN" daemon --help
+@test "norn bep44 --help lists get and set" {
+    run "$NORN_BIN" bep44 --help
     [ "$status" -eq 0 ]   # --help is a successful invocation
-    [[ "$output" == *"--port"* ]] || [[ "$output" == *"port"* ]]
+    [[ "$output" == *"get"* ]]
+    [[ "$output" == *"set"* ]]
 }
 
 @test "norn with invalid command shows error" {

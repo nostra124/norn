@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
+#include <poll.h>
+#include <time.h>
 #include <sodium.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -77,17 +79,33 @@ static char *get_default_key_path(void) {
 static int create_key_dir(const char *key_path) {
     char *dir = strdup(key_path);
     if (!dir) return -1;
-    
+
     char *last_slash = strrchr(dir, '/');
-    if (last_slash) {
-        *last_slash = '\0';
+    if (!last_slash) {
+        free(dir);
+        return 0;
+    }
+    *last_slash = '\0';
+
+    /* Create each path component (mkdir -p), so a default path like
+     * ~/.config/norn works even when the ~/.config parent doesn't exist yet. */
+    for (char *p = dir + 1; *p; p++) {
+        if (*p != '/')
+            continue;
+        *p = '\0';
         if (mkdir(dir, 0700) != 0 && errno != EEXIST) {
             fprintf(stderr, "ERROR: Failed to create directory %s: %s\n", dir, strerror(errno));
             free(dir);
             return -1;
         }
+        *p = '/';
     }
-    
+    if (mkdir(dir, 0700) != 0 && errno != EEXIST) {
+        fprintf(stderr, "ERROR: Failed to create directory %s: %s\n", dir, strerror(errno));
+        free(dir);
+        return -1;
+    }
+
     free(dir);
     return 0;
 }
@@ -353,16 +371,49 @@ static int do_node_public(int argc, char **argv) {
     return 0;
 }
 
-static int do_node_start(int argc, char **argv) {
-    (void)argc; (void)argv;
-    fprintf(stderr, "norn node start: not implemented (use systemd: systemctl --user start nornd)\n");
+/* `norn node <start|restart>` — drive the nornd systemd unit. Defaults to the
+ * per-user unit (`systemctl --user`); `--system` targets the system unit. Execs
+ * systemctl directly so its exit status is the verb's exit status. */
+static int do_node_unit_action(const char *action, int argc, char **argv) {
+    int system_node = 0;
+    for (int i = 3; i < argc; i++) {
+        if (strcmp(argv[i], "--system") == 0) {
+            system_node = 1;
+        } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+            printf("Usage: norn node %s [--system]\n"
+                   "\n"
+                   "%s the nornd daemon via systemd.\n"
+                   "\n"
+                   "Options:\n"
+                   "  --system          System nornd (default: user)\n"
+                   "  --help            Show this help\n",
+                   action, action[0] == 's' ? "Start" : "Restart");
+            return 0;
+        } else {
+            fprintf(stderr, "norn node %s: unknown option: %s\n", action, argv[i]);
+            return 1;
+        }
+    }
+    const char *args[6];
+    int na = 0;
+    args[na++] = "systemctl";
+    if (!system_node)
+        args[na++] = "--user";
+    args[na++] = action;
+    args[na++] = "nornd";
+    args[na] = NULL;
+    execvp("systemctl", (char *const *)args);
+    /* If execvp returns, an error occurred. */
+    fprintf(stderr, "norn node %s: failed to run systemctl: %s\n", action, strerror(errno));
     return 1;
 }
 
+static int do_node_start(int argc, char **argv) {
+    return do_node_unit_action("start", argc, argv);
+}
+
 static int do_node_restart(int argc, char **argv) {
-    (void)argc; (void)argv;
-    fprintf(stderr, "norn node restart: not implemented (use systemd: systemctl --user restart nornd)\n");
-    return 1;
+    return do_node_unit_action("restart", argc, argv);
 }
 
 static int do_node_status(int argc, char **argv) {
@@ -429,6 +480,39 @@ static int do_node_log(int argc, char **argv) {
     return 1;
 }
 
+/* Drive the DHT event loop for up to `budget_ms`, returning early once `*done`
+ * (if given) becomes non-zero. Polls the socket so we wake on incoming packets
+ * but still tick on the timeout slice to drive retransmits and query timeouts. */
+static void dht_pump(norn_client_t *client, int budget_ms, const volatile int *done) {
+    int fd = norn_get_fd(client);
+    const int slice = 100;
+    for (int spent = 0; spent < budget_ms; spent += slice) {
+        if (done && *done)
+            return;
+        struct pollfd pfd = { .fd = fd, .events = POLLIN, .revents = 0 };
+        poll(&pfd, 1, slice);
+        norn_tick(client);
+    }
+}
+
+/* Capture the first value delivered by a get_mutable/get_immutable query. */
+struct dht_get_ctx {
+    int found;
+    unsigned char value[1024];
+    size_t len;
+};
+
+static void on_dht_value(void *ud, const unsigned char *value, size_t value_len) {
+    struct dht_get_ctx *c = ud;
+    if (c->found)
+        return; /* keep the first result */
+    if (value_len > sizeof(c->value))
+        value_len = sizeof(c->value);
+    memcpy(c->value, value, value_len);
+    c->len = value_len;
+    c->found = 1;
+}
+
 static int do_get(int argc, char **argv) {
     static struct option long_options[] = {
         {"key", required_argument, 0, 'k'},
@@ -483,130 +567,165 @@ static int do_get(int argc, char **argv) {
     }
     
     const char *key_str = argv[optind];
-    
+
     if (strlen(key_str) != 64) {
         fprintf(stderr, "ERROR: Key must be 64 hex characters (got %zu)\n", strlen(key_str));
         return 1;
     }
-    
+
+    unsigned char target[32];
     for (int i = 0; i < 32; i++) {
         unsigned int byte;
         if (sscanf(key_str + i*2, "%2x", &byte) != 1) {
             fprintf(stderr, "ERROR: Invalid hex in key at position %d\n", i*2);
             return 1;
         }
+        target[i] = (unsigned char)byte;
     }
-    
+
     unsigned char pubkey[32], secret[64];
     if (load_keypair(pubkey, secret) != 0) {
         return 1;
     }
-    
+
     norn_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.version = NORN_VERSION;
-    
+
     norn_client_t *client = norn_new(pubkey, secret, &cfg);
     if (!client) {
         fprintf(stderr, "ERROR: Failed to create DHT client\n");
         return 1;
     }
-    
-    printf("Key: %s\n", key_str);
-    printf("(DHT get not fully implemented - requires running DHT network)\n");
-    
+
+    if (norn_bootstrap(client) != 0) {
+        fprintf(stderr, "ERROR: DHT bootstrap failed (no network?)\n");
+        norn_free(client);
+        return 1;
+    }
+    /* Let the routing table populate before querying. */
+    dht_pump(client, 2000, NULL);
+
+    struct dht_get_ctx ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    if (norn_get_mutable(client, target, on_dht_value, &ctx) != 0) {
+        fprintf(stderr, "ERROR: Failed to start DHT get\n");
+        norn_free(client);
+        return 1;
+    }
+    dht_pump(client, timeout_ms, &ctx.found);
+
+    int rc;
+    if (ctx.found) {
+        fwrite(ctx.value, 1, ctx.len, stdout);
+        fputc('\n', stdout);
+        rc = 0;
+    } else {
+        fprintf(stderr, "norn: no value found for %s\n", key_str);
+        rc = 1;
+    }
+
     norn_free(client);
-    return 0;
+    return rc;
 }
 
 static int do_set(int argc, char **argv) {
     static struct option long_options[] = {
         {"key", required_argument, 0, 'k'},
         {"seq", required_argument, 0, 's'},
-        {"salt", required_argument, 0, 'S'},
         {"help", no_argument, 0, 'h'},
         {0, 0, 0, 0}
     };
-    
+
     int opt;
-    uint32_t seq = 1;
-    const char *salt = NULL;
-    
+    int seq_given = 0;
+    uint32_t seq = 0;
+
     optind = 2;
-    
-    while ((opt = getopt_long(argc, argv, "+k:s:S:h", long_options, NULL)) != -1) {
+
+    while ((opt = getopt_long(argc, argv, "+k:s:h", long_options, NULL)) != -1) {
         switch (opt) {
             case 'k':
                 key_file = optarg;
                 break;
             case 's':
-                seq = (uint32_t)atoi(optarg);
-                break;
-            case 'S':
-                salt = optarg;
+                seq = (uint32_t)strtoul(optarg, NULL, 10);
+                seq_given = 1;
                 break;
             case 'h':
-                fprintf(stdout, "Usage: %s set [OPTIONS] <key> <value>\n", prog_name);
+                fprintf(stdout, "Usage: %s set [OPTIONS] <value>\n", prog_name);
                 fprintf(stdout, "\n");
-                fprintf(stdout, "Store signed record to DHT\n");
+                fprintf(stdout, "Publish a signed mutable record to the DHT (BEP-44).\n");
+                fprintf(stdout, "The record is addressed by your public key; retrieve it\n");
+                fprintf(stdout, "with `%s bep44 get <your-public-key>`.\n", prog_name);
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Arguments:\n");
-                fprintf(stdout, "  <key>           Key identifier\n");
-                fprintf(stdout, "  <value>         Value to store\n");
+                fprintf(stdout, "  <value>         Value to store (max %d bytes)\n", MAX_VALUE_SIZE);
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Options:\n");
                 fprintf(stdout, "  --key <path>    Key file path\n");
-                fprintf(stdout, "  --seq <n>       Sequence number (default: auto)\n");
-                fprintf(stdout, "  --salt <string> Salt for salted items\n");
+                fprintf(stdout, "  --seq <n>       Sequence number (default: current unix time)\n");
                 fprintf(stdout, "  --help          Show this help\n");
                 return 0;
             default:
                 return 1;
         }
     }
-    
-    if (optind >= argc) {
-        fprintf(stderr, "ERROR: Missing key argument\n");
-        fprintf(stderr, "Usage: %s set <key> <value>\n", prog_name);
-        return 1;
-    }
-    
-    const char *key_str = argv[optind];
-    optind++;
-    
+
     if (optind >= argc) {
         fprintf(stderr, "ERROR: Missing value argument\n");
-        fprintf(stderr, "Usage: %s set <key> <value>\n", prog_name);
+        fprintf(stderr, "Usage: %s set <value>\n", prog_name);
         return 1;
     }
-    
+
     const char *value = argv[optind];
     size_t value_len = strlen(value);
-    (void)value_len;
-    (void)seq;
-    (void)salt;
-    
+    if (value_len > MAX_VALUE_SIZE) {
+        fprintf(stderr, "ERROR: Value too large (%zu > %d bytes)\n", value_len, MAX_VALUE_SIZE);
+        return 1;
+    }
+
+    /* BEP-44 mutable records carry a monotonically increasing seq. Default to
+     * the current unix time so repeated sets from the same key advance. */
+    if (!seq_given)
+        seq = (uint32_t)time(NULL);
+
     unsigned char pubkey[32], secret[64];
     if (load_keypair(pubkey, secret) != 0) {
         return 1;
     }
-    
+
     norn_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.version = NORN_VERSION;
-    
+
     norn_client_t *client = norn_new(pubkey, secret, &cfg);
     if (!client) {
         fprintf(stderr, "ERROR: Failed to create DHT client\n");
         return 1;
     }
-    
-    printf("Key: %s\n", key_str);
-    printf("Value: %s\n", value);
-    printf("Seq: %u\n", seq);
-    if (salt) printf("Salt: %s\n", salt);
-    printf("(DHT put not fully implemented - requires running DHT network)\n");
-    
+
+    if (norn_bootstrap(client) != 0) {
+        fprintf(stderr, "ERROR: DHT bootstrap failed (no network?)\n");
+        norn_free(client);
+        return 1;
+    }
+    /* Populate the routing table before publishing. */
+    dht_pump(client, 2000, NULL);
+
+    if (norn_put_mutable(client, pubkey, secret,
+                         (const unsigned char *)value, value_len, seq) != 0) {
+        fprintf(stderr, "ERROR: DHT put failed\n");
+        norn_free(client);
+        return 1;
+    }
+    /* Give the announce time to reach the storing nodes. */
+    dht_pump(client, timeout_ms, NULL);
+
+    printf("Stored under public key: ");
+    for (int i = 0; i < 32; i++) printf("%02x", pubkey[i]);
+    printf("\nSeq: %u\n", seq);
+
     norn_free(client);
     return 0;
 }
@@ -617,8 +736,8 @@ static int do_set(int argc, char **argv) {
 static void bep44_help(FILE *out, const char *prog) {
     fprintf(out, "Usage: %s bep44 <get|set> [ARGS...]\n", prog);
     fprintf(out, "\nSubcommands:\n"
-            "  get <key>          Retrieve a signed record from the DHT\n"
-            "  set <key> <value>  Store a signed record on the DHT\n");
+            "  get <pubkey>       Retrieve a signed record from the DHT\n"
+            "  set <value>        Publish a signed record (keyed by your pubkey)\n");
 }
 
 static int do_bep44(int argc, char **argv, int sub_idx) {
@@ -653,93 +772,6 @@ static int do_bep44(int argc, char **argv, int sub_idx) {
     }
     free(view);
     return rc;
-}
-
-static int do_daemon(int argc, char **argv) {
-    static struct option long_options[] = {
-        {"key", required_argument, 0, 'k'},
-        {"port", required_argument, 0, 'p'},
-        {"read-only", no_argument, 0, 'r'},
-        {"private", no_argument, 0, 'P'},
-        {"bootstrap", required_argument, 0, 'b'},
-        {"help", no_argument, 0, 'h'},
-        {0, 0, 0, 0}
-    };
-    
-    int opt;
-    int daemon_port = port;
-    int daemon_read_only = 0;
-    int private_mode = 0;
-    
-    optind = 2;
-    
-    while ((opt = getopt_long(argc, argv, "+k:p:rPb:h", long_options, NULL)) != -1) {
-        switch (opt) {
-            case 'k':
-                key_file = optarg;
-                break;
-            case 'p':
-                daemon_port = atoi(optarg);
-                if (daemon_port <= 0 || daemon_port > 65535) {
-                    fprintf(stderr, "ERROR: Invalid port: %s\n", optarg);
-                    return 1;
-                }
-                break;
-            case 'r':
-                daemon_read_only = 1;
-                break;
-            case 'P':
-                private_mode = 1;
-                break;
-            case 'b':
-                /* Bootstrap peer - would be parsed and added */
-                break;
-            case 'h':
-                fprintf(stdout, "Usage: %s daemon [OPTIONS]\n", prog_name);
-                fprintf(stdout, "\n");
-                fprintf(stdout, "Run as DHT daemon\n");
-                fprintf(stdout, "\n");
-                fprintf(stdout, "Options:\n");
-                fprintf(stdout, "  --key <path>        Key file path\n");
-                fprintf(stdout, "  --port <port>       DHT port (default: %d)\n", DEFAULT_PORT);
-                fprintf(stdout, "  --read-only         Read-only mode (BEP-43)\n");
-                fprintf(stdout, "  --private           Private overlay mode\n");
-                fprintf(stdout, "  --bootstrap <ip:port> Add bootstrap peer\n");
-                fprintf(stdout, "  --help              Show this help\n");
-                return 0;
-            default:
-                return 1;
-        }
-    }
-    
-    (void)daemon_port;
-    (void)daemon_read_only;
-    (void)private_mode;
-    
-    unsigned char pubkey[32], secret[64];
-    if (load_keypair(pubkey, secret) != 0) {
-        return 1;
-    }
-    
-    norn_config_t cfg;
-    memset(&cfg, 0, sizeof(cfg));
-    cfg.version = NORN_VERSION;
-    cfg.read_only = daemon_read_only;
-    cfg.private_mode = private_mode;
-    
-    norn_client_t *client = norn_new(pubkey, secret, &cfg);
-    if (!client) {
-        fprintf(stderr, "ERROR: Failed to create DHT client\n");
-        return 1;
-    }
-    
-    printf("Starting DHT daemon on port %d...\n", daemon_port);
-    if (daemon_read_only) printf("  (read-only mode)\n");
-    if (private_mode) printf("  (private mode)\n");
-    printf("(Daemon mode not fully implemented - requires event loop integration)\n");
-    
-    norn_free(client);
-    return 0;
 }
 
 /* `norn peer <list|connect|get|cat> …` */
@@ -886,8 +918,6 @@ int main(int argc, char **argv) {
         return do_get(argc, argv); /* deprecated alias for `bep44 get` */
     } else if (strcmp(cmd, "set") == 0) {
         return do_set(argc, argv); /* deprecated alias for `bep44 set` */
-    } else if (strcmp(cmd, "daemon") == 0) {
-        return do_daemon(argc, argv);
     } else if (strcmp(cmd, "cluster") == 0) {
         if (optind + 1 >= argc) {
             fprintf(stdout, "Usage: %s cluster <subcommand> [ARGS...]\n", prog_name);
