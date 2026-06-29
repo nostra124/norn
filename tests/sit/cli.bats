@@ -28,6 +28,9 @@ teardown_file() {
 # The build is shared across tests (setup_file), but key state is per-test:
 # reset it so "no key" tests aren't affected by an earlier keygen.
 setup() {
+    # Start each test from a clean key state. The default key lives at
+    # ~/.config/norn/key.pem; older trees used ~/.norn — clear both.
+    rm -rf "$HOME/.config/norn"
     rm -rf "$HOME/.norn"
     rm -f "$WORK_DIR"/*.pem
 }
@@ -51,21 +54,21 @@ setup() {
 
 @test "norn keygen creates key file" {
     # Remove existing key if present
-    rm -f "$WORK_DIR/.norn/key.pem"
+    rm -f "$WORK_DIR/.config/norn/key.pem"
 
     run "$NORN_BIN" keygen
     [ "$status" -eq 0 ]
 
     # Key file should exist
-    [ -f "$WORK_DIR/.norn/key.pem" ]
+    [ -f "$WORK_DIR/.config/norn/key.pem" ]
 
     # Key file should have correct permissions (0600)
-    perms=$(stat -c "%a" "$WORK_DIR/.norn/key.pem" 2>/dev/null || stat -f "%OLp" "$WORK_DIR/.norn/key.pem")
+    perms=$(stat -c "%a" "$WORK_DIR/.config/norn/key.pem" 2>/dev/null || stat -f "%OLp" "$WORK_DIR/.config/norn/key.pem")
     [ "$perms" = "600" ]
 }
 
 @test "norn keygen prints public key" {
-    rm -f "$WORK_DIR/.norn/key.pem"
+    rm -f "$WORK_DIR/.config/norn/key.pem"
 
     run "$NORN_BIN" keygen
     [ "$status" -eq 0 ]
@@ -75,7 +78,7 @@ setup() {
 }
 
 @test "norn keygen fails if key already exists" {
-    rm -f "$WORK_DIR/.norn/key.pem"
+    rm -f "$WORK_DIR/.config/norn/key.pem"
 
     # First keygen should succeed
     run "$NORN_BIN" keygen
