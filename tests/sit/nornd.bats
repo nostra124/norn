@@ -139,8 +139,8 @@ teardown_file() {
     [[ "$output" == *"nornd"* ]]
 }
 
-@test "norn --help lists the cluster and keys verbs" {
+@test "norn --help lists the cluster and peer verbs" {
     run "$NORN" --help
     [[ "$output" == *"cluster"* ]]
-    [[ "$output" == *"keys"* ]]
+    [[ "$output" == *"peer"* ]]
 }
