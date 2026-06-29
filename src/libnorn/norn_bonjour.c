@@ -225,6 +225,9 @@ void norn_bonjour_free(norn_bonjour_t *bj) {
 
 #else /* !HAVE_AVAHI */
 
+/* Placeholder so the type is complete when Avahi is unavailable; the member is
+ * intentionally unused. */
+/* cppcheck-suppress unusedStructMember */
 struct norn_bonjour { int dummy; };
 
 norn_bonjour_t *norn_bonjour_new(struct norn_client *client,
