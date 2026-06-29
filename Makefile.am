@@ -63,7 +63,8 @@ noinst_HEADERS = src/nornd/ipc.h src/nornd/identity.h src/nornd/dispatch.h \
                  src/nornd/served.h src/nornd/served_conn.h src/nornd/agent.h \
                  src/nornd/peers.h src/nornd/transport.h \
                  src/libnorn/norn_internal.h src/libnorn/norn_session_internal.h \
-                 src/libnorn/norn_endpoint_cache.h src/libnorn/norn_upnp.h
+                 src/libnorn/norn_endpoint_cache.h src/libnorn/norn_upnp.h \
+                 src/libnorn/norn_bonjour.h
 
 include_HEADERS = src/libnorn/norn.h \
                    src/libnorn/mainline.h \
