@@ -32,15 +32,13 @@ setup() {
     rm -f "$WORK_DIR"/*.pem
 }
 
-@test "norn --help shows all commands" {
+@test "norn --help shows all command groups" {
     run "$NORN_BIN" --help
     [ "$status" -eq 0 ]   # --help is a successful invocation
-    [[ "$output" == *"keygen"* ]]
-    [[ "$output" == *"get"* ]]
-    [[ "$output" == *"set"* ]]
-    [[ "$output" == *"daemon"* ]]
+    [[ "$output" == *"node"* ]]
+    [[ "$output" == *"peer"* ]]
+    [[ "$output" == *"bep44"* ]]
     [[ "$output" == *"cluster"* ]]
-    [[ "$output" == *"keys"* ]]
     [[ "$output" == *"version"* ]]
 }
 
@@ -124,22 +122,23 @@ setup() {
 }
 
 @test "norn set fails without key" {
-    run "$NORN_BIN" set test-key test-value
+    run "$NORN_BIN" set test-value
     [ "$status" -eq 1 ]
     [[ "$output" == *"key"* ]] || [[ "$output" == *"error"* ]]
 }
 
 @test "norn set fails without value" {
     "$NORN_BIN" keygen
-    run "$NORN_BIN" set test-key
+    run "$NORN_BIN" set
     [ "$status" -eq 1 ]
-    [[ "$output" == *"value"* ]] || [[ "$output" == *"usage"* ]]
+    [[ "$output" == *"value"* ]] || [[ "$output" == *"Usage"* ]]
 }
 
-@test "norn daemon --help shows daemon options" {
-    run "$NORN_BIN" daemon --help
+@test "norn bep44 --help lists get and set" {
+    run "$NORN_BIN" bep44 --help
     [ "$status" -eq 0 ]   # --help is a successful invocation
-    [[ "$output" == *"--port"* ]] || [[ "$output" == *"port"* ]]
+    [[ "$output" == *"get"* ]]
+    [[ "$output" == *"set"* ]]
 }
 
 @test "norn with invalid command shows error" {
