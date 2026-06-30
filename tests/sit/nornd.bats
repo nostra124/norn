@@ -34,7 +34,7 @@ setup_file() {
 
     # Wait (≤5s) for the lone server to elect itself.
     for _ in $(seq 1 50); do
-        if "$NORN" cluster status 2>/dev/null | grep -q "role: leader"; then
+        if "$NORN" cluster status 2>/dev/null | grep -q "role=leader"; then
             break
         fi
         sleep 0.1
@@ -58,8 +58,8 @@ teardown_file() {
 @test "cluster status reports a single-node leader" {
     run "$NORN" cluster status
     [ "$status" -eq 0 ]
-    [[ "$output" == *"role: leader"* ]]
-    [[ "$output" == *"members: 1"* ]]
+    [[ "$output" == *"role=leader"* ]]
+    [[ "$output" == *"members=1"* ]]
 }
 
 @test "cluster put/get round-trips a value" {
@@ -102,29 +102,18 @@ teardown_file() {
     [[ "$output" == *"not found"* ]]
 }
 
-@test "cluster members lists the node pubkey" {
+@test "cluster members lists the node pubkey as TSV" {
     run "$NORN" cluster members
     [ "$status" -eq 0 ]
-    [[ "$output" =~ [0-9a-f]{64} ]]
+    # TSV: index\tnodeid  (header line + one data row)
+    [[ "$output" == $'index\tnodeid' ]]
+    [[ "$output" =~ $'\n0\t'[0-9a-f]{64} ]]
 }
 
 @test "cluster leader prints the leader pubkey" {
     run "$NORN" cluster leader
     [ "$status" -eq 0 ]
     [[ "$output" =~ ^[0-9a-f]{64}$ ]]
-}
-
-@test "keys resolves the daemon's published SSH key" {
-    id="$("$NORN" cluster leader)"
-    [ -n "$id" ]
-    run "$NORN" keys "$id"
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"ssh-ed25519"* ]]
-}
-
-@test "keys rejects a malformed nodeid" {
-    run "$NORN" keys not-a-valid-hex-id
-    [ "$status" -eq 2 ]
 }
 
 @test "unknown cluster subcommand exits 2" {
@@ -143,4 +132,29 @@ teardown_file() {
     run "$NORN" --help
     [[ "$output" == *"cluster"* ]]
     [[ "$output" == *"peer"* ]]
+}
+
+@test "node status is recfile (key=value lines) when piped" {
+    run "$NORN" node status
+    [ "$status" -eq 0 ]
+    # recfile: every non-empty line is key=value
+    [[ "$output" == *"pid="* ]]
+    [[ "$output" == *"uptime="* ]]
+    [[ "$output" == *"dht_nodes="* ]]
+    [[ "$output" == *"is_leader="* ]]
+    [[ "$output" == *"cluster_members="* ]]
+    # no ANSI escapes when piped
+    [[ "$output" != *$'\033'* ]]
+}
+
+@test "peer list is TSV with per-node attributes when piped" {
+    run "$NORN" peer list
+    [ "$status" -eq 0 ]
+    # TSV header: Node-Id, IP, Port, Age, Norn-Version, Application, App-Version
+    [[ "$output" == $'Node-Id\tIP\tPort\tAge\tNorn-Version\tApplication\tApp-Version'* ]]
+    [[ "$output" == *$'\t'* ]]
+    # the local nornd's own row is present (application = norn-node)
+    [[ "$output" == *"norn-node"* ]]
+    # no ANSI escapes when piped
+    [[ "$output" != *$'\033'* ]]
 }

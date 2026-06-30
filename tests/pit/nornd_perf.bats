@@ -31,7 +31,7 @@ setup_file() {
         >"$WORK_DIR/nornd.log" 2>&1 &
     echo $! >"$WORK_DIR/nornd.pid"
     for _ in $(seq 1 50); do
-        if "$NORN" cluster status 2>/dev/null | grep -q "role: leader"; then
+        if "$NORN" cluster status 2>/dev/null | grep -q "role=leader"; then
             break
         fi
         sleep 0.1

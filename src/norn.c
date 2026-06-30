@@ -18,7 +18,6 @@
 #include "libnorn/crypto.h"
 #include "libnorn/log.h"
 #include "nornd/cli_cluster.h"
-#include "nornd/cli_keys.h"
 #include "nornd/cli_peer.h"
 #include "nornd/ipc.h"
 
@@ -32,6 +31,116 @@ static char *key_file = NULL;
 static int port = DEFAULT_PORT;
 static int timeout_ms = DEFAULT_TIMEOUT;
 static int log_level = LOG_INFO;
+
+/* stdout is a terminal (colorize+align); when piped, emit plain recfile/tsv. */
+static int stdout_is_tty(void) {
+    return isatty(STDOUT_FILENO);
+}
+
+/* ANSI color helpers. Empty strings when not a tty so pipe output is plain. */
+static const char *col_cyan(void)    { return stdout_is_tty() ? "\033[36m" : ""; }
+static const char *col_green(void)   { return stdout_is_tty() ? "\033[32m" : ""; }
+static const char *col_magenta(void) { return stdout_is_tty() ? "\033[35m" : ""; }
+static const char *col_bold(void)    { return stdout_is_tty() ? "\033[1m"  : ""; }
+static const char *col_reset(void)   { return stdout_is_tty() ? "\033[0m"  : ""; }
+
+/* Pretty-print a recfile (key=value\n…) with aligned colored keys when tty;
+ * plain passthrough when piped. */
+static void print_recfile_pretty(const unsigned char *buf, size_t len) {
+    if (!stdout_is_tty()) {
+        fwrite(buf, 1, len, stdout);
+        return;
+    }
+    /* First pass: compute max key width for alignment. */
+    size_t max_key = 0, i = 0;
+    while (i < len) {
+        size_t eq = i;
+        while (eq < len && buf[eq] != '=' && buf[eq] != '\n') eq++;
+        if (eq < len && buf[eq] == '=' && eq - i > max_key) max_key = eq - i;
+        while (i < len && buf[i] != '\n') i++;
+        if (i < len) i++;
+    }
+    /* Second pass: print aligned, colorized key=value lines. */
+    i = 0;
+    while (i < len) {
+        size_t eq = i;
+        while (eq < len && buf[eq] != '=' && buf[eq] != '\n') eq++;
+        if (eq < len && buf[eq] == '=') {
+            size_t klen = eq - i;
+            printf("%s", col_cyan());
+            fwrite(buf + i, 1, klen, stdout);
+            for (size_t p = klen; p < max_key; p++) fputc(' ', stdout);
+            printf("%s=%s", col_reset(), col_bold());
+            size_t vstart = eq + 1, vend = vstart;
+            while (vend < len && buf[vend] != '\n') vend++;
+            fwrite(buf + vstart, 1, vend - vstart, stdout);
+            printf("%s\n", col_reset());
+            i = vend;
+            if (i < len) i++;
+        } else {
+            size_t eol = i;
+            while (eol < len && buf[eol] != '\n') eol++;
+            fwrite(buf + i, 1, eol - i, stdout);
+            if (eol < len) { fputc('\n', stdout); eol++; }
+            i = eol;
+        }
+    }
+}
+
+/* Convert a recfile response (key=value\n) into TSV (key\tvalue\n) and
+ * pretty-print with aligned columns + color when tty; plain TSV when piped. */
+static void print_tsv_pretty(const unsigned char *buf, size_t len) {
+    if (!stdout_is_tty()) {
+        fwrite(buf, 1, len, stdout);
+        return;
+    }
+    /* Collect rows; each row is a set of tab-separated cells. Compute column
+     * widths for alignment. Cap rows/cells to fixed small buffers (output is
+     * capped by the IPC val size anyway). */
+    char cells[128][16][96];
+    int widths[16] = {0};
+    int nrows = 0, maxcols = 0;
+    size_t i = 0;
+    while (i < len && nrows < 128) {
+        int ncols = 0;
+        size_t cstart = i;
+        while (i < len && buf[i] != '\n') {
+            if (buf[i] == '\t') {
+                if (ncols < 16) {
+                    size_t cl = i - cstart;
+                    if (cl >= 95) cl = 95;
+                    memcpy(cells[nrows][ncols], buf + cstart, cl);
+                    cells[nrows][ncols][cl] = '\0';
+                    if ((int)cl > widths[ncols]) widths[ncols] = (int)cl;
+                }
+                ncols++;
+                cstart = i + 1;
+            }
+            i++;
+        }
+        /* last cell (up to newline) */
+        if (ncols < 16) {
+            size_t cl = i - cstart;
+            if (cl >= 95) cl = 95;
+            memcpy(cells[nrows][ncols], buf + cstart, cl);
+            cells[nrows][ncols][cl] = '\0';
+            if ((int)cl > widths[ncols]) widths[ncols] = (int)cl;
+            ncols++;
+        }
+        if (ncols > maxcols) maxcols = ncols;
+        nrows++;
+        if (i < len) i++;
+    }
+    /* Print: header row colored cyan+bold, data rows colored bold. */
+    for (int r = 0; r < nrows; r++) {
+        printf("%s", r == 0 ? col_cyan() : col_bold());
+        for (int c = 0; c < maxcols; c++) {
+            if (c > 0) printf("%s\t%s", col_reset(), r == 0 ? col_cyan() : col_bold());
+            printf("%-*s", widths[c], cells[r][c]);
+        }
+        printf("%s\n", col_reset());
+    }
+}
 
 static void usage(FILE *out) {
     fprintf(out, "Usage: %s [OPTIONS] <command> [ARGS...]\n", prog_name);
@@ -230,10 +339,11 @@ static int do_keygen(int argc, char **argv) {
     fclose(f);
     chmod(key_path, 0600);
     
+    printf("%s", col_green());
     for (int i = 0; i < 32; i++) {
         printf("%02x", kp.public_key[i]);
     }
-    printf("\n");
+    printf("%s\n", col_reset());
     
     if (owned) free(key_path);
     return 0;
@@ -243,14 +353,27 @@ static int do_keygen(int argc, char **argv) {
 static const char *nornd_socket_path(char *buf, size_t cap) {
     const char *env = getenv("NORN_SOCK");
     if (env && env[0]) return env;
+    /* Prefer the per-user daemon socket, but fall back to the system nornd
+     * socket (/run/nornd/nornd.sock) when no user socket exists — so a
+     * desktop install talks to the system daemon by default. */
     const char *run = getenv("XDG_RUNTIME_DIR");
     if (run && run[0]) {
         snprintf(buf, cap, "%s/nornd.sock", run);
-        return buf;
+        if (access(buf, F_OK) == 0) return buf;
     }
     const char *home = getenv("HOME");
-    if (!home) home = "/tmp";
-    snprintf(buf, cap, "%s/.config/norn/nornd.sock", home);
+    if (home && home[0]) {
+        char ubuf[600];
+        snprintf(ubuf, sizeof(ubuf), "%s/.config/norn/nornd.sock", home);
+        if (access(ubuf, F_OK) == 0) {
+            size_t n = strlen(ubuf);
+            if (n >= cap) n = cap - 1;
+            memcpy(buf, ubuf, n); buf[n] = '\0';
+            return buf;
+        }
+    }
+    /* System socket fallback. */
+    snprintf(buf, cap, "%s", "/run/nornd/nornd.sock");
     return buf;
 }
 
@@ -367,8 +490,9 @@ static int do_node_public(int argc, char **argv) {
         fprintf(stderr, "norn node public: unexpected response length\n");
         return 1;
     }
+    printf("%s", col_magenta());
     for (size_t i = 0; i < 32; i++) printf("%02x", val[i]);
-    printf("\n");
+    printf("%s\n", col_reset());
     return 0;
 }
 
@@ -425,7 +549,8 @@ static int do_node_status(int argc, char **argv) {
         fprintf(stderr, "nornd is not running\n");
         return 1;
     }
-    fwrite(buf, 1, vlen, stdout);
+    /* nornd returns a recfile; colorize+align on tty, plain on pipe. */
+    print_recfile_pretty(buf, vlen);
     return 0;
 }
 
@@ -723,9 +848,14 @@ static int do_set(int argc, char **argv) {
     /* Give the announce time to reach the storing nodes. */
     dht_pump(client, timeout_ms, NULL);
 
-    printf("Stored under public key: ");
-    for (int i = 0; i < 32; i++) printf("%02x", pubkey[i]);
-    printf("\nSeq: %u\n", seq);
+    /* recfile output: key=<hex>\nseq=<n>\n */
+    char rec[128];
+    int rn = 0;
+    rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "key=");
+    for (int i = 0; i < 32; i++)
+        rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "%02x", pubkey[i]);
+    rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "\nseq=%u\n", seq);
+    print_recfile_pretty((const unsigned char *)rec, (size_t)rn);
 
     norn_free(client);
     return 0;
@@ -786,11 +916,13 @@ static int do_peer(int argc, char **argv, int optind) {
     if (strcmp(sub, "list") == 0) {
         unsigned char buf[4096];
         size_t vlen = 0;
-        if (ipc_round_trip("peers", buf, &vlen, sizeof(buf)) != 0) {
+        if (ipc_round_trip("peer-list", buf, &vlen, sizeof(buf)) != 0) {
             fprintf(stderr, "nornd is not running\n");
             return 1;
         }
-        fwrite(buf, 1, vlen, stdout);
+        /* nornd returns a TSV (header + one row per DHT node). Colorize+align
+         * on tty, plain passthrough when piped. */
+        print_tsv_pretty(buf, vlen);
         return 0;
     } else if (strcmp(sub, "connect") == 0) {
         if (sub_argc < 2) {
@@ -808,8 +940,6 @@ static int do_peer(int argc, char **argv, int optind) {
         }
         char *pv[] = {sub_argv[1], (char *)sub, sub_argv[2]};
         return nornd_cli_peer(3, pv);
-    } else if (strcmp(sub, "keys") == 0) {
-        return nornd_cli_keys(sub_argc - 1, sub_argv + 1);
     } else if (strcmp(sub, "--help") == 0 || strcmp(sub, "-h") == 0 || strcmp(sub, "help") == 0) {
         goto peer_help;
     }
@@ -821,9 +951,8 @@ peer_help:
     fprintf(stdout, "\nSubcommands:\n");
     fprintf(stdout, "  list                   List known peers\n");
     fprintf(stdout, "  connect <pubkey[@h]>   Dial a remote peer\n");
-    fprintf(stdout, "  get <pubkey[@h]> <k>   Fetch a served-KV value\n");
+    fprintf(stdout, "  get <node-id> <key>    Fetch a served-KV value from a peer\n");
     fprintf(stdout, "  cat <pubkey[@h]> <h>   Fetch a served-KV blob\n");
-    fprintf(stdout, "  keys <nodeid>          Resolve peer's SSH + GPG keys\n");
     fprintf(stdout, "\nSee `%s --help` for top-level options.\n", prog_name);
     return optind < argc ? 0 : 1;
 }
@@ -934,13 +1063,6 @@ int main(int argc, char **argv) {
             return optind + 1 < argc ? 0 : 1;
         }
         return nornd_cli_cluster(argc - optind - 1, argv + optind + 1);
-    } else if (strcmp(cmd, "keys") == 0) {
-        if (optind + 1 >= argc) {
-            fprintf(stdout, "Usage: %s keys <nodeid-hex>\n", prog_name);
-            fprintf(stdout, "\nResolve a peer's SSH + GPG public keys.\n");
-            return 1;
-        }
-        return nornd_cli_keys(argc - optind - 1, argv + optind + 1);
     } else if (strcmp(cmd, "node") == 0) {
         if (optind + 1 < argc) {
             const char *sub = argv[optind + 1];
@@ -976,11 +1098,6 @@ node_help:
         return optind + 1 < argc ? 0 : 1;
     } else if (strcmp(cmd, "peer") == 0) {
         return do_peer(argc, argv, optind + 1);
-    } else if (strcmp(cmd, "authorized-keys") == 0) {
-        /* Enumerate every fleet member's published SSH key as an
-         * authorized_keys file. Reuses the cluster IPC client (op "authkeys"). */
-        char *av[] = {(char *)"authkeys"};
-        return nornd_cli_cluster(1, av);
     }
 
     fprintf(stderr, "ERROR: Unknown command: %s\n", cmd);

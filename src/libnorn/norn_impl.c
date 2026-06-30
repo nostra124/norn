@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* norn_impl.c — Mainline DHT client library implementation.
  * Async non-blocking implementation with transaction queue. */
+#include "config.h"
 #include "norn.h"
 #include "norn_internal.h"
 #include "norn_transaction.h"
@@ -64,6 +65,37 @@ norn_client_t *norn_new(const unsigned char *self_pub,
     if (cfg && cfg->version) {
         strncpy(client->ml.self_version, cfg->version, sizeof(client->ml.self_version) - 1);
         client->ml.have_self_version = 1;
+    }
+
+    /* Protocol (norn) version: major.minor of NORN_VERSION, reported as "pv".
+     * Application name: derived from the user-agent (cfg.version) — the part
+     * before '/' (e.g. "norn-node" from "norn-node/0.12"). Reported via the
+     * BEP-5 "v" field. */
+    {
+        /* Norn-Version (pv) = major.minor of NORN_VERSION (e.g. "0.12" from
+         * "0.12.1"). Take up to the second '.' (or the end if no minor). */
+        const char *pv = NORN_VERSION;
+        const char *d1 = strchr(pv, '.');
+        const char *end = d1 ? strchr(d1 + 1, '.') : NULL;
+        size_t pvlen = end ? (size_t)(end - pv) : strlen(pv);
+        if (pvlen >= sizeof(client->ml.self_pv)) pvlen = sizeof(client->ml.self_pv) - 1;
+        memcpy(client->ml.self_pv, pv, pvlen);
+        client->ml.self_pv[pvlen] = '\0';
+        const char *ua = (cfg && cfg->version) ? cfg->version : "";
+        const char *slash = strchr(ua, '/');
+        if (slash && slash > ua) {
+            size_t l = (size_t)(slash - ua);
+            if (l >= sizeof(client->ml.self_app)) l = sizeof(client->ml.self_app) - 1;
+            memcpy(client->ml.self_app, ua, l);
+            client->ml.self_app[l] = '\0';
+        } else if (ua[0]) {
+            /* No slash: treat the whole string as the application name. */
+            size_t l = strlen(ua);
+            if (l >= sizeof(client->ml.self_app)) l = sizeof(client->ml.self_app) - 1;
+            memcpy(client->ml.self_app, ua, l);
+            client->ml.self_app[l] = '\0';
+        }
+        client->ml.have_self_pv = 1;
     }
     
     if (cfg && cfg->read_only) {
@@ -196,6 +228,18 @@ int norn_get_id(const norn_client_t *client, unsigned char out[NORN_ID_BYTES]) {
     return 0;
 }
 
+int norn_external_addr(const norn_client_t *client, uint32_t *ip_out,
+                       uint16_t *port_out, int *have) {
+    if (!client || !ip_out || !port_out || !have) return -1;
+    const struct norn_client *c = (const struct norn_client *)client;
+    *have = c->have_external_addr;
+    if (c->have_external_addr) {
+        *ip_out = c->external_ip;
+        *port_out = c->external_port;
+    }
+    return 0;
+}
+
 int norn_bootstrap(norn_client_t *client) {
     if (!client || !client->initialized) return -1;
     return mainline_bootstrap(&client->ml);
@@ -207,6 +251,25 @@ int norn_routing_size(const norn_client_t *client) {
      * mainline_get_node_count doesn't modify the state, so the const cast is safe. */
     const struct norn_client *c = (const struct norn_client *)client;
     return mainline_get_node_count((mainline_state_t *)&c->ml);
+}
+
+int norn_routing_nodes(const norn_client_t *client, norn_routing_node_t *out,
+                       int cap) {
+    if (!client || !out || cap < 0) return -1;
+    if (cap == 0) return 0;
+    const struct norn_client *c = (const struct norn_client *)client;
+    mainline_state_t *ml = (mainline_state_t *)&c->ml;
+    int n = ml->node_count;
+    if (n > cap) n = cap;
+    for (int i = 0; i < n; i++) {
+        memcpy(out[i].id, ml->nodes[i].id, 20);
+        out[i].ip = ml->nodes[i].ip;
+        out[i].port = ml->nodes[i].port;
+        out[i].last_seen = ml->nodes[i].last_seen;
+        memcpy(out[i].pv, ml->nodes[i].pv, sizeof(out[i].pv));
+        memcpy(out[i].app, ml->nodes[i].app, sizeof(out[i].app));
+    }
+    return n;
 }
 
 int norn_save_dht_nodes(norn_client_t *client, const char *path) {

@@ -23,14 +23,24 @@
 static const char *socket_path(char *buf, size_t cap) {
     const char *env = getenv("NORN_SOCK");
     if (env && env[0]) return env;
+    /* Prefer the per-user daemon socket, fall back to the system nornd socket. */
     const char *run = getenv("XDG_RUNTIME_DIR");
     if (run && run[0]) {
         snprintf(buf, cap, "%s/nornd.sock", run);
-        return buf;
+        if (access(buf, F_OK) == 0) return buf;
     }
     const char *home = getenv("HOME");
-    if (!home) home = "/tmp";
-    snprintf(buf, cap, "%s/.config/norn/nornd.sock", home);
+    if (home && home[0]) {
+        char ubuf[600];
+        snprintf(ubuf, sizeof(ubuf), "%s/.config/norn/nornd.sock", home);
+        if (access(ubuf, F_OK) == 0) {
+            size_t n = strlen(ubuf);
+            if (n >= cap) n = cap - 1;
+            memcpy(buf, ubuf, n); buf[n] = '\0';
+            return buf;
+        }
+    }
+    snprintf(buf, cap, "%s", "/run/nornd/nornd.sock");
     return buf;
 }
 
@@ -83,7 +93,79 @@ static int print_resp(const nornd_ipc_req_t *req, const unsigned char *frame,
     char out[NORND_IPC_MAX_VAL + 4096];
     size_t olen = 0;
     int rc = nornd_client_format(req, &resp, out, sizeof(out), &olen);
-    fwrite(out, 1, olen, rc == 0 ? stdout : stderr);
+    if (rc != 0) {
+        /* error path: plain, no colorize */
+        fwrite(out, 1, olen, stderr);
+        return rc;
+    }
+    /* On a tty, colorize+align structured outputs (recfile/tsv). Raw outputs
+     * (get value, watch events) pass through unchanged. */
+    int tty = isatty(STDOUT_FILENO);
+    const char *op = req->op;
+    int structured = strcmp(op, "status") == 0 || strcmp(op, "members") == 0;
+    if (tty && structured) {
+        const char *cyan = "\033[36m", *bold = "\033[1m", *reset = "\033[0m";
+        if (strcmp(op, "status") == 0) {
+            /* recfile: align keys, color values */
+            size_t i = 0, maxk = 0;
+            while (i < olen) {
+                size_t eq = i;
+                while (eq < olen && out[eq] != '=' && out[eq] != '\n') eq++;
+                if (eq < olen && out[eq] == '=' && eq - i > maxk) maxk = eq - i;
+                while (i < olen && out[i] != '\n') i++;
+                if (i < olen) i++;
+            }
+            i = 0;
+            while (i < olen) {
+                size_t eq = i;
+                while (eq < olen && out[eq] != '=' && out[eq] != '\n') eq++;
+                if (eq < olen && out[eq] == '=') {
+                    size_t klen = eq - i;
+                    fwrite(cyan, 1, strlen(cyan), stdout);
+                    fwrite(out + i, 1, klen, stdout);
+                    for (size_t p = klen; p < maxk; p++) fputc(' ', stdout);
+                    printf("%s=%s", reset, bold);
+                    size_t vs = eq + 1, ve = vs;
+                    while (ve < olen && out[ve] != '\n') ve++;
+                    fwrite(out + vs, 1, ve - vs, stdout);
+                    printf("%s\n", reset);
+                    i = ve;
+                    if (i < olen) i++;
+                } else {
+                    size_t eol = i;
+                    while (eol < olen && out[eol] != '\n') eol++;
+                    fwrite(out + i, 1, eol - i, stdout);
+                    if (eol < olen) { fputc('\n', stdout); eol++; }
+                    i = eol;
+                }
+            }
+        } else {
+            /* members TSV: colorize header + data rows, align columns */
+            /* TSV lines: header "index\tnodeid", then "0\t<hex>"… */
+            size_t i = 0;
+            while (i < olen) {
+                size_t eol = i;
+                while (eol < olen && out[eol] != '\n') eol++;
+                /* find tab */
+                size_t tab = i;
+                while (tab < eol && out[tab] != '\t') tab++;
+                if (tab < eol) {
+                    fwrite(cyan, 1, strlen(cyan), stdout);
+                    fwrite(out + i, 1, tab - i, stdout);
+                    printf("%s\t%s", reset, bold);
+                    fwrite(out + tab + 1, 1, eol - tab - 1, stdout);
+                    printf("%s\n", reset);
+                } else {
+                    fwrite(out + i, 1, eol - i, stdout);
+                    if (eol < olen) fputc('\n', stdout);
+                }
+                i = eol;
+                if (i < olen) i++;
+            }
+        }
+    } else {
+        fwrite(out, 1, olen, stdout);
+    }
     return rc;
 }
 

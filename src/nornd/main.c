@@ -14,12 +14,12 @@
  * remaining integration seam — cluster_send() is where it plugs in.
  */
 
+#include "config.h"
 #include "agent.h"
 #include "crypto.h"
 #include "dispatch.h"
 #include "identity.h"
 #include "ipc.h"
-#include "keydir.h"
 #include "norn.h"
 #include "norn_cluster.h"
 #include "norn_raft.h"
@@ -41,6 +41,7 @@
 #include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
 #define MAX_CLIENTS 64
 
@@ -366,6 +367,7 @@ typedef struct {
     const keypair_t *kp;
     norn_client_t *client;
     time_t start_time;
+    uint16_t listen_port;   /* the DHT UDP port we listen on (for the self row) */
 } serve_ctx_t;
 
 /* Read, decode, dispatch and reply to one ready client. Returns 0 to keep the
@@ -420,6 +422,103 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
         int wn = snprintf((char *)resp.val, sizeof(resp.val),
             "dht_nodes=%d\n", norn_routing_size(ctx->client));
         if (wn > 0) { resp.vlen = (size_t)wn; }
+    } else if (strcmp(req.op, "peer-list") == 0) {
+        /* Render the DHT routing table as TSV: a header line, then one row
+         * per node (Node-Id, IP, Port, Age, Norn-Version, Application,
+         * App-Version). The local nornd is emitted as the first data row so
+         * the node sees itself. Application/App-Version come from the BEP-5
+         * "v" vendor field (split on the first space: name, then version);
+         * "mainline" is the fallback when a peer advertises nothing. Output
+         * is capped to resp.val capacity; nodes that don't fit are omitted. */
+        resp.ok = 1;
+        resp.has_val = 1;
+        norn_routing_node_t nodes[64];
+        int n = norn_routing_nodes(ctx->client, nodes, 64);
+        if (n < 0) n = 0;
+        time_t now = time(NULL);
+        size_t off = 0;
+        int wn = snprintf((char *)resp.val + off, sizeof(resp.val) - off,
+            "Node-Id\tIP\tPort\tAge\tNorn-Version\tApplication\tApp-Version\n");
+        if (wn > 0) off += (size_t)wn;
+
+        /* Helper to append one row, splitting the BEP-5 v string into
+         * application name + version. Split on the first space (the BEP-5
+         * convention, e.g. "Transmission 4.0.6"); if there is no space, split
+         * on the first '/' (the norn user-agent convention, e.g.
+         * "norn-node/0.12"). */
+        #define APPEND_ROW(idhex_v, ip_v, port_v, age_v, pv_v, app_v) \
+            do { \
+                const char *_app = (app_v)[0] ? (app_v) : "mainline"; \
+                const char *_sp = strchr(_app, ' '); \
+                const char *_sl = strchr(_app, '/'); \
+                const char *_sep = _sp ? _sp : _sl; \
+                char _name[24] = {0}, _ver[24] = {0}; \
+                if (_sep) { \
+                    size_t _nl = (size_t)(_sep - _app); \
+                    if (_nl >= sizeof(_name)) _nl = sizeof(_name) - 1; \
+                    memcpy(_name, _app, _nl); _name[_nl] = '\0'; \
+                    size_t _vl = strlen(_sep + 1); \
+                    if (_vl >= sizeof(_ver)) _vl = sizeof(_ver) - 1; \
+                    memcpy(_ver, _sep + 1, _vl); _ver[_vl] = '\0'; \
+                } else { \
+                    size_t _nl = strlen(_app); \
+                    if (_nl >= sizeof(_name)) _nl = sizeof(_name) - 1; \
+                    memcpy(_name, _app, _nl); _name[_nl] = '\0'; \
+                } \
+                wn = snprintf((char *)resp.val + off, sizeof(resp.val) - off, \
+                    "%s\t%s\t%u\t%ld\t%s\t%s\t%s\n", \
+                    idhex_v, ip_v, (unsigned)(port_v), (long)(age_v), \
+                    (pv_v)[0] ? (pv_v) : "-", \
+                    _name[0] ? _name : "mainline", \
+                    _ver[0] ? _ver : "-"); \
+                if (wn < 0) break; \
+                if ((size_t)wn >= sizeof(resp.val) - off) break; \
+                off += (size_t)wn; \
+            } while (0)
+
+        /* Self row: the local nornd. The application version is the full
+         * norn version (NORN_VERSION), since the user-agent is "norn-node/<v>". */
+        unsigned char self_id[20];
+        if (norn_get_id(ctx->client, self_id) == 0) {
+            char idhex[41];
+            for (int b = 0; b < 20; b++) snprintf(idhex + b * 2, 3, "%02x", self_id[b]);
+            uint32_t extip = 0; uint16_t extport = 0; int have_ext = 0;
+            norn_external_addr(ctx->client, &extip, &extport, &have_ext);
+            char ipbuf[INET_ADDRSTRLEN] = "0.0.0.0";
+            if (have_ext) {
+                struct in_addr a; a.s_addr = extip;
+                inet_ntop(AF_INET, &a, ipbuf, sizeof(ipbuf));
+            }
+            char self_pv[8] = {0};
+            /* self_pv = major.minor of NORN_VERSION (e.g. "0.12" from "0.12.1"). */
+            {
+                const char *pv = NORN_VERSION;
+                const char *d1 = strchr(pv, '.');
+                const char *end = d1 ? strchr(d1 + 1, '.') : NULL;
+                size_t l = end ? (size_t)(end - pv) : strlen(pv);
+                if (l >= sizeof(self_pv)) l = sizeof(self_pv) - 1;
+                memcpy(self_pv, pv, l); self_pv[l] = '\0';
+            }
+            /* norn-node/<NORN_VERSION> so the macro's '/'-split yields the
+             * full version as App-Version. */
+            char self_app[40];
+            snprintf(self_app, sizeof(self_app), "norn-node/%s", NORN_VERSION);
+            APPEND_ROW(idhex, ipbuf, ctx->listen_port, 0, self_pv, self_app);
+        }
+
+        for (int i = 0; i < n && off + 1 < sizeof(resp.val); i++) {
+            char ipbuf[INET_ADDRSTRLEN];
+            struct in_addr a; a.s_addr = nodes[i].ip;
+            inet_ntop(AF_INET, &a, ipbuf, sizeof(ipbuf));
+            long age = (long)(now - nodes[i].last_seen);
+            if (age < 0) age = 0;
+            char idhex[41];
+            for (int b = 0; b < 20; b++)
+                snprintf(idhex + b * 2, 3, "%02x", nodes[i].id[b]);
+            APPEND_ROW(idhex, ipbuf, ntohs(nodes[i].port), age, nodes[i].pv, nodes[i].app);
+        }
+        #undef APPEND_ROW
+        resp.vlen = off;
     } else {
         nornd_dispatch(ctx->be, &req, &resp);
     }
@@ -602,7 +701,7 @@ int main(int argc, char **argv) {
     norn_cluster_kv_watch(cl, (const unsigned char *)"", 0, on_kv_change,
                           &watches);
 
-    serve_ctx_t srv = {&be, &watches, &kp, client, time(NULL)};
+    serve_ctx_t srv = {&be, &watches, &kp, client, time(NULL), listen_port};
 
     /* Node-served KV (FEAT-033): host GET/LIST from the cluster KV and CAT from a
      * file-backed object store under <data-dir>/objects, served to peers that

@@ -81,7 +81,7 @@ int nornd_client_build_req(int argc, char **argv, nornd_ipc_req_t *req,
         return 0;
     }
     if (strcmp(sub, "members") == 0 || strcmp(sub, "leader") == 0 ||
-        strcmp(sub, "status") == 0 || strcmp(sub, "authkeys") == 0) {
+        strcmp(sub, "status") == 0) {
         strcpy(req->op, sub);
         return 0;
     }
@@ -128,26 +128,27 @@ int nornd_client_format(const nornd_ipc_req_t *req, const nornd_ipc_resp_t *resp
         put_hex(&s, resp->val, resp->vlen);
         put_cstr(&s, "\n");
     } else if (strcmp(op, "members") == 0) {
+        /* TSV: header + one row per member (index\tnodeid). */
+        put_cstr(&s, "index\tnodeid");
         for (int i = 0; i < resp->n_items; i++) {
+            put_cstr(&s, "\n");
+            char row[16];
+            snprintf(row, sizeof(row), "%d\t", i);
+            put_cstr(&s, row);
             put_hex(&s, resp->items[i].data, resp->items[i].len);
-            put_cstr(&s, "\n");
         }
-    } else if (strcmp(op, "authkeys") == 0) {
-        /* Each item is a verbatim authorized_keys line (ssh-ed25519 …). */
-        for (int i = 0; i < resp->n_items; i++) {
-            put_bytes(&s, resp->items[i].data, resp->items[i].len);
-            put_cstr(&s, "\n");
-        }
+        put_cstr(&s, "\n");
     } else if (strcmp(op, "status") == 0) {
-        put_cstr(&s, resp->vlen > 0 && resp->val[0] == 1 ? "role: leader\n"
-                                                         : "role: follower\n");
+        /* recfile: role=<leader|follower>, leader=<hex>, members=<n> */
+        put_cstr(&s, resp->vlen > 0 && resp->val[0] == 1 ? "role=leader\n"
+                                                         : "role=follower\n");
         if (resp->vlen > 1) {
-            put_cstr(&s, "leader: ");
+            put_cstr(&s, "leader=");
             put_hex(&s, resp->val + 1, resp->vlen - 1);
             put_cstr(&s, "\n");
         }
         char line[32];
-        snprintf(line, sizeof(line), "members: %d\n", resp->n_items);
+        snprintf(line, sizeof(line), "members=%d\n", resp->n_items);
         put_cstr(&s, line);
     } else if (strcmp(op, "watch") == 0) {
         /* The subscription ack carries no items; each later frame is a change

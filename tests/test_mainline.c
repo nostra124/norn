@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <time.h>
+#include <arpa/inet.h>
 
 static void test_init_cleanup(void) {
     net_t net;
@@ -579,6 +580,176 @@ static void test_bootstrap_local_null(void) {
     printf("OK\n");
 }
 
+/* mainline_update_node_info: sets pv/app on a known node, preserves
+ * existing non-empty fields when the caller passes empty strings, and
+ * returns -1 for NULL state/id or an unknown id. */
+static void test_update_node_info(void) {
+    printf("  test_update_node_info: ");
+
+    net_t net;
+    net_init(&net, 0);
+    mainline_state_t state;
+    unsigned char key[32];
+    crypto_sign_keypair(key, (unsigned char[64]){0});
+    mainline_init(&state, &net, key);
+
+    unsigned char nid[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
+    assert(mainline_add_node(&state, nid, 0x01020304, 6881) == 1);
+
+    /* NULL state / id → -1 */
+    assert(mainline_update_node_info(NULL, nid, "0.12", "wyrd") == -1);
+    assert(mainline_update_node_info(&state, NULL, "0.12", "wyrd") == -1);
+
+    /* unknown id → -1 */
+    unsigned char unknown[20] = {0};
+    assert(mainline_update_node_info(&state, unknown, "0.12", "wyrd") == -1);
+
+    /* set both fields */
+    assert(mainline_update_node_info(&state, nid, "0.12", "wyrd") == 0);
+    assert(strcmp(state.nodes[0].pv, "0.12") == 0);
+    assert(strcmp(state.nodes[0].app, "wyrd") == 0);
+
+    /* refresh with empty strings preserves previously-learned values */
+    assert(mainline_update_node_info(&state, nid, "", "") == 0);
+    assert(state.nodes[0].pv[0] != '\0');
+    assert(state.nodes[0].app[0] != '\0');
+
+    mainline_cleanup(&state);
+    net_cleanup(&net);
+    printf("OK\n");
+}
+
+/* Peer-preference (FEAT-prefer): norn / same-app peers are preferred and win
+ * admission over generic mainline nodes when the table is full, bypass the
+ * /24 subnet cap, and are marked is_preferred=1 once we learn their pv/app. */
+static void test_preferred_admission(void) {
+    printf("  test_preferred_admission: ");
+
+    net_t net;
+    net_init(&net, 0);
+    mainline_state_t state;
+    unsigned char key[32];
+    crypto_sign_keypair(key, (unsigned char[64]){0});
+    mainline_init(&state, &net, key);
+
+    /* Fill the table with generic (non-preferred) nodes in distinct /24s. */
+    int added = 0;
+    for (int i = 0; i < 5000 && added < MAINLINE_MAX_NODES; i++) {
+        unsigned char nid[20];
+        /* distinct id each: encode i in the first 4 bytes */
+        nid[0] = (unsigned char)(i & 0xff);
+        nid[1] = (unsigned char)((i >> 8) & 0xff);
+        nid[2] = (unsigned char)((i >> 16) & 0xff);
+        nid[3] = (unsigned char)((i >> 24) & 0xff);
+        memset(nid + 4, 0x42, 16);
+        /* distinct /24: 10.<i low>.<i high>.1 */
+        uint32_t ip = htonl(0x0A000000u | ((uint32_t)(i % 256) << 16) | ((uint32_t)(i / 256) << 8) | 1u);
+        if (mainline_add_node(&state, nid, ip, 6881) == 1) added++;
+    }
+    assert(state.node_count == MAINLINE_MAX_NODES);
+
+    /* A brand-new contact when the table is full: it evicts the oldest
+     * non-preferred node to make room (preference unknown, but it gets in). */
+    unsigned char new_id[20];
+    memset(new_id, 0xAA, 20);
+    int ret = mainline_add_node(&state, new_id, htonl(0xC0A80101u), 6881);
+    assert(ret == 1);
+    assert(state.node_count == MAINLINE_MAX_NODES);
+
+    /* Marking a node preferred via update_node_info protects it: build a fresh
+     * small table, mark one node preferred, then fill the table and confirm the
+     * preferred node is retained when the table overflows. */
+    mainline_cleanup(&state);
+    net_init(&net, 0);
+    mainline_init(&state, &net, key);
+    unsigned char pref_id[20];
+    memset(pref_id, 0x11, 20);
+    assert(mainline_add_node(&state, pref_id, htonl(0x01020304u), 6881) == 1);
+    assert(mainline_update_node_info(&state, pref_id, "0.12", "norn-node") == 0);
+    assert(state.nodes[0].is_preferred == 1);
+
+    /* Fill the rest with generic nodes (distinct /24s). */
+    for (int i = 1, g = 0; i < MAINLINE_MAX_NODES && g < 5000; g++) {
+        unsigned char nid[20];
+        nid[0] = (unsigned char)(g & 0xff);
+        nid[1] = (unsigned char)((g >> 8) & 0xff);
+        nid[2] = (unsigned char)((g >> 16) & 0xff);
+        nid[3] = (unsigned char)((g >> 24) & 0xff);
+        memset(nid + 4, 0x43, 16);
+        if (memcmp(nid, pref_id, 20) == 0) continue;
+        uint32_t ip = htonl(0x0B000000u | ((uint32_t)(g % 256) << 16) | ((uint32_t)(g / 256) << 8) | 1u);
+        int r = mainline_add_node(&state, nid, ip, 6881);
+        if (r == 1) i++;
+    }
+    assert(state.node_count == MAINLINE_MAX_NODES);
+
+    /* The preferred node should still be present (was never the oldest
+     * non-preferred victim). Confirm by id lookup. */
+    int found = 0;
+    for (int i = 0; i < state.node_count; i++)
+        if (memcmp(state.nodes[i].id, pref_id, 20) == 0) { found = 1; break; }
+    assert(found == 1);
+
+    mainline_cleanup(&state);
+    net_cleanup(&net);
+    printf("OK\n");
+}
+
+static void test_preferred_subnet_cap(void) {
+    printf("  test_preferred_subnet_cap: ");
+
+    net_t net;
+    net_init(&net, 0);
+    mainline_state_t state;
+    unsigned char key[32];
+    crypto_sign_keypair(key, (unsigned char[64]){0});
+    mainline_init(&state, &net, key);
+
+    /* Fill a /24 to the cap with generic (non-preferred) nodes. */
+    uint32_t base = htonl(0x0A0B0C00u);
+    for (int i = 0; i < MAINLINE_MAX_PER_SUBNET; i++) {
+        unsigned char nid[20];
+        nid[0] = (unsigned char)(i + 1);
+        memset(nid + 1, 0x40, 19);
+        assert(mainline_add_node(&state, nid, base + htonl((uint32_t)i), 6881) == 1);
+    }
+    /* A further generic node in the same /24 evicts the oldest non-preferred
+     * one (cap bypass: newcomers win admission over generic incumbents in a
+     * full subnet, since all incumbents here are non-preferred). */
+    unsigned char extra[20];
+    memset(extra, 0xEE, 20);
+    int ret = mainline_add_node(&state, extra, base + htonl((uint32_t)MAINLINE_MAX_PER_SUBNET), 6881);
+    assert(ret == 1);
+    /* The count stays at the cap (one evicted, one added). */
+    int same = 0;
+    for (int i = 0; i < state.node_count; i++)
+        if ((ntohl(state.nodes[i].ip) & 0xffffff00u) == ntohl(base)) same++;
+    assert(same == MAINLINE_MAX_PER_SUBNET);
+
+    /* If the subnet's incumbents are ALL preferred, a generic newcomer is
+     * rejected (can't displace preferred peers). */
+    mainline_cleanup(&state);
+    net_init(&net, 0);
+    mainline_init(&state, &net, key);
+    for (int i = 0; i < MAINLINE_MAX_PER_SUBNET; i++) {
+        unsigned char nid[20];
+        nid[0] = (unsigned char)(i + 1);
+        memset(nid + 1, 0x50, 19);
+        assert(mainline_add_node(&state, nid, base + htonl((uint32_t)i), 6881) == 1);
+        /* mark each preferred */
+        char pv[8]; snprintf(pv, sizeof(pv), "0.%d", i);
+        assert(mainline_update_node_info(&state, nid, pv, "norn-node") == 0);
+        assert(state.nodes[i].is_preferred == 1);
+    }
+    unsigned char gen[20];
+    memset(gen, 0xFF, 20);
+    assert(mainline_add_node(&state, gen, base + htonl((uint32_t)MAINLINE_MAX_PER_SUBNET), 6881) == -1);
+
+    mainline_cleanup(&state);
+    net_cleanup(&net);
+    printf("OK\n");
+}
+
 int main(void) {
     printf("=== test_mainline.c ===\n");
     
@@ -612,6 +783,9 @@ int main(void) {
     test_needs_bootstrap();
     test_find_node();
     test_get_bootstrap_nodes();
+    test_update_node_info();
+    test_preferred_admission();
+    test_preferred_subnet_cap();
     
     printf("=== All tests passed ===\n");
     return 0;

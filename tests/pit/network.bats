@@ -76,9 +76,9 @@ skip_if_no_network() {
         skip "DHT publish unavailable"
     fi
 
-    # `set` prints "Stored under public key: <64-hex>"; that pubkey is the
+    # `set` prints a recfile: `key=<64-hex>`; that pubkey is the
     # retrieval address.
-    PUB_KEY=$(echo "$output" | awk '/Stored under public key:/{print $5}')
+    PUB_KEY=$(echo "$output" | awk -F= '/^key=/{print $2}')
     [ -n "$PUB_KEY" ]
 
     # Retrieve it back. DHT propagation is best-effort, so found/not-found/timeout

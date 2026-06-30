@@ -38,9 +38,6 @@ static void test_build_basic(void) {
     char *status[] = {"status"};
     assert(nornd_client_build_req(1, status, &r, err, sizeof(err)) == 0);
     assert(strcmp(r.op, "status") == 0);
-    char *authkeys[] = {"authkeys"};
-    assert(nornd_client_build_req(1, authkeys, &r, err, sizeof(err)) == 0);
-    assert(strcmp(r.op, "authkeys") == 0);
 }
 
 static void test_build_errors(void) {
@@ -141,7 +138,7 @@ static void test_format(void) {
     assert(nornd_client_format(&rq, &resp, out, sizeof(out), &n) == 0);
     assert(memcmp(out, "dead\n", 5) == 0);
 
-    /* members → one hex line per item */
+    /* members → TSV: header + one row per item (index\tnodeid) */
     memset(&resp, 0, sizeof(resp));
     resp.ok = 1;
     resp.n_items = 2;
@@ -151,9 +148,10 @@ static void test_format(void) {
     resp.items[1].data[0] = 0xff;
     rq = req_op("members");
     assert(nornd_client_format(&rq, &resp, out, sizeof(out), &n) == 0);
-    assert(memcmp(out, "01\nff\n", 6) == 0);
+    out[n] = '\0';
+    assert(strcmp(out, "index\tnodeid\n0\t01\n1\tff\n") == 0);
 
-    /* status: leader role with leader pubkey + members */
+    /* status: leader role with leader pubkey + members (recfile) */
     memset(&resp, 0, sizeof(resp));
     resp.ok = 1;
     resp.has_val = 1;
@@ -164,8 +162,8 @@ static void test_format(void) {
     rq = req_op("status");
     assert(nornd_client_format(&rq, &resp, out, sizeof(out), &n) == 0);
     out[n] = '\0';
-    assert(strstr(out, "role: leader\n") && strstr(out, "leader: ab\n") &&
-           strstr(out, "members: 3\n"));
+    assert(strstr(out, "role=leader\n") && strstr(out, "leader=ab\n") &&
+           strstr(out, "members=3\n"));
 
     /* status: follower, no leader pubkey (vlen == 1) */
     memset(&resp, 0, sizeof(resp));
@@ -175,15 +173,15 @@ static void test_format(void) {
     resp.vlen = 1;
     assert(nornd_client_format(&rq, &resp, out, sizeof(out), &n) == 0);
     out[n] = '\0';
-    assert(strstr(out, "role: follower\n") && !strstr(out, "leader:") &&
-           strstr(out, "members: 0\n"));
+    assert(strstr(out, "role=follower\n") && !strstr(out, "leader=") &&
+           strstr(out, "members=0\n"));
 
     /* status: vlen == 0 → follower branch via short-circuit */
     memset(&resp, 0, sizeof(resp));
     resp.ok = 1;
     assert(nornd_client_format(&rq, &resp, out, sizeof(out), &n) == 0);
     out[n] = '\0';
-    assert(strstr(out, "role: follower\n"));
+    assert(strstr(out, "role=follower\n"));
 
     /* watch: subscription ack (no items) prints OK */
     memset(&resp, 0, sizeof(resp));
@@ -218,19 +216,6 @@ static void test_format(void) {
     assert(nornd_client_format(&rq, &resp, out, sizeof(out), &n) == 0);
     out[n] = '\0';
     assert(strcmp(out, "del foo\n") == 0);
-
-    /* authkeys → one verbatim line per item */
-    memset(&resp, 0, sizeof(resp));
-    resp.ok = 1;
-    resp.n_items = 2;
-    memcpy(resp.items[0].data, "ssh-ed25519 AAAA a", 18);
-    resp.items[0].len = 18;
-    memcpy(resp.items[1].data, "ssh-ed25519 BBBB b", 18);
-    resp.items[1].len = 18;
-    rq = req_op("authkeys");
-    assert(nornd_client_format(&rq, &resp, out, sizeof(out), &n) == 0);
-    out[n] = '\0';
-    assert(strcmp(out, "ssh-ed25519 AAAA a\nssh-ed25519 BBBB b\n") == 0);
 
     /* put/del/cas ack */
     memset(&resp, 0, sizeof(resp));

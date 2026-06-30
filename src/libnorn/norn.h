@@ -57,6 +57,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <time.h>
 
 /** @brief DHT node ID size (SHA-1 hash, 20 bytes) */
 #define NORN_ID_BYTES      20
@@ -253,6 +254,24 @@ void norn_free(norn_client_t *client);
  * @endcode
  */
 int norn_get_id(const norn_client_t *client, unsigned char out[NORN_ID_BYTES]);
+
+/**
+ * @brief Get the node's discovered external (public) IP and port
+ *
+ * Returns the reflexive endpoint learned from BEP-42 ("ip" field in peer
+ * replies). Before any peer has reported it, *have is set to 0 and the
+ * out values are left unchanged.
+ *
+ * @param client Client handle
+ * @param ip_out   Filled with the external IP (network byte order) if *have
+ * @param port_out Filled with the external port (host byte order) if *have
+ * @param have     Set to 1 if an external address has been discovered, 0 if not
+ * @return 0 on success, -1 on error (NULL client/outputs)
+ *
+ * @note NULL-safe: Returns -1 if client, ip_out, port_out, or have is NULL
+ */
+int norn_external_addr(const norn_client_t *client, uint32_t *ip_out,
+                       uint16_t *port_out, int *have);
 
 /* === DHT operations === */
 
@@ -593,6 +612,21 @@ int norn_decode_mutable(const unsigned char *buf, size_t len,
 /* === DHT routing table === */
 
 /**
+ * @brief A single DHT routing-table node, for norn_routing_nodes().
+ *
+ * @note id is a 20-byte Mainline DHT node id (SHA-1 of the peer key),
+ *       not an Ed25519 pubkey. ip/port are in network byte order.
+ */
+typedef struct {
+    unsigned char id[20];
+    uint32_t ip;        /* network byte order */
+    uint16_t port;      /* network byte order */
+    time_t last_seen;   /* unix seconds of last contact */
+    char pv[8];          /* peer's norn (protocol) version, major.minor; "" if non-norn/unknown */
+    char app[24];        /* peer's application name, from BEP-5 "v" (e.g. "norn-node", "Transmission"); "" if unknown */
+} norn_routing_node_t;
+
+/**
  * @brief Get the number of nodes in the DHT routing table
  *
  * Returns the count of Kademlia nodes currently known in the
@@ -604,6 +638,23 @@ int norn_decode_mutable(const unsigned char *buf, size_t len,
  * @note NULL-safe: Returns -1 if client is NULL
  */
 int norn_routing_size(const norn_client_t *client);
+
+/**
+ * @brief Snapshot the DHT routing table into a caller buffer
+ *
+ * Copies up to `cap` routing-table nodes into `out`, in table order.
+ * Use norn_routing_size() to size the buffer. The snapshot is a point-in-time
+ * copy; the table may change after this call.
+ *
+ * @param client  Client handle
+ * @param out     Output array (caller-owned); may be NULL only if cap is 0
+ * @param cap     Max entries `out` can hold
+ * @return Number of entries written (0..cap), or -1 on error
+ *
+ * @note NULL-safe: Returns -1 if client or out is NULL
+ */
+int norn_routing_nodes(const norn_client_t *client, norn_routing_node_t *out,
+                       int cap);
 
 /* === DHT state persistence === */
 

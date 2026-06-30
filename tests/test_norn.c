@@ -440,6 +440,80 @@ static void test_save_load_dht_nodes_null(void) {
     printf("OK\n");
 }
 
+/* norn_routing_nodes: iterate the DHT routing table. With a fresh client and
+ * no bootstrap, the table is empty → returns 0 and writes nothing. NULL client
+ * returns -1. */
+static void test_routing_nodes(void) {
+    printf("  test_routing_nodes: ");
+
+    unsigned char pk[32], sk[64];
+    crypto_sign_keypair(pk, sk);
+
+    norn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.version = "test";
+
+    norn_client_t *client = norn_new(pk, sk, &cfg);
+    assert(client != NULL);
+
+    norn_routing_node_t out[8];
+    int n = norn_routing_nodes(client, out, 8);
+    assert(n >= 0);
+    assert(n <= 8); /* can't exceed the cap we passed */
+
+    norn_free(client);
+    printf("OK\n");
+}
+
+static void test_routing_nodes_null(void) {
+    printf("  test_routing_nodes_null: ");
+
+    /* NULL client → -1, out untouched */
+    norn_routing_node_t out[1];
+    int n = norn_routing_nodes(NULL, out, 1);
+    assert(n == -1);
+
+    /* NULL out buffer with a valid client → 0 (or -1); must not crash. */
+    unsigned char pk[32], sk[64];
+    crypto_sign_keypair(pk, sk);
+    norn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.version = "test";
+    norn_client_t *client = norn_new(pk, sk, &cfg);
+    assert(client != NULL);
+    n = norn_routing_nodes(client, NULL, 8);
+    assert(n == -1);
+    norn_free(client);
+
+    printf("OK\n");
+}
+
+/* norn_external_addr: returns -1 on NULL; for a fresh client have==0. */
+static void test_external_addr(void) {
+    printf("  test_external_addr: ");
+
+    unsigned char pk[32], sk[64];
+    crypto_sign_keypair(pk, sk);
+    norn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.version = "test";
+    norn_client_t *client = norn_new(pk, sk, &cfg);
+    assert(client != NULL);
+
+    uint32_t ip = 0; uint16_t port = 0; int have = -1;
+    assert(norn_external_addr(client, &ip, &port, &have) == 0);
+    assert(have == 0 || have == 1); /* before discovery, 0; if discovered, 1 */
+    norn_free(client);
+
+    /* NULL safety */
+    assert(norn_external_addr(NULL, &ip, &port, &have) == -1);
+    assert(norn_external_addr(client, NULL, &port, &have) == -1);
+    assert(norn_external_addr(client, &ip, NULL, &have) == -1);
+    assert(norn_external_addr(client, &ip, &port, NULL) == -1);
+
+    printf("OK\n");
+}
+
 int main(void) {
     if (sodium_init() < 0) {
         fprintf(stderr, "Failed to initialize libsodium\n");
@@ -473,6 +547,9 @@ int main(void) {
     test_listen_async();
     test_save_load_dht_nodes();
     test_save_load_dht_nodes_null();
+    test_routing_nodes();
+    test_routing_nodes_null();
+    test_external_addr();
     
     printf("test_norn: OK\n");
     return 0;

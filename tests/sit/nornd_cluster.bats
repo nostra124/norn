@@ -20,10 +20,10 @@ node_pubkey() {
 wait_for_leader() {
     # Echoes "A" or "B" once one of the two nodes reports leader; empty on timeout.
     for _ in $(seq 1 100); do
-        if NORN_SOCK="$SOCK_A" "$NORN" cluster status 2>/dev/null | grep -q "role: leader"; then
+        if NORN_SOCK="$SOCK_A" "$NORN" cluster status 2>/dev/null | grep -q "role=leader"; then
             echo A; return
         fi
-        if NORN_SOCK="$SOCK_B" "$NORN" cluster status 2>/dev/null | grep -q "role: leader"; then
+        if NORN_SOCK="$SOCK_B" "$NORN" cluster status 2>/dev/null | grep -q "role=leader"; then
             echo B; return
         fi
         sleep 0.2
@@ -85,9 +85,9 @@ teardown_file() {
     [ -n "$la" ]
     [ "$la" = "$lb" ]
     run bash -c "NORN_SOCK='$SOCK_A' '$NORN' cluster status"
-    [[ "$output" == *"members: 2"* ]]
+    [[ "$output" == *"members=2"* ]]
     run bash -c "NORN_SOCK='$SOCK_B' '$NORN' cluster status"
-    [[ "$output" == *"members: 2"* ]]
+    [[ "$output" == *"members=2"* ]]
 }
 
 @test "a write on the leader replicates to the follower" {

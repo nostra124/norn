@@ -70,12 +70,10 @@ void mainline_cleanup(mainline_state_t *state) {
 
 int mainline_add_node(mainline_state_t *state, const unsigned char *id, uint32_t ip, uint16_t port) {
     if (!state || !id) return -1;
-    if (state->node_count >= MAINLINE_MAX_NODES) return -1;
-    
     if (ip == 0 || port == 0) return -1;
-    
     if (memcmp(id, state->self_id, 20) == 0) return -1;
-    
+
+    /* Update an existing entry in place. */
     for (int i = 0; i < state->node_count; i++) {
         if (memcmp(state->nodes[i].id, id, 20) == 0) {
             state->nodes[i].ip = ip;
@@ -85,22 +83,85 @@ int mainline_add_node(mainline_state_t *state, const unsigned char *id, uint32_t
         }
     }
 
-    /* Per-/24 admission cap (BUG-014): a peer can name arbitrary node ids in its
-     * 'nodes' reply, so without a subnet limit one attacker-controlled /24 fills
-     * the table and eclipses lookups. Cap how many table entries share a /24. */
+    /* Per-/24 admission cap (BUG-014): cap how many table entries share a /24.
+     * If the cap is hit and there is a non-preferred (generic mainline) node in
+     * the same subnet, evict it to make room — preferred peers (norn / same
+     * application) win admission over unrelated nodes sharing the subnet. */
     uint32_t new_net = ntohl(ip) & 0xffffff00u;
     int same_net = 0;
     for (int i = 0; i < state->node_count; i++)
         if ((ntohl(state->nodes[i].ip) & 0xffffff00u) == new_net) same_net++;
-    if (same_net >= MAINLINE_MAX_PER_SUBNET) return -1;
+    if (same_net >= MAINLINE_MAX_PER_SUBNET) {
+        int victim = -1;
+        time_t oldest = 0;
+        for (int i = 0; i < state->node_count; i++) {
+            if ((ntohl(state->nodes[i].ip) & 0xffffff00u) != new_net) continue;
+            if (state->nodes[i].is_preferred) continue;       /* protect preferred */
+            if (victim < 0 || state->nodes[i].last_seen < oldest) {
+                victim = i; oldest = state->nodes[i].last_seen;
+            }
+        }
+        if (victim < 0)
+            return -1; /* subnet is full of preferred peers; don't displace them */
+        /* evict the oldest non-preferred node in this subnet */
+        state->nodes[victim] = state->nodes[--state->node_count];
+    }
 
+    /* If the table is full, make room by evicting the oldest non-preferred
+     * (generic mainline) node. Preferred peers are never displaced to admit
+     * a newcomer; a brand-new contact (preference unknown, is_preferred=0) is
+     * admitted over a known-generic node — it may turn out to be preferred. */
+    if (state->node_count >= MAINLINE_MAX_NODES) {
+        int victim = -1;
+        time_t oldest = 0;
+        for (int i = 0; i < state->node_count; i++) {
+            if (state->nodes[i].is_preferred) continue;
+            if (victim < 0 || state->nodes[i].last_seen < oldest) {
+                victim = i; oldest = state->nodes[i].last_seen;
+            }
+        }
+        if (victim < 0)
+            return -1; /* table is full of preferred peers */
+        state->nodes[victim] = state->nodes[--state->node_count];
+    }
+
+    memset(&state->nodes[state->node_count], 0, sizeof(state->nodes[state->node_count]));
     memcpy(state->nodes[state->node_count].id, id, 20);
     state->nodes[state->node_count].ip = ip;
     state->nodes[state->node_count].port = port;
     state->nodes[state->node_count].last_seen = time(NULL);
     state->node_count++;
-    
+
     return 1;
+}
+
+/* Set the peer's version/application metadata on a known node, preserving any
+ * field the caller left empty (so a refresh that omits the version info doesn't
+ * wipe a previously-learned version). */
+int mainline_update_node_info(mainline_state_t *state, const unsigned char *id,
+                               const char *pv, const char *app) {
+    if (!state || !id) return -1;
+    for (int i = 0; i < state->node_count; i++) {
+        if (memcmp(state->nodes[i].id, id, 20) != 0) continue;
+        if (pv && pv[0]) {
+            strncpy(state->nodes[i].pv, pv, sizeof(state->nodes[i].pv) - 1);
+            state->nodes[i].pv[sizeof(state->nodes[i].pv) - 1] = '\0';
+        }
+        if (app && app[0]) {
+            strncpy(state->nodes[i].app, app, sizeof(state->nodes[i].app) - 1);
+            state->nodes[i].app[sizeof(state->nodes[i].app) - 1] = '\0';
+        }
+        /* Mark preferred: a norn peer (advertises pv) or a peer running our own
+         * application (app == self_app). Such peers implement norn's better
+         * functionality and are retained over generic mainline nodes. */
+        int pref = 0;
+        if (state->nodes[i].pv[0]) pref = 1;
+        if (state->self_app[0] && state->nodes[i].app[0] &&
+            strcmp(state->nodes[i].app, state->self_app) == 0) pref = 1;
+        state->nodes[i].is_preferred = pref;
+        return 0;
+    }
+    return -1;
 }
 
 int mainline_get_node_count(mainline_state_t *state) {
@@ -113,7 +174,27 @@ int mainline_evict_stale(mainline_state_t *state, long max_age_secs) {
     time_t now = time(NULL);
     int kept = 0, evicted = 0;
     for (int i = 0; i < state->node_count; i++) {
-        if ((long)(now - state->nodes[i].last_seen) > max_age_secs) { evicted++; continue; }
+        long age = (long)(now - state->nodes[i].last_seen);
+        int stale = age > max_age_secs;
+        /* Preferred peers get a grace period: evict them only if they're stale
+         * AND no non-preferred stale nodes remain (i.e. preferred are the last
+         * to be dropped). Non-preferred stale nodes are always evicted. */
+        if (stale && state->nodes[i].is_preferred) {
+            int non_pref_stale = 0;
+            for (int j = 0; j < state->node_count; j++) {
+                if (j == i) continue;
+                long a2 = (long)(now - state->nodes[j].last_seen);
+                if (a2 > max_age_secs && !state->nodes[j].is_preferred) { non_pref_stale = 1; break; }
+            }
+            if (non_pref_stale) {
+                /* keep this preferred stale node; evict non-preferred stale instead */
+                if (kept != i) state->nodes[kept] = state->nodes[i];
+                kept++;
+                continue;
+            }
+            evicted++; continue;
+        }
+        if (stale) { evicted++; continue; }
         if (kept != i) state->nodes[kept] = state->nodes[i];
         kept++;
     }
@@ -322,6 +403,15 @@ static void mainline_tag_ro(mainline_state_t *state, bencode_value_t *dict) {
         bencode_dict_add(dict, "ro", bencode_int_new(1));
 }
 
+/* Tag the message with the BEP-5 "v" field — our vendor/client user-agent — so
+ * peers can identify our application. The user-agent is self_version (e.g.
+ * "norn-node/0.12"). No-op if we have no version string. */
+static void mainline_tag_v(mainline_state_t *state, bencode_value_t *dict) {
+    if (state && state->have_self_version && state->self_version[0])
+        bencode_dict_add(dict, "v",
+            bencode_string_new(state->self_version, strlen(state->self_version)));
+}
+
 int mainline_bootstrap(mainline_state_t *state) {
     if (!state) return -1;
 
@@ -378,9 +468,13 @@ int mainline_find_node(mainline_state_t *state, const unsigned char *target, uin
     
     bencode_dict_add(args, "id", bencode_string_new((const char *)state->self_id, 20));
     bencode_dict_add(args, "target", bencode_string_new((const char *)target, 20));
+    /* Tag our query with the norn protocol version so norn peers can classify
+     * us. The BEP-5 "v" vendor field is added at the top level by mainline_tag_v. */
+    if (state->have_self_pv && state->self_pv[0])
+        bencode_dict_add(args, "pv", bencode_string_new(state->self_pv, strlen(state->self_pv)));
     bencode_dict_add(dict, "t", bencode_string_new(tid, 4));
     bencode_dict_add(dict, "y", bencode_string_new("q", 1));
-    mainline_tag_ro(state, dict);
+    mainline_tag_ro(state, dict); mainline_tag_v(state, dict);
     bencode_dict_add(dict, "q", bencode_string_new("find_node", 9));
     bencode_dict_add(dict, "a", args);
     
@@ -438,6 +532,7 @@ typedef struct {
     size_t token_len;
     int queried;
     int has_token;
+    int is_preferred;  /* 1 if this candidate is a known norn/same-app peer */
 } look_cand_t;
 
 /* <0 if id_a is closer to target than id_b (XOR metric) */
@@ -450,27 +545,53 @@ static int look_closer(const unsigned char *target, const unsigned char *a, cons
     return 0;
 }
 
-/* insert (id,ip,port) keeping cand[] sorted by distance to target, deduped */
-static void look_insert(look_cand_t *cand, int *count, const unsigned char *target,
+/* Look up whether a candidate id is a known preferred (norn/same-app) peer in
+ * the routing table. Returns 1 if preferred, 0 otherwise. */
+static int look_preferred(const mainline_state_t *state, const unsigned char *id) {
+    if (!state) return 0;
+    for (int i = 0; i < state->node_count; i++) {
+        if (memcmp(state->nodes[i].id, id, 20) == 0)
+            return state->nodes[i].is_preferred ? 1 : 0;
+    }
+    return 0;
+}
+
+/* insert (id,ip,port) keeping cand[] sorted by distance to target, deduped.
+ * Equidistant candidates tie-break in favor of preferred (norn/same-app) peers
+ * so our own kind wins the closest-K set. */
+static void look_insert(look_cand_t *cand, int *count, const mainline_state_t *state,
+                        const unsigned char *target,
                         const unsigned char *id, uint32_t ip, uint16_t port) {
     if (ip == 0 || port == 0) return;
     for (int i = 0; i < *count; i++) {
         if (memcmp(cand[i].id, id, 20) == 0) return;
     }
+    int pref = look_preferred(state, id);
     if (*count >= LOOK_MAX_CAND) {
         int far = *count - 1;
-        if (look_closer(target, id, cand[far].id) >= 0) return;  /* not closer than farthest */
+        int c = look_closer(target, id, cand[far].id);
+        /* not closer; but replace the farthest if we're preferred and it isn't */
+        if (c >= 0 && !(pref && !cand[far].is_preferred)) return;
         *count = far;  /* drop farthest */
     }
     int pos = *count;
-    while (pos > 0 && look_closer(target, id, cand[pos - 1].id) < 0) {
+    while (pos > 0) {
+        int c = look_closer(target, id, cand[pos - 1].id);
+        if (c < 0) break;                       /* strictly closer: keep order */
+        if (c == 0) {                            /* equidistant: prefer preferred */
+            if (pref && !cand[pos - 1].is_preferred) break; /* we win the tie */
+            if (!pref && cand[pos - 1].is_preferred) { pos = -1; break; } /* they win; insert after */
+            break;                               /* same preference: stable order */
+        }
         cand[pos] = cand[pos - 1];
         pos--;
     }
+    if (pos < 0) return;  /* lost the tie to a preferred incumbent */
     memset(&cand[pos], 0, sizeof(cand[pos]));
     memcpy(cand[pos].id, id, 20);
     cand[pos].ip = ip;
     cand[pos].port = port;
+    cand[pos].is_preferred = pref;
     (*count)++;
 }
 
@@ -483,7 +604,7 @@ static char *look_build_get_peers(mainline_state_t *state, const unsigned char *
     bencode_dict_add(args, "info_hash", bencode_string_new((const char *)info_hash, 20));
     bencode_dict_add(dict, "t", bencode_string_new(tid, 2));
     bencode_dict_add(dict, "y", bencode_string_new("q", 1));
-    mainline_tag_ro(state, dict);
+    mainline_tag_ro(state, dict); mainline_tag_v(state, dict);
     bencode_dict_add(dict, "q", bencode_string_new("get_peers", 9));
     bencode_dict_add(dict, "a", args);
     char *data = bencode_encode(dict, out_len);
@@ -512,7 +633,7 @@ static char *look_build_announce(mainline_state_t *state, const unsigned char *i
         bencode_dict_add(args, "pk", bencode_string_new((const char *)state->self_pub, 32));
     bencode_dict_add(dict, "t", bencode_string_new(tid, 2));
     bencode_dict_add(dict, "y", bencode_string_new("q", 1));
-    mainline_tag_ro(state, dict);
+    mainline_tag_ro(state, dict); mainline_tag_v(state, dict);
     bencode_dict_add(dict, "q", bencode_string_new("announce_peer", 13));
     bencode_dict_add(dict, "a", args);
     char *data = bencode_encode(dict, out_len);
@@ -545,7 +666,7 @@ int mainline_lookup_ex(mainline_state_t *state, const unsigned char *info_hash,
     if (!cand) return -1;
     int count = 0;
     for (int i = 0; i < state->node_count; i++) {
-        look_insert(cand, &count, info_hash, state->nodes[i].id, state->nodes[i].ip, state->nodes[i].port);
+        look_insert(cand, &count, state, info_hash, state->nodes[i].id, state->nodes[i].ip, state->nodes[i].port);
     }
     if (count == 0) {
         if (logf) logf("dht lookup: routing table empty, cannot search");
@@ -656,7 +777,7 @@ int mainline_lookup_ex(mainline_state_t *state, const unsigned char *info_hash,
                     memcpy(&nip, p + 20, 4);
                     memcpy(&nport, p + 24, 2);
                     nport = ntohs(nport);
-                    look_insert(cand, &count, info_hash, (const unsigned char *)p, nip, nport);
+                    look_insert(cand, &count, state, info_hash, (const unsigned char *)p, nip, nport);
                 }
             }
             bencode_free(msg);
@@ -708,7 +829,7 @@ static char *look_build_get_mutable(mainline_state_t *state, const unsigned char
     bencode_dict_add(args, "target", bencode_string_new((const char *)target, 20));
     bencode_dict_add(dict, "t", bencode_string_new(tid, 2));
     bencode_dict_add(dict, "y", bencode_string_new("q", 1));
-    mainline_tag_ro(state, dict);
+    mainline_tag_ro(state, dict); mainline_tag_v(state, dict);
     bencode_dict_add(dict, "q", bencode_string_new("get", 3));
     bencode_dict_add(dict, "a", args);
     char *data = bencode_encode(dict, out_len);
@@ -766,7 +887,7 @@ int mainline_lookup_mutable(mainline_state_t *state, const unsigned char *target
     if (!cand) return -1;
     int count = 0;
     for (int i = 0; i < state->node_count; i++)
-        look_insert(cand, &count, target, state->nodes[i].id, state->nodes[i].ip, state->nodes[i].port);
+        look_insert(cand, &count, state, target, state->nodes[i].id, state->nodes[i].ip, state->nodes[i].port);
     if (count == 0) { free(cand); return 0; }
 
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -880,7 +1001,7 @@ int mainline_lookup_mutable(mainline_state_t *state, const unsigned char *target
                     const char *p = nodes->val.str_val.data + i;
                     uint32_t nip; uint16_t nport;
                     memcpy(&nip, p + 20, 4); memcpy(&nport, p + 24, 2); nport = ntohs(nport);
-                    look_insert(cand, &count, target, (const unsigned char *)p, nip, nport);
+                    look_insert(cand, &count, state, target, (const unsigned char *)p, nip, nport);
                 }
             bencode_free(msg);
         }
@@ -918,7 +1039,7 @@ static char *look_build_find_node(mainline_state_t *state, const unsigned char *
     bencode_dict_add(args, "target", bencode_string_new((const char *)target, 20));
     bencode_dict_add(dict, "t", bencode_string_new(tid, 2));
     bencode_dict_add(dict, "y", bencode_string_new("q", 1));
-    mainline_tag_ro(state, dict);
+    mainline_tag_ro(state, dict); mainline_tag_v(state, dict);
     bencode_dict_add(dict, "q", bencode_string_new("find_node", 9));
     bencode_dict_add(dict, "a", args);
     char *data = bencode_encode(dict, out_len);
@@ -943,7 +1064,7 @@ int mainline_resolve_node(mainline_state_t *state, const unsigned char *node_id,
     if (!cand) return 0;
     int count = 0;
     for (int i = 0; i < state->node_count; i++)
-        look_insert(cand, &count, node_id, state->nodes[i].id, state->nodes[i].ip, state->nodes[i].port);
+        look_insert(cand, &count, state, node_id, state->nodes[i].id, state->nodes[i].ip, state->nodes[i].port);
     if (count == 0) { free(cand); return 0; }
 
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -1018,7 +1139,7 @@ int mainline_resolve_node(mainline_state_t *state, const unsigned char *node_id,
                     memcpy(&nport, p + 24, 2);
                     nport = ntohs(nport);
                     if (memcmp(p, node_id, 20) == 0 && contact_ip == 0) { contact_ip = nip; contact_port = nport; }
-                    look_insert(cand, &count, node_id, (const unsigned char *)p, nip, nport);
+                    look_insert(cand, &count, state, node_id, (const unsigned char *)p, nip, nport);
                 }
             }
             bencode_free(msg);
@@ -1237,8 +1358,37 @@ int mainline_process_packet(mainline_state_t *state, const uint8_t *data, size_t
         /* Learn the responder itself (it answered us, so it's alive) — unless it
          * is read-only (BEP-43). */
         bencode_value_t *rid = bencode_dict_get(r, "id");
-        if (!incoming_ro && rid && rid->type == BENCODE_STRING && rid->val.str_val.len >= 20)
+        if (!incoming_ro && rid && rid->type == BENCODE_STRING && rid->val.str_val.len >= 20) {
             mainline_add_node(state, (const unsigned char *)rid->val.str_val.data, from_ip, from_port);
+            /* Learn the responder's protocol/application version if it tags the
+             * reply with pv/app. Empty strings are ignored by the helper so
+             * a refresh without these fields keeps any previously-learned value. */
+            char pv[8] = {0}, app[24] = {0};
+            bencode_value_t *vpv = bencode_dict_get(r, "pv");
+            if (vpv && vpv->type == BENCODE_STRING && vpv->val.str_val.len > 0 &&
+                vpv->val.str_val.len < sizeof(pv)) {
+                memcpy(pv, vpv->val.str_val.data, vpv->val.str_val.len);
+                pv[vpv->val.str_val.len] = '\0';
+            }
+            bencode_value_t *vapp = bencode_dict_get(r, "app");
+            if (vapp && vapp->type == BENCODE_STRING && vapp->val.str_val.len > 0 &&
+                vapp->val.str_val.len < sizeof(app)) {
+                memcpy(app, vapp->val.str_val.data, vapp->val.str_val.len);
+                app[vapp->val.str_val.len] = '\0';
+            }
+            /* BEP-5 "v": the peer's self-advertised vendor/client string (top
+             * level). This is the standard Mainline application identifier, so
+             * it takes precedence over our norn-specific "app" field. */
+            bencode_value_t *vv = bencode_dict_get(msg, "v");
+            if (vv && vv->type == BENCODE_STRING && vv->val.str_val.len > 0 &&
+                vv->val.str_val.len < sizeof(app)) {
+                memcpy(app, vv->val.str_val.data, vv->val.str_val.len);
+                app[vv->val.str_val.len] = '\0';
+            }
+            if (pv[0] || app[0])
+                mainline_update_node_info(state, (const unsigned char *)rid->val.str_val.data,
+                                          pv, app);
+        }
         
         /* BEP-42: the "ip" field is a top-level key holding our reflexive
          * (public) ip:port as seen by the responder. Feed it to the vote. */
@@ -1297,8 +1447,34 @@ int mainline_process_packet(mainline_state_t *state, const uint8_t *data, size_t
         /* Learn the querier (it contacted us) — essential for the overlay to
          * form — unless it is read-only (BEP-43). */
         bencode_value_t *qid = bencode_dict_get(a, "id");
-        if (!incoming_ro && qid && qid->type == BENCODE_STRING && qid->val.str_val.len >= 20)
+        if (!incoming_ro && qid && qid->type == BENCODE_STRING && qid->val.str_val.len >= 20) {
             mainline_add_node(state, (const unsigned char *)qid->val.str_val.data, from_ip, from_port);
+            /* Learn the pinger's norn protocol version (pv) and application.
+             * The application comes from the BEP-5 "v" vendor field (top level)
+             * or our norn-specific "app" in the args. */
+            char pv[8] = {0}, app[24] = {0};
+            bencode_value_t *vpv = bencode_dict_get(a, "pv");
+            if (vpv && vpv->type == BENCODE_STRING && vpv->val.str_val.len > 0 &&
+                vpv->val.str_val.len < sizeof(pv)) {
+                memcpy(pv, vpv->val.str_val.data, vpv->val.str_val.len);
+                pv[vpv->val.str_val.len] = '\0';
+            }
+            bencode_value_t *vapp = bencode_dict_get(a, "app");
+            if (vapp && vapp->type == BENCODE_STRING && vapp->val.str_val.len > 0 &&
+                vapp->val.str_val.len < sizeof(app)) {
+                memcpy(app, vapp->val.str_val.data, vapp->val.str_val.len);
+                app[vapp->val.str_val.len] = '\0';
+            }
+            bencode_value_t *vv = bencode_dict_get(msg, "v");
+            if (vv && vv->type == BENCODE_STRING && vv->val.str_val.len > 0 &&
+                vv->val.str_val.len < sizeof(app)) {
+                memcpy(app, vv->val.str_val.data, vv->val.str_val.len);
+                app[vv->val.str_val.len] = '\0';
+            }
+            if (pv[0] || app[0])
+                mainline_update_node_info(state, (const unsigned char *)qid->val.str_val.data,
+                                          pv, app);
+        }
 
         bencode_value_t *t_val = bencode_dict_get(msg, "t");
         if (!t_val || t_val->type != BENCODE_STRING) {
@@ -1328,6 +1504,10 @@ int mainline_process_packet(mainline_state_t *state, const uint8_t *data, size_t
             if (state->have_self_version)
                 bencode_dict_add(r, "nv", bencode_string_new(state->self_version,
                                                              strlen(state->self_version)));
+            /* protocol (norn) version (major.minor); only meaningful for norn peers */
+            if (state->have_self_pv && state->self_pv[0])
+                bencode_dict_add(r, "pv", bencode_string_new(state->self_pv,
+                                                             strlen(state->self_pv)));
         } else if (qlen == 9 && memcmp(q, "find_node", 9) == 0) {
             bencode_value_t *t = bencode_dict_get(a, "target");
             const unsigned char *target =
@@ -1444,6 +1624,7 @@ int mainline_process_packet(mainline_state_t *state, const uint8_t *data, size_t
         bencode_dict_add(resp, "t", bencode_string_new(t_val->val.str_val.data, t_val->val.str_val.len));
         bencode_dict_add(resp, "y", bencode_string_new("r", 1));
         bencode_dict_add(resp, "r", r);
+        mainline_tag_v(state, resp);
         /* BEP-42: tell the querier the reflexive ip:port we saw it from, so it
          * can learn its own public endpoint (and we learn ours reciprocally). */
         {
