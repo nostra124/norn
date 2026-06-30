@@ -20,6 +20,7 @@
 #include "dispatch.h"
 #include "identity.h"
 #include "ipc.h"
+#include "localstore.h"
 #include "norn.h"
 #include "norn_cluster.h"
 #include "norn_raft.h"
@@ -165,7 +166,20 @@ typedef struct {
     nornd_served_backend_t be;
     nornd_serve_conn_t conns[MAX_SERVE];
     int n;
+    localstore_t lstore;   /* `norn node set` keys: local, non-replicated */
 } serve_host_t;
+
+/* served-KV backend: read GET/LIST from the local store (node-set keys). */
+static int served_get(void *ctx, const unsigned char *k, size_t kl,
+                      unsigned char *out, size_t cap) {
+    serve_host_t *h = ctx;
+    return localstore_get(&h->lstore, k, kl, out, cap);
+}
+static int served_list(void *ctx, const unsigned char *prefix, size_t plen,
+                       norn_kv_visit_fn fn, void *ud) {
+    serve_host_t *h = ctx;
+    return localstore_list(&h->lstore, prefix, plen, fn, ud);
+}
 
 static void on_served_accept(norn_stream_t *stream, void *ud) {
     serve_host_t *h = ud;
@@ -368,6 +382,7 @@ typedef struct {
     norn_client_t *client;
     time_t start_time;
     uint16_t listen_port;   /* the DHT UDP port we listen on (for the self row) */
+    localstore_t *lstore;    /* `norn node set` keys (the served local store) */
 } serve_ctx_t;
 
 /* Read, decode, dispatch and reply to one ready client. Returns 0 to keep the
@@ -389,6 +404,21 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
         memcpy(resp.val, "pong", 4);
         resp.vlen = 4;
         resp.has_val = 1;
+    } else if (strcmp(req.op, "node-set") == 0) {
+        /* `norn node set <name> <value>`: store a local (non-replicated) key in
+         * the served store. req.key = name, req.val = value. */
+        if (req.klen == 0 || !req.has_val || !ctx->lstore) {
+            resp.ok = 0;
+            resp.has_err = 1;
+            strcpy(resp.err, "missing key or value");
+        } else if (localstore_put(ctx->lstore, req.key, req.klen,
+                                  req.val, req.vlen) != 0) {
+            resp.ok = 0;
+            resp.has_err = 1;
+            strcpy(resp.err, "store full or key too large");
+        } else {
+            resp.ok = 1;
+        }
     } else if (strcmp(req.op, "node-public") == 0) {
         resp.ok = 1;
         resp.has_val = 1;
@@ -701,7 +731,7 @@ int main(int argc, char **argv) {
     norn_cluster_kv_watch(cl, (const unsigned char *)"", 0, on_kv_change,
                           &watches);
 
-    serve_ctx_t srv = {&be, &watches, &kp, client, time(NULL), listen_port};
+    serve_ctx_t srv = {&be, &watches, &kp, client, time(NULL), listen_port, NULL};
 
     /* Node-served KV (FEAT-033): host GET/LIST from the cluster KV and CAT from a
      * file-backed object store under <data-dir>/objects, served to peers that
@@ -722,11 +752,15 @@ int main(int argc, char **argv) {
             base = homebuf;
         }
         mkdir(base, 0700); /* ensure the parent exists before the object dir */
+        /* The local served-KV store is always available for `norn node set`,
+         * independent of the optional file-backed object store. */
+        localstore_init(&serve.lstore);
+        srv.lstore = &serve.lstore;
         snprintf(objdir, sizeof(objdir), "%s/objects", base);
         if (nornd_store_init(&serve_store, objdir) == 0) {
-            serve.be.ctx = cl;
-            serve.be.get = be_get;
-            serve.be.list = be_scan;
+            serve.be.ctx = &serve;
+            serve.be.get = served_get;
+            serve.be.list = served_list;
             serve.be.store = &serve_store;
             norn_register_stream_service(client, NORN_SVC_SERVED_KV,
                                          on_served_accept, &serve);

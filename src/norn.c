@@ -433,6 +433,62 @@ static int ipc_round_trip(const char *op, unsigned char *val, size_t *vlen,
     return 0;
 }
 
+/* ipc_round_trip variant that sends a key + value (for `node-set`). Returns 0
+ * on success (resp.ok); -1 on transport/decode failure or a not-ok response. */
+static int ipc_round_trip_kv(const char *op, const char *key, const char *value) {
+    char pbuf[512];
+    const char *path = nornd_socket_path(pbuf, sizeof(pbuf));
+    int fd = ipc_connect(path);
+    if (fd < 0) {
+        fprintf(stderr, "norn: cannot reach nornd at %s. Is nornd running?\n", path);
+        return -1;
+    }
+    nornd_ipc_req_t req;
+    memset(&req, 0, sizeof(req));
+    strcpy(req.op, op);
+    size_t kl = strlen(key);
+    if (kl > sizeof(req.key)) kl = sizeof(req.key);
+    memcpy(req.key, key, kl);
+    req.klen = kl;
+    if (value) {
+        size_t vl = strlen(value);
+        if (vl > sizeof(req.val)) vl = sizeof(req.val);
+        memcpy(req.val, value, vl);
+        req.vlen = vl;
+        req.has_val = 1;
+    }
+    unsigned char wire[NORND_IPC_MAX_BODY + 4];
+    int wlen = nornd_ipc_encode_req(&req, wire, sizeof(wire));
+    if (wlen < 0 || write(fd, wire, (size_t)wlen) != wlen) {
+        close(fd);
+        return -1;
+    }
+    unsigned char frame[NORND_IPC_MAX_BODY + 4];
+    size_t got = 0;
+    while (got < 4) {
+        ssize_t n = read(fd, frame + got, 4 - got);
+        if (n <= 0) { close(fd); return -1; }
+        got += (size_t)n;
+    }
+    int64_t body = nornd_ipc_frame_len(frame, 4);
+    if (body < 0 || (size_t)body + 4 > sizeof(frame)) { close(fd); return -1; }
+    while (got < (size_t)body + 4) {
+        ssize_t n = read(fd, frame + got, (size_t)body + 4 - got);
+        if (n <= 0) { close(fd); return -1; }
+        got += (size_t)n;
+    }
+    close(fd);
+    nornd_ipc_resp_t resp;
+    size_t consumed = 0;
+    if (nornd_ipc_decode_resp(frame, got, &resp, &consumed) != 0) return -1;
+    if (!resp.ok) {
+        if (resp.has_err && resp.err[0])
+            fprintf(stderr, "norn: %s\n", resp.err);
+        return -1;
+    }
+    return 0;
+}
+
 static int do_node_secret(int argc, char **argv) {
     static struct option long_opts[] = {
         {"help", no_argument, 0, 'h'},
@@ -551,6 +607,28 @@ static int do_node_status(int argc, char **argv) {
     }
     /* nornd returns a recfile; colorize+align on tty, plain on pipe. */
     print_recfile_pretty(buf, vlen);
+    return 0;
+}
+
+/* `norn node set <name> <value>` — store a local (non-replicated) key on this
+ * node, queryable by peers via `peer get`. Not DHT, not cluster KV. */
+static int do_node_set(int argc, char **argv) {
+    for (int i = 3; i < argc; i++) {
+        if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+            printf("Usage: norn node set <name> <value>\n"
+                   "\n"
+                   "Store a local key on this node. The key is queryable by a\n"
+                   "peer via `norn peer get <node-id> <name>`; it is not stored\n"
+                   "in the DHT or the cluster KV, and is only available while\n"
+                   "this node is online and reachable.\n");
+            return 0;
+        }
+    }
+    if (argc < 5) {
+        fprintf(stderr, "Usage: norn node set <name> <value>\n");
+        return 1;
+    }
+    if (ipc_round_trip_kv("node-set", argv[3], argv[4]) != 0) return 1;
     return 0;
 }
 
@@ -1083,6 +1161,8 @@ int main(int argc, char **argv) {
                 return do_node_secret(argc, argv);
             if (strcmp(sub, "keygen") == 0)
                 return do_keygen(argc, argv);
+            if (strcmp(sub, "set") == 0)
+                return do_node_set(argc, argv);
         }
 node_help:
         fprintf(stdout, "Usage: %s node <subcommand> [ARGS...]\n", prog_name);
@@ -1093,6 +1173,7 @@ node_help:
                 "  log            View daemon logs\n"
                 "  public         Print node's Ed25519 public key\n"
                 "  secret         Print node's Ed25519 secret key\n"
+                "  set            Set a local served-KV key\n"
                 "  keygen         Generate an Ed25519 keypair\n");
         fprintf(stdout, "\nSee `%s --help` for top-level options.\n", prog_name);
         return optind + 1 < argc ? 0 : 1;
