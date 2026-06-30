@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_kvstore.h
  * @brief Replicated key-value state machine (FEAT-026).

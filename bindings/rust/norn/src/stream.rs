@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! A norn logical stream as Rust I/O.
 //!
 //! [`Stream`] wraps a `norn_stream_t` and implements [`std::io::Read`] +

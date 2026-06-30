@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* TCP stream transport implementation — wraps a connected TCP socket
  * in the transport vtable. Production wiring for stream I/O (shell/copy). */
 #include "transport.h"

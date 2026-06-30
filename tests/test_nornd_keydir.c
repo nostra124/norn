@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit tests for the nornd fleet key directory (FEAT-031). 100% coverage. */
 #include <stdio.h>
 #include <stdlib.h>

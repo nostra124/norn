@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file served_proto.c
  * @brief Node-served KV stream protocol codec (FEAT-033). See served_proto.h.

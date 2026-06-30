@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_raft.h
  * @brief Pure Raft consensus core (FEAT-024) — class-aware, I/O-free.

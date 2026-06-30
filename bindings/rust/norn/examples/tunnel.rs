@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Service-over-pubkey echo tunnel (FEAT-018/019).
 //!
 //! Demonstrates the safe stream API end to end:

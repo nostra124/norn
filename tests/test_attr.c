@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Test node attributes API. */
 #include <stdio.h>
 #include <stdlib.h>

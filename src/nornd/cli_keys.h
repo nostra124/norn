@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file cli_keys.h
  * @brief `norn keys <nodeid>` command glue (FEAT-031).

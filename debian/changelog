@@ -11,7 +11,7 @@ norn (0.12.1) unstable; urgency=medium
   * norn --help wraps at terminal width (TIOCGWINSZ / COLUMNS / 80).
   * norn_upnp.c added to the library build.
 
- -- norn developers <noreply@example.com>  Mon, 29 Jun 2026 00:00:00 +0000
+ -- norn maintainers <16991612+nostra124@users.noreply.github.com>  Mon, 29 Jun 2026 00:00:00 +0000
 
 norn (0.12.0) unstable; urgency=medium
 
@@ -21,4 +21,4 @@ norn (0.12.0) unstable; urgency=medium
   * Ships the v0.12.0 milestone: the nornd node daemon and the norn IPC CLI
     over the Raft-replicated cluster key-value store.
 
- -- norn developers <noreply@example.com>  Fri, 26 Jun 2026 00:00:00 +0000
+ -- norn maintainers <16991612+nostra124@users.noreply.github.com>  Fri, 26 Jun 2026 00:00:00 +0000

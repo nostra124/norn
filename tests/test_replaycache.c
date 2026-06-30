@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* BUG-118: receiver-side nonce anti-replay cache. */
 #include "replaycache.h"
 #include <stdio.h>

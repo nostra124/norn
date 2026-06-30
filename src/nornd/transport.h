@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file transport.h
  * @brief Multi-node cluster frame transport over norn sessions (FEAT-029).

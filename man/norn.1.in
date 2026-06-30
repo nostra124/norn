@@ -10,43 +10,94 @@ norn \- Mainline DHT client and control program for the norn node daemon
 .B norn
 is the command-line front end to the norn stack. It does two distinct jobs:
 .IP \(bu 3
-direct Mainline DHT operations (BEP-5 / BEP-44): key generation, mutable
-record get/set, and a standalone DHT daemon; and
+direct Mainline DHT operations (BEP-5 / BEP-44) via the
+.B bep44
+command, plus key generation; and
 .IP \(bu 3
 a thin IPC client to
 .BR nornd (8),
 the node daemon that hosts the replicated cluster key-value store and the
 fleet key directory. The
+.BR node ,
+.BR peer ,
 .B cluster
 and
 .B keys
-commands connect to a running
+commands talk to a running
 .B nornd
-over its Unix socket and exit.
+over its Unix socket.
 .SH COMMANDS
-.SS Local / DHT
+Commands are grouped:
+.BR keygen ", " bep44 " (direct DHT), " node " and " peer " (talk to the local"
+.BR nornd ), " cluster " (replicated KV), " keys ", and " version .
+.SS Key generation
 .TP
 .B keygen
 Generate an Ed25519 keypair and write it to
-.I ~/.norn/key.pem
+.I ~/.config/norn/key.pem
 (or
 .BR --key / NORN_KEY ).
 Prints the 32-byte public key, hex-encoded, to standard output. The key file
 is created with mode 0600.
+.SS Direct DHT (bep44)
 .TP
-.B get \fIKEY\fP
-Retrieve a mutable record from the DHT addressed by the author's 64-character
-hex public
-.IR KEY .
+.B bep44 get \fIPUBKEY\fP
+Retrieve a mutable BEP-44 record from the DHT addressed by the author's
+64-character hex public key
+.IR PUBKEY .
+Exits 0 and prints the value on a hit; non-zero on miss or no network.
 .TP
-.B set \fIKEY VALUE\fP
-Publish a signed mutable record (BEP-44) to the DHT. Requires a keypair.
+.B bep44 set \fIVALUE\fP
+Publish a signed mutable BEP-44 record to the DHT, addressed by your own public
+key. Prints the public key others use to retrieve it. Requires a keypair.
+.IP
+The flat
+.B get
+and
+.B set
+verbs remain as deprecated aliases for
+.B bep44 get
+and
+.BR "bep44 set" .
+.SS Node daemon control (node)
 .TP
-.B daemon \fR[\fIOPTIONS\fR]
-Run a standalone Mainline DHT node that answers queries. Supports read-only
-mode (BEP-43) and a private overlay. This is the public-DHT daemon; for the
-cluster KV host see
-.BR nornd (8).
+.B node start \fR|\fB restart \fR[\fB--system\fR]
+Start or restart the
+.BR nornd (8)
+service via
+.BR systemctl
+.RB ( --user
+by default;
+.B --system
+targets the system unit).
+.TP
+.B node status
+Print the local node's status (pid, uptime, DHT node count, cluster role) as a
+recfile.
+.TP
+.B node log \fR[\fB--system\fR] [\fB-n\fR \fILINES\fR] [\fB-f\fR]
+Show the daemon's logs via
+.BR journalctl .
+.TP
+.B node public \fR|\fB secret
+Print the node's Ed25519 public (or secret) key, hex-encoded.
+.SS Remote peers (peer)
+.TP
+.B peer list
+List known peers.
+.TP
+.B peer connect \fIPUBKEY\fR[@\fIhost\fR:\fIport\fR]
+Dial a remote peer over its single UDP port.
+.TP
+.B peer get \fIPUBKEY\fR[@\fIhost\fR] \fIKEY\fP
+Fetch a value from a peer's node-served KV store over a dialed stream.
+.TP
+.B peer cat \fIPUBKEY\fR[@\fIhost\fR] \fIHASH\fP
+Fetch a content-addressed blob from a peer's node-served KV store.
+.TP
+.B peer keys \fINODEID\fP
+Resolve a peer's published SSH and GPG public keys.
+.SS Other
 .TP
 .B version
 Print version information and exit.
@@ -92,7 +143,7 @@ is the peer's 64-character hex node id (its Ed25519/SSH public key).
 .TP
 .BR \-\-key " " \fIPATH\fP
 Key file path. Default
-.IR ~/.norn/key.pem .
+.IR ~/.config/norn/key.pem .
 .TP
 .BR \-\-port " " \fIPORT\fP
 DHT UDP port. Default 6881.
@@ -118,7 +169,7 @@ Show usage and exit 0.
 .TP
 .B NORN_KEY
 Default key file path; overrides
-.IR ~/.norn/key.pem .
+.IR ~/.config/norn/key.pem .
 .TP
 .B NORN_SOCK
 Path to the
@@ -130,10 +181,10 @@ and
 If unset, the client tries
 .I $XDG_RUNTIME_DIR/nornd.sock
 then
-.IR ~/.norn/nornd.sock .
+.IR ~/.config/norn/nornd.sock .
 .SH FILES
 .TP
-.I ~/.norn/key.pem
+.I ~/.config/norn/key.pem
 Default Ed25519 keypair, created by
 .B keygen
 with mode 0600.

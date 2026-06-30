@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Test TCP transport implementation. */
 #include <stdio.h>
 #include <stdlib.h>

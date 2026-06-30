@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file bep44.h
  * @brief BEP-44 mutable and immutable items for DHT
@@ -24,8 +25,8 @@
  * - SHA1 hashes ensure content integrity
  */
 
-#ifndef BIFROST_BEP44_H
-#define BIFROST_BEP44_H
+#ifndef NORN_BEP44_H
+#define NORN_BEP44_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -36,7 +37,7 @@
 /**
  * @brief BEP-44 mutable record structure
  * 
- * Represents a signed record published by a bifrost node. Contains
+ * Represents a signed record published by a norn node. Contains
  * reachability information, capabilities, and optional service advertisements.
  */
 typedef struct {
@@ -232,4 +233,4 @@ int bep44_decode(const unsigned char *in, size_t len,
                  uint32_t *seq,
                  unsigned char sig[64]);
 
-#endif /* BIFROST_BEP44_H */
+#endif /* NORN_BEP44_H */

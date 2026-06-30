@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file keydir.c
  * @brief Fleet key directory (FEAT-031). See keydir.h.

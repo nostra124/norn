@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Safe wrapper over libnorn's class-aware Raft cluster KV (FEAT-024/025/026).
 //!
 //! A [`Cluster`] is a pubkey-addressed replicated key-value store. Wire frames
@@ -256,7 +257,7 @@ impl Cluster {
 
     /// Every `(key, value)` pair whose key starts with `prefix` (empty = all) in
     /// the local replica — a read-only scan. The basis for the attention-queue
-    /// style listings dvalin's coordinator needs.
+    /// style listings a coordinator needs.
     pub fn list(&self, prefix: &[u8]) -> Vec<(Vec<u8>, Vec<u8>)> {
         let mut out: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
         unsafe extern "C" fn visit(

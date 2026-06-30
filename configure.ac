@@ -1,5 +1,5 @@
 AC_PREREQ([2.69])
-AC_INIT([norn], m4_esyscmd_s([cat VERSION]), [noreply@example.com])
+AC_INIT([norn], m4_esyscmd_s([cat VERSION]), [https://github.com/nostra124/norn/issues])
 AC_CONFIG_SRCDIR([src/libnorn/norn.c])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([build-aux])

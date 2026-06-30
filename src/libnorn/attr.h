@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef NORN_ATTR_H
 #define NORN_ATTR_H
 

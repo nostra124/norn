@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file peers.c
  * @brief Multi-node cluster transport helpers for nornd. See peers.h.

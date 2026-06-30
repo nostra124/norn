@@ -1,5 +1,6 @@
-#ifndef BIFROST_SHA1_H
-#define BIFROST_SHA1_H
+/* SPDX-License-Identifier: MIT */
+#ifndef NORN_SHA1_H
+#define NORN_SHA1_H
 
 #include <stddef.h>
 #include <stdint.h>

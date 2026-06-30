@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef KADEMLIA_H
 #define KADEMLIA_H
 

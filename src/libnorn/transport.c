@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "transport.h"
 #include <stdlib.h>
 #include <string.h>

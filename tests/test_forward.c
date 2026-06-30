@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit tests for the stream-tunnel engine (FEAT-018), norn_forward.
  *
  * The pump is transport-agnostic, so every path is driven with in-memory fake

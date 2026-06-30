@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* norn — Mainline DHT client CLI */
 #include <stdio.h>
 #include <stdlib.h>

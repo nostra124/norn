@@ -22,7 +22,7 @@ norn is a mainline DHT client library for P2P peer discovery and bootstrap. Name
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         Application                              │
-│                   (bifrost, CLI, etc.)                           │
+│                   (your app, CLI, etc.)                          │
 └─────────────────────────────┬───────────────────────────────────┘
                               │ norn.h API
 ┌─────────────────────────────▼───────────────────────────────────┐

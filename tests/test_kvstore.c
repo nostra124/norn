@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit tests for the replicated KV state machine (FEAT-026), norn_kvstore.
  * Pure module — exercised directly to 100% line + branch coverage. */
 #include <stdio.h>

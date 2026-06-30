@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Sessions and the dial/listen callback plumbing (FEAT-019).
 //!
 //! A [`Session`] is a verified, encrypted connection to a peer. Open logical

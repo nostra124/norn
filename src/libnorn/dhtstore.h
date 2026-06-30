@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file dhtstore.h
  * @brief Bounded cache for untrusted DHT items
@@ -26,8 +27,8 @@
  * @note Not thread-safe. Caller must synchronize.
  */
 
-#ifndef BIFROST_DHTSTORE_H
-#define BIFROST_DHTSTORE_H
+#ifndef NORN_DHTSTORE_H
+#define NORN_DHTSTORE_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -232,4 +233,4 @@ typedef struct {
  */
 int dhtstore_list(int want_immutable, dht_item_info_t *out, int max);
 
-#endif /* BIFROST_DHTSTORE_H */
+#endif /* NORN_DHTSTORE_H */

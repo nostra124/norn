@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Test idexch build/parse/verify - signed identity exchange protocol. */
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,7 +64,7 @@ int main(void) {
     {
         unsigned char big[4 + 1 + 16 + 32 + 16 + 1 + 1 + 2 + 2000 + 64];
         size_t o = 0;
-        memcpy(big + o, "BFID", 4); o += 4;
+        memcpy(big + o, "NORN", 4); o += 4;
         size_t sstart = o;
         big[o++] = IDEXCH_RESP;
         memset(big + o, 0xab, 16); o += 16;
@@ -130,7 +131,7 @@ int main(void) {
     /* Valid magic but too short for the fixed header (line 49) */
     {
         unsigned char shortmsg[10];
-        memcpy(shortmsg, "BFID", 4);
+        memcpy(shortmsg, "NORN", 4);
         shortmsg[4] = IDEXCH_REQ;  /* only 6 bytes total, header needs >= 4+66 */
         assert(idexch_parse(shortmsg, 6, &t, on, opub, oula, over, sizeof(over),
                             oacct, sizeof(oacct), opay, sizeof(opay), &opl) == -1);
@@ -140,7 +141,7 @@ int main(void) {
     {
         unsigned char m[4 + 1 + 16 + 32 + 16 + 1];
         size_t o = 0;
-        memcpy(m + o, "BFID", 4); o += 4;
+        memcpy(m + o, "NORN", 4); o += 4;
         m[o++] = IDEXCH_REQ;
         memset(m + o, 0, 16); o += 16;
         memset(m + o, 0, 32); o += 32;
@@ -154,7 +155,7 @@ int main(void) {
     {
         unsigned char m[4 + 1 + 16 + 32 + 16 + 1 + 1];
         size_t o = 0;
-        memcpy(m + o, "BFID", 4); o += 4;
+        memcpy(m + o, "NORN", 4); o += 4;
         m[o++] = IDEXCH_REQ;
         memset(m + o, 0, 16); o += 16;
         memset(m + o, 0, 32); o += 32;
@@ -169,7 +170,7 @@ int main(void) {
     {
         unsigned char m[4 + 1 + 16 + 32 + 16 + 1 + 1 + 2];
         size_t o = 0;
-        memcpy(m + o, "BFID", 4); o += 4;
+        memcpy(m + o, "NORN", 4); o += 4;
         m[o++] = IDEXCH_REQ;
         memset(m + o, 0, 16); o += 16;
         memset(m + o, 0, 32); o += 32;
@@ -221,12 +222,12 @@ int main(void) {
 
     /* Test idexch_is with invalid inputs */
     assert(idexch_is(NULL, 0) == 0);
-    assert(idexch_is((unsigned char*)"BFID", 4) == 0);  /* too short */
+    assert(idexch_is((unsigned char*)"NORN", 4) == 0);  /* too short */
     assert(idexch_is((unsigned char*)"XXXX", 5) == 0);  /* wrong magic byte 0 */
-    assert(idexch_is((unsigned char*)"BXID\x01", 5) == 0);  /* wrong magic byte 1 */
-    assert(idexch_is((unsigned char*)"BFXD\x01", 5) == 0);  /* wrong magic byte 2 */
-    assert(idexch_is((unsigned char*)"BFIX\x01", 5) == 0);  /* wrong magic byte 3 */
-    assert(idexch_is((unsigned char*)"BFID\x01", 5) == 1);  /* valid */
+    assert(idexch_is((unsigned char*)"NXRN\x01", 5) == 0);  /* wrong magic byte 1 */
+    assert(idexch_is((unsigned char*)"NOXN\x01", 5) == 0);  /* wrong magic byte 2 */
+    assert(idexch_is((unsigned char*)"NORX\x01", 5) == 0);  /* wrong magic byte 3 */
+    assert(idexch_is((unsigned char*)"NORN\x01", 5) == 1);  /* valid */
 
     printf("test_idexch: OK\n");
     return 0;

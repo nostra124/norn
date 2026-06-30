@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file served_conn.c
  * @brief Serve-side driver for node-served-KV streams (FEAT-033). See header.

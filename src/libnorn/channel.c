@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "channel.h"
 #include "crypto.h"
 #include <sodium.h>
@@ -10,7 +11,7 @@ int channel_resumption_secret(const channel_t *c, unsigned char out[CHANNEL_RESU
      * (lexicographically smaller key first) to get a value both peers agree on. */
     const unsigned char *lo = c->rx_key, *hi = c->tx_key;
     if (memcmp(lo, hi, 32) > 0) { const unsigned char *t = lo; lo = hi; hi = t; }
-    static const unsigned char label[] = "bifrost-resume-v1";
+    static const unsigned char label[] = "norn-resume-v1";
     crypto_generichash_state st;
     crypto_generichash_init(&st, NULL, 0, CHANNEL_RESUMEBYTES);
     crypto_generichash_update(&st, label, sizeof(label) - 1);
@@ -24,7 +25,7 @@ int channel_resumption_secret(const channel_t *c, unsigned char out[CHANNEL_RESU
  * The same transform on both ends preserves the kx pairing (initiator.tx ==
  * responder.rx), while a different PSK diverges the result. */
 static void resume_mix(unsigned char key[32], const unsigned char psk[CHANNEL_RESUMEBYTES]) {
-    static const unsigned char label[] = "bifrost-0rtt-v1";
+    static const unsigned char label[] = "norn-0rtt-v1";
     crypto_generichash_state st;
     crypto_generichash_init(&st, NULL, 0, 32);
     crypto_generichash_update(&st, label, sizeof(label) - 1);
@@ -59,8 +60,8 @@ void channel_derive_0rtt(channel_t *c, const unsigned char *init_eph,
                          int is_initiator, const unsigned char psk[CHANNEL_RESUMEBYTES]) {
     if (!c || !init_eph || !psk) return;
     unsigned char k_i2r[32], k_r2i[32];
-    early_key(k_i2r, "bifrost-0rtt-early-i2r-v1", psk, init_eph);
-    early_key(k_r2i, "bifrost-0rtt-early-r2i-v1", psk, init_eph);
+    early_key(k_i2r, "norn-0rtt-early-i2r-v1", psk, init_eph);
+    early_key(k_r2i, "norn-0rtt-early-r2i-v1", psk, init_eph);
     if (is_initiator) { memcpy(c->tx_key, k_i2r, 32); memcpy(c->rx_key, k_r2i, 32); }
     else              { memcpy(c->rx_key, k_i2r, 32); memcpy(c->tx_key, k_r2i, 32); }
     c->established = 1;   /* enough for seal/open; ephemeral fields left for the full HS */

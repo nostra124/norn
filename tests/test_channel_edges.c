@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* COV-1: branch coverage for channel.c — the argument guards and handshake-validation
  * failure arms (NULL args, bad magic / type / length / buffer caps, low-order keys,
  * tampered ciphertext) that the happy-path test_channel doesn't reach. */

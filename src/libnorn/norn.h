@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn.h
  * @brief Mainline DHT client library for P2P peer discovery and bootstrap.
@@ -100,7 +101,7 @@ typedef uint16_t norn_service_t;
  * (not copied) and must remain valid for the lifetime of the client.
  */
 typedef struct {
-    const char *version;                  /**< Application version string (e.g., "bifrost/1.0") */
+    const char *version;                  /**< Application version string (e.g., "norn/1.0") */
     int read_only;                        /**< BEP-43: read-only mode (don't respond to queries) */
     int private_mode;                      /**< Bootstrap only to boot_* peers (no public DHT) */
     

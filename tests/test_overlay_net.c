@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Integration test for the private overlay (FEAT-020 / v0.10.0).
  *
  * Forms a private pubkey-mesh over loopback — no public mainline DHT — from a

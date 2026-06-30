@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef MAINLINE_H
 #define MAINLINE_H
 
@@ -40,7 +41,7 @@ typedef struct {
     int have_self_pub;
     unsigned char self_account[20]; /* hash(our account); we serve it authoritatively */
     int have_self_account;
-    char self_version[24];          /* our bifrost version, reported in ping replies ("bv") */
+    char self_version[24];          /* our norn version, reported in ping replies ("nv") */
     int have_self_version;
 
     mainline_node_t nodes[MAINLINE_MAX_NODES];

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Locate and link libnorn.
 //!
 //! Resolution order:

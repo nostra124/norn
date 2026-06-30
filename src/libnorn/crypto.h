@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef CRYPTO_H
 #define CRYPTO_H
 
@@ -33,7 +34,7 @@ int bf_hash_name(const char *name, unsigned char *hash_out);
 int bf_is_fqdn(const char *name);
 
 /* Anonymous public-key encryption to an ed25519 identity (sealed box over the
- * X25519 form of the key). Used by `bifrost encrypt`/`decrypt`.
+ * X25519 form of the key). Used by `norn encrypt`/`decrypt`.
  * bf_seal: ed_pub is the recipient's 32-byte ed25519 public key; writes
  *   ptlen + BF_SEAL_OVERHEAD bytes to out. Returns 0 or -1.
  * bf_seal_open: ed_pub/ed_sk are the recipient's ed25519 keypair (sk is the

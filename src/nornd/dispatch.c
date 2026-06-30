@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file dispatch.c
  * @brief Pure IPC request→response mapping (FEAT-029). See dispatch.h.

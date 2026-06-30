@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* FEAT-074 regression: logical-stream multiplexing. Two independent byte-streams
  * share one mux (one channel); across a link that drops/reorders/dups framed
  * segments, both arrive complete and in order, and loss on one logical stream
@@ -155,7 +156,7 @@ static void test_streammux_edges(void) {
     streammux_free(m);
 
     /* OOM: the mux struct allocation fails (tested via calloc returning NULL) */
-    /* Note: norn uses calloc directly, no OOM injection like bifrost's bfalloc */
+    /* Note: norn uses calloc directly, no OOM injection with OOM injection */
     /* The NULL-safety tests above cover the guard branches */
 
     streammux_free(NULL);                                  /* NULL free no-op */

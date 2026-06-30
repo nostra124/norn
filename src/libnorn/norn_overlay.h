@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_overlay.h
  * @brief Private-overlay bootstrap configuration (FEAT-020).

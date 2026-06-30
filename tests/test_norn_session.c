@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file test_norn_session.c
  * @brief Unit tests for session management (FEAT-016)

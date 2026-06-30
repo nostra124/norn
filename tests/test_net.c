@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Test network layer with 100% coverage */
 #include "net.h"
 #include <stdio.h>

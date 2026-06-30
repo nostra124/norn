@@ -3,7 +3,7 @@ name = "norn"
 version = "0.1.0"
 edition = "2021"
 description = "Safe, idiomatic Rust bindings to libnorn — TCP/UDP addressed by public key"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 
 [dependencies]
 norn-sys = { path = "../norn-sys", version = "0.1.0" }

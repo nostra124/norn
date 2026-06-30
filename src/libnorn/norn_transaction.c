@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* norn_transaction.c — Transaction tracking for async operations */
 #include "norn_transaction.h"
 #include <string.h>

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* UDP transport — wraps a socket fd in the transport vtable. */
 #ifndef NORN_TRANSPORT_UDP_H
 #define NORN_TRANSPORT_UDP_H

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* End-to-end loopback test for the session stream data path (FEAT-016/018).
  *
  * Establishes two real sessions over loopback UDP sockets, then verifies that a

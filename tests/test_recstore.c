@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "recstore.h"
 #include "bep44.h"
 #include "crypto.h"

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit tests for nornd peer transport helpers (FEAT-029 multi-node). 100% cov. */
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file cli_cluster.c
  * @brief `norn cluster …` command glue (FEAT-030). See cli_cluster.h.

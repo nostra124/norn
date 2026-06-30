@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Safe, idiomatic Rust bindings to **libnorn** (FEAT-019).
 //!
 //! norn provides "TCP/UDP addressed by **public key** instead of IP": you hand

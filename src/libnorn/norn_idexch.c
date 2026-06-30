@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_idexch.c
  * @brief Generic identity exchange implementation.

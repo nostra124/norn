@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file test_suite.c
  * @brief Unit tests for norn_crypto_suite_t (FEAT-013)

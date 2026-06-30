@@ -15,7 +15,7 @@
 #
 # Options:
 #   PREFIX=/usr/local     Install prefix (default: /usr/local)
-#   VERSION=v0.12.0      Version to install (default: latest release)
+#   VERSION=v0.12.1      Version to install (default: latest release)
 #   BUILD_DIR=/tmp/norn-build   Build directory
 #   NO_CLEANUP=1        Don't remove build directory after install
 #   SKIP_DEPS=1         Skip dependency installation (assume installed)
@@ -29,7 +29,7 @@ set -e
 # ==============================================================================
 
 PREFIX="${PREFIX:-/usr/local}"
-VERSION="${VERSION:-v0.12.0}"
+VERSION="${VERSION:-v0.12.1}"
 BUILD_DIR="${BUILD_DIR:-/tmp/norn-build-$$}"
 NO_CLEANUP="${NO_CLEANUP:-}"
 SKIP_DEPS="${SKIP_DEPS:-}"

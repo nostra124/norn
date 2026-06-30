@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Raw FFI bindings to libnorn — the C SDK (FEAT-019).
 //!
 //! Hand-written (no bindgen, so no libclang build dependency). Only the surface

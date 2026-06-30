@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef BENCODE_H
 #define BENCODE_H
 

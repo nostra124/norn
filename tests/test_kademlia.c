@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "kademlia.h"
 #include "crypto.h"
 #include <stdio.h>
