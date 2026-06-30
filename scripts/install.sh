@@ -278,6 +278,44 @@ install() {
     run make install
 }
 
+# BUG-002: a stale libnorn.so* left in an alternative prefix by a prior install
+# can shadow the freshly installed library on the linker search path and break
+# nornd at runtime (undefined symbol). Before installing, scrub prior copies
+# in well-known libdirs *other* than the current $PREFIX's libdir so this
+# install is authoritative. The list covers the common defaults plus the
+# Debian/Ubuntu multiarch libdir.
+purge_stale_lib() {
+    info "Removing stale libnorn from alternative prefixes..."
+
+    # Candidate libdirs to scrub. Keep these as literal paths so both the test
+    # and a reader can see exactly which directories are touched. The loop
+    # skips any entry that lives under $PREFIX (so a /usr/local install does
+    # not wipe its own files, and a /usr install does not wipe /usr).
+    candidates="/usr/local/lib /usr/lib"
+    # Append Debian multiarch libdirs (e.g. /usr/lib/x86_64-linux-gnu).
+    for d in /usr/local/lib/*-linux-gnu /usr/lib/*-linux-gnu; do
+        [ -d "$d" ] && candidates="$candidates $d"
+    done
+
+    prefix_lib="$PREFIX/lib"
+    for libdir in $candidates; do
+        [ "$libdir" = "$prefix_lib" ] && continue
+        [ -d "$libdir" ] || continue
+        # Remove every libnorn artifact a prior `make install` could have laid
+        # down here. Errors are ignored (files may not exist).
+        rm -f "$libdir"/libnorn.so \
+              "$libdir"/libnorn.so.0 \
+              "$libdir"/libnorn.so.0.0.0 \
+              "$libdir"/libnorn.a \
+              "$libdir"/libnorn.la 2>/dev/null || true
+    done
+
+    # Refresh the linker cache so the removals take effect immediately.
+    if [ "$OS" = "linux" ] && [ -x /sbin/ldconfig ]; then
+        run /sbin/ldconfig 2>/dev/null || true
+    fi
+}
+
 # ==============================================================================
 # Post-install
 # ==============================================================================
@@ -369,6 +407,11 @@ main() {
     
     # Test (optional, don't fail on test errors)
     run_tests 2>/dev/null || true
+    echo ""
+    
+    # Remove stale libnorn from alternative prefixes so it cannot shadow
+    # the freshly installed library at runtime (BUG-002).
+    purge_stale_lib
     echo ""
     
     # Install
