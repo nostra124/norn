@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* norn_impl.c — Mainline DHT client library implementation.
  * Async non-blocking implementation with transaction queue. */
 #include "norn.h"

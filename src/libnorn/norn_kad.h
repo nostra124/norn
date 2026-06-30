@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_kad.h
  * @brief Parameterised Kademlia routing table.

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Test BEP-44 encoding/decoding */
 #include "bep44.h"
 #include "sha1.h"

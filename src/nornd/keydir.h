@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file keydir.h
  * @brief Fleet key directory: publish/resolve SSH + GPG public keys (FEAT-031).

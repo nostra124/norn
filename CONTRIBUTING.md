@@ -55,7 +55,7 @@ pkg install gcc gmake autoconf automake libtool libsodium
 
 ```bash
 # Clone the repository
-git clone https://github.com/anomalyco/norn.git
+git clone https://github.com/nostra124/norn.git
 cd norn
 
 # Generate build system
@@ -177,7 +177,7 @@ git commit -m "FEAT-XXX: Add norn_version() function"
 
 ### Test Naming Convention
 
-Tests follow the **dvalin methodology**: `test_<function>_<scenario>`
+Tests follow the **per-scenario methodology**: `test_<function>_<scenario>`
 
 ```c
 test_init                    // Basic init test
@@ -494,12 +494,12 @@ norn/
 
 ### Issues
 
-- [GitHub Issues](https://github.com/anomalyco/norn/issues) — Bug reports, feature requests
+- [GitHub Issues](https://github.com/nostra124/norn/issues) — Bug reports, feature requests
 - Issue template guides you through required information
 
 ### Discussions
 
-- [GitHub Discussions](https://github.com/anomalyco/norn/discussions) — Questions, ideas
+- [GitHub Discussions](https://github.com/nostra124/norn/discussions) — Questions, ideas
 
 ### Email
 

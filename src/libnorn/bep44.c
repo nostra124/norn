@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "bep44.h"
 #include "sha1.h"
 #include <sodium.h>

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file main.c
  * @brief nornd — node + cluster host + Unix-socket IPC server (FEAT-029).

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file served.h
  * @brief Node-served KV request handler (FEAT-033).

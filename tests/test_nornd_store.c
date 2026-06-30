@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit tests for the file-backed object store (FEAT-033). 100% line+branch. */
 #include <assert.h>
 #include <stdio.h>

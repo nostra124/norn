@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit tests for the ssh-agent signing client (FEAT-028). 100% line+branch. */
 #include <assert.h>
 #include <stdio.h>

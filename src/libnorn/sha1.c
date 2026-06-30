@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Public-domain SHA-1 (after Steve Reid's implementation), trimmed to a
  * one-shot sha1(). Used ONLY for BEP-44 mutable-item targets. */
 #include "sha1.h"

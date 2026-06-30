@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* TCP stream transport — wraps a connected TCP socket in the transport vtable. */
 #ifndef NORN_TRANSPORT_TCP_H
 #define NORN_TRANSPORT_TCP_H

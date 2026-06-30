@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* UDP transport implementation — wraps a socket fd in the transport vtable.
  * Production wiring for datagram I/O (channel handshake, etc.). */
 #include "transport.h"

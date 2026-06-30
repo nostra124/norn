@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* End-to-end loopback test for the async accept path (FEAT-029).
  *
  * Unlike test_session_loopback (which hand-wires fds and drives the low-level

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Test transport vtable dispatchers and NULL-safety. */
 #include <stdio.h>
 #include <stdlib.h>

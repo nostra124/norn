@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* norn_endpoint_cache.c — Endpoint cache with TTL implementation */
 #include "norn_endpoint_cache.h"
 #include <string.h>

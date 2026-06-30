@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file agent.c
  * @brief ssh-agent signing client (FEAT-028). See agent.h.

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "mainline.h"
 #include "crypto.h"
 #include "bep44.h"      /* BEP-44 mutable items: target = SHA1(k) */
@@ -504,7 +505,7 @@ static char *look_build_announce(mainline_state_t *state, const unsigned char *i
     bencode_dict_add(args, "implied_port", bencode_int_new(1));
     bencode_dict_add(args, "port", bencode_int_new(port));
     bencode_dict_add(args, "token", bencode_string_new((const char *)token, token_len));
-    /* bifrost extension: publish our ed25519 pubkey so peers resolving this
+    /* norn extension: publish our ed25519 pubkey so peers resolving this
      * account learn its identity (-> VPN ULA) without contacting us directly
      * (enables routing/relay by identity). */
     if (state->have_self_pub)
@@ -643,7 +644,7 @@ int mainline_lookup_ex(mainline_state_t *state, const unsigned char *info_hash,
                     }
                 }
             }
-            /* bifrost extension: the account's published ed25519 pubkey */
+            /* norn extension: the account's published ed25519 pubkey */
             bencode_value_t *pkv = bencode_dict_get(r, "pk");
             if (pkv && pkv->type == BENCODE_STRING && pkv->val.str_val.len == 32 && peer_pub)
                 memcpy(peer_pub, pkv->val.str_val.data, 32);
@@ -681,7 +682,7 @@ int mainline_lookup_ex(mainline_state_t *state, const unsigned char *info_hash,
                 done++;
             }
         }
-        if (logf) logf("bifrost announce: sent to %d node(s) from main socket", announced);
+        if (logf) logf("norn announce: sent to %d node(s) from main socket", announced);
     }
 
     close(sock);
@@ -1323,9 +1324,9 @@ int mainline_process_packet(mainline_state_t *state, const uint8_t *data, size_t
         bencode_dict_add(r, "id", bencode_string_new((const char *)state->self_id, 20));
 
         if (qlen == 4 && memcmp(q, "ping", 4) == 0) {
-            /* id + our bifrost version, so a pinger learns the remote version */
+            /* id + our norn version, so a pinger learns the remote version */
             if (state->have_self_version)
-                bencode_dict_add(r, "bv", bencode_string_new(state->self_version,
+                bencode_dict_add(r, "nv", bencode_string_new(state->self_version,
                                                              strlen(state->self_version)));
         } else if (qlen == 9 && memcmp(q, "find_node", 9) == 0) {
             bencode_value_t *t = bencode_dict_get(a, "target");
@@ -1352,7 +1353,7 @@ int mainline_process_packet(mainline_state_t *state, const uint8_t *data, size_t
                     bencode_dict_add(r, "nodes", bencode_string_new(nodes ? nodes : "", nlen));
                     free(nodes);
                 }
-                /* bifrost: also return the account's published pubkey if we hold it */
+                /* norn: also return the account's published pubkey if we hold it */
                 const unsigned char *pk = serve_pubkey(state, ih);
                 if (pk) bencode_dict_add(r, "pk", bencode_string_new((const char *)pk, 32));
             }

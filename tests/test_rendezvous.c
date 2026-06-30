@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file test_rendezvous.c
  * @brief Test rendezvous coordination (FEAT-017 Phase 3).

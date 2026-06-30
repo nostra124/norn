@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file agent.h
  * @brief ssh-agent signing client for nornd identity (FEAT-028).

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* norn_endpoint_cache.h — Endpoint cache with TTL
  * 
  * Caches resolved endpoints to avoid repeated DHT lookups.

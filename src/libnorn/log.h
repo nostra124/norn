@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file log.h
  * @brief Leveled logging with severity filtering
@@ -30,7 +31,7 @@
  * @par Output Format
  * Format: "[timestamp] LEVEL category: message"
  * 
- * The level token enables `bifrost daemon log` to color and filter by severity.
+ * The level token enables `norn daemon log` to color and filter by severity.
  * 
  * @note Thread Safety: Thread-safe (uses vprintf internally)
  * @note Output: Single stream (stderr by default)

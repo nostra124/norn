@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file dispatch.h
  * @brief Pure request→response mapping for the nornd IPC server (FEAT-029).

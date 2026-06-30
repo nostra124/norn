@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_session_udp.c
  * @brief UDP transport for direct session handshake (FEAT-016 Phase 1).

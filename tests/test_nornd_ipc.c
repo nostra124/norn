@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit tests for the nornd IPC codec (FEAT-027). Pure module → 100% coverage. */
 #include <stdio.h>
 #include <stdlib.h>

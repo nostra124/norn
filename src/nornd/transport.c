@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file transport.c
  * @brief Multi-node cluster frame transport over norn sessions. See transport.h.

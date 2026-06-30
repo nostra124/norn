@@ -107,7 +107,7 @@ today's direct-DHT semantics; `keygen`/`version` stay local.
 with norn's mission (MILESTONE-0.3.0), libnorn surfaces only the verified peer
 pubkey and opaque payloads; identity *sources* (SSH key / ssh-agent), the IPC
 protocol, and the key directory are application policy. nornd is an app on top
-of libnorn — like bifrost and wyrd — consuming the existing public API
+of libnorn — like any downstream application — consuming the existing public API
 (`norn_cluster_*`, the crypto-suite `sign` hook for agent-backed identity, the
 DHT/overlay client). libnorn gains **nothing** new for this; everything lives in
 nornd.
@@ -138,4 +138,4 @@ key directory) are nornd's own — they may have their own tests, but they are
   need a commit-wait surfaced from the cluster API).
 - Single-node default vs configured cluster membership at startup.
 - Does nornd live in this repo (reference daemon for libnorn, paired with the
-  `norn` CLI) or as a sibling repo like bifrost/wyrd?
+  `norn` CLI) or as a separate downstream repo?

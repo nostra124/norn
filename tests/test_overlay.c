@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit tests for private-overlay config (FEAT-020), norn_overlay.
  * Pure module — exercised to 100% line + branch coverage. */
 #include <stdio.h>

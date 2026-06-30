@@ -123,7 +123,7 @@ that is 100% unit-testable without a network.
 
 ```
             ┌───────────────────────────────────────────────┐
-            │            application (regin, thunder…)       │
+            │            application (node-a, node-b…)       │
             └───────────────────────┬───────────────────────┘
                                     │ norn_cluster.h  (KV + membership API)
             ┌───────────────────────▼───────────────────────┐

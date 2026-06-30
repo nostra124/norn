@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "recstore.h"
 #include "bep44.h"
 #include "crypto.h"
@@ -128,7 +129,7 @@ void recstore_set_via(const unsigned char k[32], const char *via) {
         snprintf(e->via, sizeof(e->via), "%s", via);
         /* A peer just (re)gossiped this record to us — a fresh sighting even when
          * the record is a duplicate (same seq, so recstore_accept didn't re-stamp
-         * it). Refresh last_seen so `bifrost gossip` SEEN reflects actual mesh
+         * it). Refresh last_seen so `norn gossip` SEEN reflects actual mesh
          * liveness ("last heard"), not just when we first saw this version. */
         e->last_seen = time(NULL);
     }

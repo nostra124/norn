@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file recstore.h
  * @brief Trusted record store for signed items
@@ -27,8 +28,8 @@
  * @note Not thread-safe. Caller must synchronize.
  */
 
-#ifndef BIFROST_RECSTORE_H
-#define BIFROST_RECSTORE_H
+#ifndef NORN_RECSTORE_H
+#define NORN_RECSTORE_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -218,4 +219,4 @@ int recstore_count(void);
  */
 int recstore_list(rec_t *out, int max);
 
-#endif /* BIFROST_RECSTORE_H */
+#endif /* NORN_RECSTORE_H */

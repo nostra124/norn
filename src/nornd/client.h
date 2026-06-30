@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file client.h
  * @brief `norn cluster …` CLI client helpers (FEAT-030).

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /*
  * norn-forward — service-over-pubkey stream tunnel (FEAT-018).
  *

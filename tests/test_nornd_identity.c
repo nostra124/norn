@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit tests for nornd SSH-key identity (FEAT-028). Pure parsers → 100% cov. */
 #include <stdio.h>
 #include <stdlib.h>

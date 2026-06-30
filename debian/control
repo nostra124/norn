@@ -1,7 +1,7 @@
 Source: norn
 Section: net
 Priority: optional
-Maintainer: norn developers <noreply@example.com>
+Maintainer: norn maintainers <16991612+nostra124@users.noreply.github.com>
 Build-Depends:
  debhelper-compat (= 13),
  pkg-config,

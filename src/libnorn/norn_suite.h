@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_suite.h
  * @brief Pluggable cryptography suite interface.

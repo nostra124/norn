@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_forward.c
  * @brief Generic stream-tunnel engine (FEAT-018). See norn_forward.h.

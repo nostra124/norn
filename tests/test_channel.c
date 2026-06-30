@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit test for the secure-channel session crypto (FEAT-002 slice 1). */
 #include "channel.h"
 #include "crypto.h"

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef NET_H
 #define NET_H
 

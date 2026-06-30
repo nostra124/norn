@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_rendezvous.c
  * @brief Rendezvous coordination service implementation (FEAT-017 Phase 3).

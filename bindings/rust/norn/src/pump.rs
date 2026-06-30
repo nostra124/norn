@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Safe wrapper over the C splice engine (`norn_pump_*`, FEAT-018).
 //!
 //! A [`Pump`] bidirectionally splices two [`Endpoint`]s — e.g. a TCP socket and

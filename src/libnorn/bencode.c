@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "bencode.h"
 #include <stdlib.h>
 #include <string.h>

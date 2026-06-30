@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file store.h
  * @brief File-backed immutable object store for node-served content (FEAT-033).

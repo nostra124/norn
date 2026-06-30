@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_nat.c
  * @brief NAT traversal wire protocol implementation (FEAT-017).

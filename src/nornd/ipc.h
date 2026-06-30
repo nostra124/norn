@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file ipc.h
  * @brief norn <-> nornd IPC protocol codec (FEAT-027).
