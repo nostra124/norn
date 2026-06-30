@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* COV-1: surgical branch coverage for stream.c — the reliability/CC edges the
  * lossy-link tests (test_stream_recovery / test_stream_cc) don't pin precisely:
  * RTO ceiling clamp + Karn backoff, FIN-on-empty, SACK build/apply (in- and

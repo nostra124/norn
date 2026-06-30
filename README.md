@@ -28,7 +28,7 @@ curl -fsSL https://raw.githubusercontent.com/nostra124/norn/master/scripts/insta
 Installs to `/usr/local` by default. Options:
 
 ```sh
-PREFIX=/usr VERSION=v0.12.0 curl -fsSL ... | sh
+PREFIX=/usr VERSION=v0.12.1 curl -fsSL ... | sh
 ```
 
 ### macOS (Homebrew)
@@ -64,10 +64,9 @@ sudo dpkg -i ../libnorn_*.deb ../norn_*.deb
 Direct DHT (no daemon):
 
 ```sh
-norn keygen                       # create ~/.norn/key.pem, print the pubkey
-norn set <key> <value>            # publish a signed BEP-44 record
-norn get <author-pubkey>          # fetch a record
-norn daemon                       # run a standalone public-DHT node
+norn keygen                       # create ~/.config/norn/key.pem, print the pubkey
+norn bep44 set <value>            # publish a signed BEP-44 record (keyed by your pubkey)
+norn bep44 get <author-pubkey>    # fetch a mutable record by its author's pubkey
 ```
 
 Cluster KV and key directory (via a running `nornd`):
@@ -125,9 +124,16 @@ application        norn (CLI)            nornd (daemon)
 
 ## Integration
 
-libnorn is the foundation layer for **bifrost** (P2P connectivity) and other
-applications needing DHT discovery, secure pubkey-addressed transport, or a
-fleet-wide replicated store. Rust bindings live under `bindings/rust/`.
+libnorn is the foundation layer for **P2P applications** needing DHT
+discovery, secure pubkey-addressed transport, or a fleet-wide replicated
+store. Rust bindings live under `bindings/rust/`.
+
+## Contributing
+
+Bug reports and feature requests go to
+[GitHub Issues](https://github.com/nostra124/norn/issues); see
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for the development workflow and coding
+conventions.
 
 ## License
 

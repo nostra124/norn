@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Test DHT storage with 100% coverage */
 #include "dhtstore.h"
 #include "bep44.h"

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "norn.h"
 #include "norn_transaction.h"
 #include <sodium.h>

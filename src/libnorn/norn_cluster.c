@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_cluster.c
  * @brief Clustered KV store glue (FEAT-025). See norn_cluster.h.

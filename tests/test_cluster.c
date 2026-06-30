@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit tests for the cluster glue (FEAT-025), norn_cluster.
  *
  * Drives a multi-node cluster over a simulated pubkey transport (a message

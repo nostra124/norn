@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file identity.h
  * @brief SSH-key node identity for nornd (FEAT-028).

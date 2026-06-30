@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_internal.h
  * @brief Internal norn client structure definition.

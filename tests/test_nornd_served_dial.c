@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Integration test for the node-served-KV dial transport (FEAT-033): a peer
  * dials a node, opens a NORN_SVC_SERVED_KV stream, and CAT-fetches a file-backed
  * object — proving served-KV rides the app-mux over one session/port. Loopback

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "net.h"
 #include "log.h"   /* BUG-113: surface socket/bind errno on the daemon's main UDP socket */
 #include <stdio.h>

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file test_relay.c
  * @brief Test relay wire protocol (FEAT-017 Phase 4).

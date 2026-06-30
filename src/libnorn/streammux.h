@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef STREAMMUX_H
 #define STREAMMUX_H
 

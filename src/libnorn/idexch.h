@@ -1,9 +1,10 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef IDEXCH_H
 #define IDEXCH_H
 
 #include <stddef.h>
 
-/* Signed identity exchange — a stateless, single-round-trip protocol two bifrost
+/* Signed identity exchange — a stateless, single-round-trip protocol two norn
  * nodes run on their MAIN sockets to learn (and cache) each other's verified
  * identity. Unlike a secure-channel handshake it needs no key agreement and no
  * per-peer state: each side sends one cleartext message authenticated by an
@@ -23,14 +24,14 @@
  * point-to-point lookup over the same transport.
  *
  * Wire layout (fixed offsets, 2-byte big-endian payload length):
- *   "BFID"(4) type(1) nonce(16) pub(32) ula(16) vlen(1) ver alen(1) acct
+ *   "NORN"(4) type(1) nonce(16) pub(32) ula(16) vlen(1) ver alen(1) acct
  *   plen(2) payload sig(64)
  * The signature covers everything from `type` through `payload` (exclusive). */
 
-#define IDEXCH_MAGIC0 0x42  /* 'B' */
-#define IDEXCH_MAGIC1 0x46  /* 'F' */
-#define IDEXCH_MAGIC2 0x49  /* 'I' */
-#define IDEXCH_MAGIC3 0x44  /* 'D' */
+#define IDEXCH_MAGIC0 0x4E  /* 'N' */
+#define IDEXCH_MAGIC1 0x4F  /* 'O' */
+#define IDEXCH_MAGIC2 0x52  /* 'R' */
+#define IDEXCH_MAGIC3 0x4E  /* 'N' */
 
 #define IDEXCH_REQ     0x01
 #define IDEXCH_RESP    0x02
@@ -75,7 +76,7 @@
 #define CAP_EXIT       (1u << 8)  /* offers exit-node / subnet routing — FEAT-019 */
 #define CAP_UDP        (1u << 9)  /* speaks the UDP transport (always) — FEAT-038 */
 #define CAP_TCP        (1u << 10) /* serves a TCP relay hub (root + relay_hub on) — FEAT-038 */
-#define CAP_WS         (1u << 11) /* serves a WebSocket transport (path /api/bifrost/v1) — FEAT-047 */
+#define CAP_WS         (1u << 11) /* serves a WebSocket transport (path /api/norn/v1) — FEAT-047 */
 #define CAP_REALITY    (1u << 12) /* serves a VLESS+Reality transport via Xray — FEAT-050 (0.18) */
 #define CAP_SHADOWSOCKS (1u << 13) /* serves a Shadowsocks transport via Xray — FEAT-062. Distinct
                                     * from CAP_REALITY because ONE tool (xray) serves several wire
@@ -85,7 +86,7 @@
                                     * CDN edge (the origin IP stays hidden), so it survives IP-blocking
                                     * — the complement to CAP_REALITY (which needs a reachable hub). */
 
-/* True if buf begins with the BFID magic. */
+/* True if buf begins with the NORN magic. */
 int idexch_is(const unsigned char *buf, size_t len);
 
 /* Serialize + sign a REQ/RESP into out (capacity outcap, >= IDEXCH_MAX is safe).

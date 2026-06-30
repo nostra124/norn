@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef NORN_TRANSPORT_H
 #define NORN_TRANSPORT_H
 #include <stddef.h>

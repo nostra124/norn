@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "crypto.h"
 #include <sodium.h>
 #include <stdio.h>

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit tests for the node-served KV request handler (FEAT-033). 100% cov. */
 #include <assert.h>
 #include <stdio.h>

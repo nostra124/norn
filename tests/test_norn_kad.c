@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file test_norn_kad.c
  * @brief Unit tests for parameterised Kademlia routing table (FEAT-014)

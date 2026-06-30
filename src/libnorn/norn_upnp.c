@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "norn_upnp.h"
 #include "net.h"
 #include <string.h>

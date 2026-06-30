@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Minimal example: generate an identity, create a node, print its DHT id.
 //!
 //! Run against an in-tree build:

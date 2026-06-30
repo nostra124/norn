@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* FEAT-072 regression: stream loss recovery — adaptive RTO (RTT-estimated, Karn),
  * selective retransmit (SACK), and fast retransmit (3 dup-ACKs before the RTO).
  *

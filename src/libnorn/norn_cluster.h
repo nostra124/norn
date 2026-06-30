@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_cluster.h
  * @brief Clustered key-value store — class-aware Raft over a pubkey transport

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "kademlia.h"
 #include <stdlib.h>
 #include <string.h>

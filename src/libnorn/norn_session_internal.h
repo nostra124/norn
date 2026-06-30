@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_session_internal.h
  * @brief Internal session structure definition.

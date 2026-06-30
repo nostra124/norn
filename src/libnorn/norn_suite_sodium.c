@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_suite_sodium.c
  * @brief Default libsodium cryptographic suite implementation.

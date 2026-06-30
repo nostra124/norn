@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef NORN_BONJOUR_H
 #define NORN_BONJOUR_H
 

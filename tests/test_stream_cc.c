@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* FEAT-073 (1/n) regression: AIMD congestion control + dynamic window. The send
  * window is no longer a static 64 segments — a congestion window (cwnd) grows in
  * slow start, switches to additive increase, and multiplicatively decreases on

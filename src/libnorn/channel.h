@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef CHANNEL_H
 #define CHANNEL_H
 

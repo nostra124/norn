@@ -26,7 +26,7 @@ docs/            — architecture docs, BEP references
 ```
 
 ## Supported Platforms
-Same as bifrost:
+Conventions (inherited house style):
 - Linux: alpine, debian, ubuntu, fedora, rhel, centos, arch, opensuse
 - macOS: homebrew, macports
 - FreeBSD

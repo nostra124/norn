@@ -14,8 +14,10 @@ class Norn < Formula
   homepage "https://github.com/nostra124/norn"
   license "MIT"
 
-  url "https://github.com/nostra124/norn/archive/refs/tags/v0.12.0.tar.gz"
-  sha256 "8aa1cc3c10a7702b644a10f3f6118d20eb02a16a8e3c6d2e874c42518801a460"
+  # url + sha256 are bumped automatically by .github/workflows/release.yml when a
+  # vX.Y.Z tag is pushed (it computes the archive checksum at release time).
+  url "https://github.com/nostra124/norn/archive/refs/tags/v0.12.1.tar.gz"
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   head "https://github.com/nostra124/norn.git", branch: "master"
 
   depends_on "autoconf" => :build
@@ -53,7 +55,7 @@ class Norn < Formula
     # keygen writes a 0600 key and prints the 64-hex public key.
     output = shell_output("HOME=#{testpath} #{bin}/norn keygen").strip
     assert_match(/\A[0-9a-f]{64}\z/, output)
-    assert_predicate testpath/".norn/key.pem", :exist?
+    assert_predicate testpath/".config/norn/key.pem", :exist?
 
     # The daemon binary is present and shows its usage.
     assert_match "nornd", shell_output("#{bin}/nornd --bogus 2>&1", 2)

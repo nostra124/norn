@@ -69,3 +69,7 @@ covhtml/
 /m4/libtool.m4
 /m4/lt*.m4
 .local/
+
+# Internal project-management material (tracking lives in GitHub Issues)
+.repo/
+issues/

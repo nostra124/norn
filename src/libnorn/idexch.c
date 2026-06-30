@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "idexch.h"
 #include "crypto.h"
 

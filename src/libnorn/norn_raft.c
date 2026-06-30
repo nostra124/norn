@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_raft.c
  * @brief Pure Raft consensus core (FEAT-024). See norn_raft.h.

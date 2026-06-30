@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file cli_peer.c
  * @brief `norn peer …` peer content fetch (FEAT-033). See cli_peer.h.

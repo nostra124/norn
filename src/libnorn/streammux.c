@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "streammux.h"
 #include "stream.h"
 

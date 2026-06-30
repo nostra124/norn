@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit tests for the nornd IPC dispatcher (FEAT-029). Pure → 100% coverage. */
 #include <stdio.h>
 #include <stdlib.h>

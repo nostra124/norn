@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit tests for the pure Raft core (FEAT-024), norn_raft.
  *
  * Drives an in-memory multi-node simulation: nodes are ticked on a shared

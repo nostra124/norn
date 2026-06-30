@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_session.c
  * @brief Async session management implementation (FEAT-016).

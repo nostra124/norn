@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "mainline.h"
 #include "net.h"
 #include "crypto.h"

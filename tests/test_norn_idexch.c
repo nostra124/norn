@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file test_norn_idexch.c
  * @brief Unit tests for generic identity exchange (FEAT-015)

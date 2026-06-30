@@ -778,6 +778,6 @@ norn is licensed under the MIT License. See LICENSE file for details.
 
 ## Contact
 
-- Issues: <https://github.com/anomalyco/norn/issues>
-- Documentation: <https://github.com/anomalyco/norn>
+- Issues: <https://github.com/nostra124/norn/issues>
+- Documentation: <https://github.com/nostra124/norn>
 - Email: norn@example.com

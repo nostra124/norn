@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* STR-U: seeded-random property tests for the streammux (logical stream multiplexer).
  * Run N iterations with different PRNG seeds, asserting byte-exact delivery and
  * head-of-line independence across logical streams. Deterministic and reproducible. */

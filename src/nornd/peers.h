@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file peers.h
  * @brief Multi-node cluster transport helpers for nornd (FEAT-029 multi-node).

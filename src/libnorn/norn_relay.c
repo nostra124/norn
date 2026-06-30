@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_relay.c
  * @brief Static relay for NAT traversal (FEAT-017 Phase 4).

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_upnp.h
  * @brief UPnP/NAT-PMP automatic port forwarding.

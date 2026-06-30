@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_session.h
  * @brief Async session management — connect by public key (FEAT-016).

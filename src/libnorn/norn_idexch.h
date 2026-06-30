@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file norn_idexch.h
  * @brief Generic identity exchange protocol.
@@ -52,8 +53,8 @@
  * @par Application Payload
  *
  * The payload is opaque to norn — applications define their own schemas:
- * - bifrost: account, ULA, version, capabilities (moved to bifrost layer)
- * - wyrd: Nostr pubkey, relay URLs, trust signals (defined by wyrd)
+ * - A VPN app: account, addresses, version, capabilities
+ * - A messaging app: identity pubkey, relay URLs, trust signals
  * - Custom: Any application-specific data
  *
  * @par Thread Safety

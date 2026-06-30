@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit tests for the node-served KV stream protocol (FEAT-033). 100% cov. */
 #include <stdio.h>
 #include <stdlib.h>

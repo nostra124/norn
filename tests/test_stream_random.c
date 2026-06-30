@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* STR-U: seeded-random property tests for the reliable stream.
  * Run N iterations with different PRNG seeds, asserting byte-exact delivery
  * and per-stream head-of-line independence. Deterministic and reproducible. */

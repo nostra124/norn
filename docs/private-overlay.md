@@ -17,8 +17,8 @@ norn_bootstrap(c);
 
 ## Private overlay (closed fleet)
 
-A closed fleet (e.g. one org's `regin` + `dvalin` + `raven` agents, or wyrd's
-private packs/clans) forms a **private pubkey-mesh from its own bootstrap
+A closed fleet (e.g. one org's `node-a` + `node-b` + `node-c` agents, or another app's
+private groups) forms a **private pubkey-mesh from its own bootstrap
 node(s)** and never touches the public mainline:
 
 - `private_mode = 1` — bootstrap only to the fleet's `boot_*` peers; no public

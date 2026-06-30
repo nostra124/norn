@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "norn_bonjour.h"
 #include "norn.h"
 #include "norn_internal.h"

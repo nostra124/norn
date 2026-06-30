@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Test UDP transport implementation. */
 #include <stdio.h>
 #include <stdlib.h>

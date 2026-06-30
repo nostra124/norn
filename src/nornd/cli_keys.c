@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /**
  * @file cli_keys.c
  * @brief `norn keys <nodeid>` — resolve a peer's SSH/GPG keys (FEAT-031).

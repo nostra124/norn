@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* Unit test for the reliable stream (FEAT-003 slice 3a). Two streams exchange
  * data across a simulated link that drops, reorders and duplicates datagrams;
  * the bytes must arrive complete and in order on both ends. */
