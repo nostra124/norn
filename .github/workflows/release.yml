@@ -1,0 +1,98 @@
+name: Release
+
+# Cut a release when a vX.Y.Z tag is pushed. Builds the source tarball and the
+# Debian packages, publishes them as GitHub Release assets ("packages served by
+# GitHub"), then bumps the Homebrew formula to the new tag.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential debhelper devscripts \
+            autoconf automake libtool pkg-config libsodium-dev doxygen graphviz
+
+      - name: Verify tag matches VERSION
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          file="$(cat VERSION)"
+          if [ "$tag" != "$file" ]; then
+            echo "::error::tag v$tag does not match VERSION file ($file)"
+            exit 1
+          fi
+
+      - name: Bootstrap, configure, distcheck
+        run: |
+          ./autogen.sh
+          ./configure
+          make -j"$(nproc)" distcheck
+
+      - name: Build source tarball
+        run: |
+          make dist
+          mkdir -p out
+          cp norn-*.tar.gz out/
+
+      - name: Build Debian packages
+        run: |
+          # Give dpkg-buildpackage a clean tree (keep only the saved tarball).
+          git clean -xfd -e out
+          dpkg-buildpackage -us -uc -b
+          cp ../*.deb out/
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            out/norn-*.tar.gz
+            out/*.deb
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+
+  bump-formula:
+    name: Bump Homebrew formula
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Update formula url and sha256 to the released tag
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${tag}.tar.gz"
+          sha="$(curl -fsSL "$url" | sha256sum | awk '{print $1}')"
+          echo "sha256($tag) = $sha"
+          sed -i -E "s#archive/refs/tags/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz#archive/refs/tags/${tag}.tar.gz#" Formula/norn.rb
+          sed -i -E "s/^  sha256 \"[0-9a-f]{64}\"/  sha256 \"${sha}\"/" Formula/norn.rb
+
+      - name: Commit and push formula bump
+        run: |
+          if git diff --quiet -- Formula/norn.rb; then
+            echo "Formula already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/norn.rb
+          git commit -m "release: bump Homebrew formula to ${GITHUB_REF_NAME}"
+          git push origin master
