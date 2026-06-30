@@ -224,9 +224,9 @@ int main(void) {
     assert(idexch_is(NULL, 0) == 0);
     assert(idexch_is((unsigned char*)"NORN", 4) == 0);  /* too short */
     assert(idexch_is((unsigned char*)"XXXX", 5) == 0);  /* wrong magic byte 0 */
-    assert(idexch_is((unsigned char*)"BXID\x01", 5) == 0);  /* wrong magic byte 1 */
-    assert(idexch_is((unsigned char*)"BFXD\x01", 5) == 0);  /* wrong magic byte 2 */
-    assert(idexch_is((unsigned char*)"BFIX\x01", 5) == 0);  /* wrong magic byte 3 */
+    assert(idexch_is((unsigned char*)"NXRN\x01", 5) == 0);  /* wrong magic byte 1 */
+    assert(idexch_is((unsigned char*)"NOXN\x01", 5) == 0);  /* wrong magic byte 2 */
+    assert(idexch_is((unsigned char*)"NORX\x01", 5) == 0);  /* wrong magic byte 3 */
     assert(idexch_is((unsigned char*)"NORN\x01", 5) == 1);  /* valid */
 
     printf("test_idexch: OK\n");
