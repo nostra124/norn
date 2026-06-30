@@ -4,6 +4,17 @@ set -e
 case "$1" in
     install|upgrade)
         adduser --system --group --quiet --no-create-home norn 2>/dev/null || true
+
+        # BUG-002: a prior --prefix=/usr/local (or universal install.sh) build
+        # leaves libnorn.so* in /usr/local/lib, which precedes /usr/lib on the
+        # linker search path. The stale copy then shadows the packaged library
+        # and nornd fails at startup with "undefined symbol". Remove any stray
+        # copies so this package's /usr/lib copy is authoritative.
+        rm -f /usr/local/lib/libnorn.so \
+              /usr/local/lib/libnorn.so.0 \
+              /usr/local/lib/libnorn.so.0.0.0 \
+              /usr/local/lib/libnorn.a \
+              /usr/local/lib/libnorn.la 2>/dev/null || true
         ;;
 esac
 

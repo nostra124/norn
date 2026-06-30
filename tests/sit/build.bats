@@ -96,3 +96,30 @@ teardown_file() {
     grep -q 'SocketUser=norn' "$SRC/contrib/systemd/nornd.socket"
     grep -q 'SocketGroup=norn' "$SRC/contrib/systemd/nornd.socket"
 }
+
+# BUG-002: a stale libnorn.so* left in /usr/local/lib by a prior
+# --prefix=/usr/local install shadows the freshly installed /usr copy and
+# breaks nornd at runtime (undefined symbol: norn_routing_size). The fix is
+# for the installer to purge prior copies in alternative prefixes before
+# laying down the new library, so the new install is authoritative.
+
+@test "debian preinst purges stale /usr/local/lib/libnorn before install (BUG-002)" {
+    SRC="$(norn_src)"
+    [ -f "$SRC/debian/norn.preinst" ]
+    # The deb installs under /usr; a stray /usr/local copy must be removed so
+    # it cannot shadow the packaged library at load time.
+    grep -q '/usr/local/lib/libnorn' "$SRC/debian/norn.preinst"
+    grep -q 'rm -f' "$SRC/debian/norn.preinst"
+}
+
+@test "install.sh purges stale libnorn from alternative prefixes before install (BUG-002)" {
+    SRC="$(norn_src)"
+    [ -f "$SRC/scripts/install.sh" ]
+    # The universal installer must scrub prior copies in well-known prefixes
+    # other than the target $PREFIX so the new install is authoritative and
+    # no stale library can shadow it at runtime.
+    grep -q 'rm -f' "$SRC/scripts/install.sh"
+    grep -q 'libnorn' "$SRC/scripts/install.sh"
+    # Must reference at least one alternative prefix path to scrub.
+    grep -qE '/usr/local/lib|/usr/lib' "$SRC/scripts/install.sh"
+}
