@@ -58,11 +58,58 @@ unsafe extern "C" fn send_trampoline(
     (sb.cb)(pk, bytes);
 }
 
+/// A committed KV change reported to a [`Cluster::watch`] callback.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WatchEvent {
+    /// A key was set (the callback receives the new value).
+    Put,
+    /// A key was removed (the value slice is empty).
+    Del,
+}
+
+/// Boxed watch closure, kept alive for the cluster's lifetime; the C side holds a
+/// pointer into it.
+struct WatchBox {
+    cb: Box<dyn FnMut(WatchEvent, &[u8], &[u8])>,
+}
+
+unsafe extern "C" fn watch_trampoline(
+    ud: *mut c_void,
+    ev: std::os::raw::c_int,
+    key: *const u8,
+    klen: usize,
+    val: *const u8,
+    vlen: usize,
+) {
+    if ud.is_null() {
+        return;
+    }
+    let wb = &mut *(ud as *mut WatchBox);
+    let event = if ev == sys::NORN_KV_EV_DEL {
+        WatchEvent::Del
+    } else {
+        WatchEvent::Put
+    };
+    let k = if key.is_null() || klen == 0 {
+        &[][..]
+    } else {
+        std::slice::from_raw_parts(key, klen)
+    };
+    let v = if val.is_null() || vlen == 0 {
+        &[][..]
+    } else {
+        std::slice::from_raw_parts(val, vlen)
+    };
+    (wb.cb)(event, k, v);
+}
+
 /// A class-aware Raft cluster node + its replicated KV store.
 pub struct Cluster {
     raw: *mut sys::norn_cluster,
     /// Kept alive: the C side holds a pointer into this box.
     _send: Box<SendBox>,
+    /// Kept alive: the C side holds pointers into these watch closures.
+    _watches: Vec<Box<WatchBox>>,
 }
 
 impl Cluster {
@@ -91,7 +138,37 @@ impl Cluster {
         if raw.is_null() {
             return Err(Error::Op);
         }
-        Ok(Cluster { raw, _send: sb })
+        Ok(Cluster {
+            raw,
+            _send: sb,
+            _watches: Vec::new(),
+        })
+    }
+
+    /// Register a prefix watch: `cb` fires on each committed PUT/DEL whose key
+    /// starts with `prefix` (empty = all keys), invoked from [`tick`](Cluster::tick)
+    /// as entries apply. The closure lives for the cluster's lifetime.
+    pub fn watch<F>(&mut self, prefix: &[u8], cb: F) -> Result<(), Error>
+    where
+        F: FnMut(WatchEvent, &[u8], &[u8]) + 'static,
+    {
+        let mut wb = Box::new(WatchBox { cb: Box::new(cb) });
+        let ud = (&mut *wb as *mut WatchBox) as *mut c_void;
+        let rc = unsafe {
+            sys::norn_cluster_kv_watch(
+                self.raw,
+                prefix.as_ptr(),
+                prefix.len(),
+                Some(watch_trampoline),
+                ud,
+            )
+        };
+        self._watches.push(wb);
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(Error::Op)
+        }
     }
 
     /// Add a member of class `class` (SERVER → voter, else learner). `eligible`
@@ -318,6 +395,47 @@ mod tests {
             cl.tick(t);
         }
         assert!(cl.get(b"greet").is_none());
+    }
+
+    #[test]
+    fn prefix_watch_fires_on_committed_changes() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let pk = [9u8; PUBKEY_BYTES];
+        let mut cl = Cluster::new(&pk, NodeClass::Server, |_pk, _frame| {}).unwrap();
+        let events: Rc<RefCell<Vec<(WatchEvent, Vec<u8>, Vec<u8>)>>> =
+            Rc::new(RefCell::new(Vec::new()));
+        let ev = events.clone();
+        // watch the "run/" prefix only.
+        cl.watch(b"run/", move |kind, key, val| {
+            ev.borrow_mut().push((kind, key.to_vec(), val.to_vec()));
+        })
+        .unwrap();
+
+        let mut t = 0u64;
+        for _ in 0..200 {
+            t += 20;
+            cl.tick(t);
+            if cl.is_leader() {
+                break;
+            }
+        }
+        assert!(cl.is_leader());
+
+        cl.put(b"run/1", b"running").unwrap();
+        cl.put(b"other/1", b"ignored").unwrap(); // outside the prefix
+        cl.del(b"run/1").unwrap();
+        for _ in 0..80 {
+            t += 20;
+            cl.tick(t);
+        }
+
+        let got = events.borrow();
+        // only the run/ keys fired — a PUT (with value) then a DEL.
+        assert!(got.iter().all(|(_, k, _)| k.starts_with(b"run/")), "watch leaked a non-prefix key: {got:?}");
+        assert!(got.iter().any(|(e, k, v)| *e == WatchEvent::Put && k == b"run/1" && v == b"running"));
+        assert!(got.iter().any(|(e, k, _)| *e == WatchEvent::Del && k == b"run/1"));
     }
 
     #[test]
