@@ -122,6 +122,21 @@ pub type norn_kv_visit_fn = unsafe extern "C" fn(
     vlen: usize,
 );
 
+/// Watch event kind (`norn_kv_event_t`): a committed PUT or DEL.
+pub const NORN_KV_EV_PUT: c_int = 0;
+pub const NORN_KV_EV_DEL: c_int = 1;
+
+/// Prefix-watch callback for `norn_cluster_kv_watch`. `val`/`vlen` is the new
+/// value for a PUT (empty for DEL). Pointers are valid only during the call.
+pub type norn_kv_watch_fn = unsafe extern "C" fn(
+    ud: *mut c_void,
+    ev: c_int,
+    key: *const u8,
+    klen: usize,
+    val: *const u8,
+    vlen: usize,
+);
+
 #[repr(C)]
 pub struct norn_cluster_config_t {
     pub self_class: c_int,
@@ -258,6 +273,13 @@ extern "C" {
         prefix: *const u8,
         plen: usize,
         visit: Option<norn_kv_visit_fn>,
+        ud: *mut c_void,
+    ) -> c_int;
+    pub fn norn_cluster_kv_watch(
+        cl: *mut norn_cluster,
+        prefix: *const u8,
+        plen: usize,
+        cb: Option<norn_kv_watch_fn>,
         ud: *mut c_void,
     ) -> c_int;
 }
