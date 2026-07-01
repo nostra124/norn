@@ -544,18 +544,23 @@ static int ipc_round_trip_key(const char *op, const unsigned char *key, size_t k
 }
 
 /* Notify nornd of a successful bep44 publish so `bep44 list` can show it.
- * Packs [immutable:1][vlen:4][seq:4][name...] into the value. Best-effort:
- * failure is non-fatal (the record is already published to the DHT). */
+ * Packs [immutable:1][vlen:4][seq:4][name_len:1][name...][value...] into the
+ * IPC value. Best-effort: failure is non-fatal. */
 static void publog_notify(const unsigned char *target, int immutable,
-                          size_t vlen, uint32_t seq, const char *name) {
-    unsigned char val[200];
-    if (sizeof(val) < 9 + (name ? strlen(name) : 0)) return;
+                          size_t vlen, uint32_t seq, const char *name,
+                          const unsigned char *value) {
+    size_t nl = name ? strlen(name) : 0;
+    if (nl > 127) nl = 127;
+    if (vlen > 1000) vlen = 1000;
+    size_t need = 10 + nl + vlen;
+    if (need > NORND_IPC_MAX_VAL) return;
+    unsigned char val[NORND_IPC_MAX_VAL];
     val[0] = immutable ? 1 : 0;
     memcpy(val + 1, &vlen, 4);
     memcpy(val + 5, &seq, 4);
-    size_t nl = name ? strlen(name) : 0;
-    if (nl) memcpy(val + 9, name, nl);
-    size_t vlen_total = 9 + nl;
+    val[9] = (unsigned char)nl;
+    if (nl) memcpy(val + 10, name, nl);
+    if (value && vlen) memcpy(val + 10 + nl, value, vlen);
     char pbuf[512];
     const char *path = nornd_socket_path(pbuf, sizeof(pbuf));
     int fd = ipc_connect(path);
@@ -565,8 +570,8 @@ static void publog_notify(const unsigned char *target, int immutable,
     strcpy(req.op, "publog-add");
     memcpy(req.key, target, 20);
     req.klen = 20;
-    memcpy(req.val, val, vlen_total);
-    req.vlen = vlen_total;
+    memcpy(req.val, val, need);
+    req.vlen = need;
     req.has_val = 1;
     unsigned char wire[NORND_IPC_MAX_BODY + 4];
     int wlen = nornd_ipc_encode_req(&req, wire, sizeof(wire));
@@ -1030,7 +1035,7 @@ static int do_put_immutable(int argc, char **argv) {
     /* The immutable target = SHA1(bencode(value)); compute it for display. */
     unsigned char target[20];
     bep44_immutable_target((const unsigned char *)value, value_len, target);
-    publog_notify(target, 1, value_len, 0, NULL);
+    publog_notify(target, 1, value_len, 0, NULL, (const unsigned char *)value);
     printf("%s", col_magenta());
     for (int i = 0; i < 20; i++) printf("%02x", target[i]);
     printf("%s\n", col_reset());
@@ -1226,7 +1231,7 @@ static int do_set(int argc, char **argv) {
     /* Compute the target so we can log the publish + show it. */
     unsigned char target[20];
     bep44_target_salted(pubkey, (const unsigned char *)name, strlen(name), target);
-    publog_notify(target, 0, value_len, seq, name);
+    publog_notify(target, 0, value_len, seq, name, (const unsigned char *)value);
 
     /* recfile output: key=<hex>\nseq=<n>\nname=<name>\n */
     char rec[160];

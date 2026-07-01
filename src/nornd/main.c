@@ -425,20 +425,22 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
     } else if (strcmp(req.op, "publog-add") == 0) {
         /* `norn bep44 set/put` logs the publish here so `bep44 list` can show
          * our own records. req.key = 20-byte target; req.val packs:
-         * [immutable:1][vlen:4][seq:4][name...]. */
-        if (req.klen != 20 || !req.has_val || !ctx->publog || req.vlen < 9) {
+         * [immutable:1][vlen:4][seq:4][name_len:1][name...][value...] */
+        if (req.klen != 20 || !req.has_val || !ctx->publog || req.vlen < 10) {
             resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "bad publog request");
         } else {
             int immutable = req.val[0] ? 1 : 0;
             uint32_t vlen, seq;
             memcpy(&vlen, req.val + 1, 4);
             memcpy(&seq, req.val + 5, 4);
-            const char *name = (const char *)req.val + 9;
-            size_t namelen = req.vlen - 9;
+            size_t nl = req.val[9];
+            const char *name = (const char *)req.val + 10;
+            const unsigned char *value = req.val + 10 + nl;
+            size_t val_len = req.vlen - 10 - nl;
             char namebuf[128] = {0};
-            if (namelen && namelen < sizeof(namebuf)) memcpy(namebuf, name, namelen);
+            if (nl && nl < sizeof(namebuf)) memcpy(namebuf, name, nl);
             publog_add(ctx->publog, req.key, immutable,
-                       namelen ? namebuf : NULL, (size_t)vlen, seq);
+                       nl ? namebuf : NULL, value, val_len, seq);
             resp.ok = 1;
         }
     } else if (strcmp(req.op, "node-public") == 0) {
@@ -595,13 +597,22 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
     } else if (strcmp(req.op, "bep44-list") == 0) {
         /* `norn bep44 list`: two sections — records this node PUBLISHED (from
          * the publog) and records this node is HOLDING for the DHT (from the
-         * dhtstore). TSV: Target, Type, Size, Seq, Stored, Name, Source. */
+         * dhtstore). TSV: Target, Type, Size, Seq, Stored, Name, Value, Source. */
         resp.ok = 1;
         resp.has_val = 1;
         size_t off = 0;
         int wn = snprintf((char *)resp.val + off, sizeof(resp.val) - off,
-            "Target\tType\tSize\tSeq\tStored\tName\tSource\n");
+            "Target\tType\tSize\tSeq\tStored\tName\tValue\tSource\n");
         if (wn > 0) off += (size_t)wn;
+        /* Helper: render a value as a truncated printable string (max 60 chars,
+         * non-printable → '.'). */
+        #define VAL_STR(dst, v, vl) do { \
+            size_t _vl = (vl) < 60 ? (vl) : 60; \
+            for (size_t _j = 0; _j < _vl; _j++) \
+                (dst)[_j] = ((v)[_j] >= 0x20 && (v)[_j] < 0x7f) ? (char)(v)[_j] : '.'; \
+            (dst)[_vl] = '\0'; \
+            if ((vl) > 60) strcpy((dst) + 60, "…"); \
+        } while (0)
         /* Section 1: records this node published (publog). */
         if (ctx->publog) {
             int np = publog_count(ctx->publog);
@@ -610,11 +621,13 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
                 if (!e) break;
                 char tgt[41];
                 for (int b = 0; b < 20; b++) snprintf(tgt + b * 2, 3, "%02x", e->target[b]);
+                char vstr[64];
+                VAL_STR(vstr, e->value, e->vlen);
                 wn = snprintf((char *)resp.val + off, sizeof(resp.val) - off,
-                    "%s\t%s\t%zu\t%u\t%ld\t%s\tpublished\n", tgt,
+                    "%s\t%s\t%zu\t%u\t%ld\t%s\t%s\tpublished\n", tgt,
                     e->immutable ? "immutable" : "mutable",
                     e->vlen, e->seq, (long)e->published,
-                    e->name[0] ? e->name : "-");
+                    e->name[0] ? e->name : "-", vstr);
                 if (wn < 0) break;
                 if ((size_t)wn >= sizeof(resp.val) - off) break;
                 off += (size_t)wn;
@@ -629,15 +642,20 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
                 char tgt[41];
                 for (int b = 0; b < 20; b++)
                     snprintf(tgt + b * 2, 3, "%02x", items[i].target[b]);
+                unsigned char vbuf[1024];
+                int vgot = norn_dht_get_value(items[i].target, vbuf, sizeof(vbuf));
+                char vstr[64] = "-";
+                if (vgot > 0) VAL_STR(vstr, vbuf, (size_t)vgot);
                 wn = snprintf((char *)resp.val + off, sizeof(resp.val) - off,
-                    "%s\t%s\t%zu\t%u\t%ld\t-\theld\n", tgt,
+                    "%s\t%s\t%zu\t%u\t%ld\t-\t%s\theld\n", tgt,
                     items[i].immutable ? "immutable" : "mutable",
-                    items[i].vlen, items[i].seq, items[i].stored);
+                    items[i].vlen, items[i].seq, items[i].stored, vstr);
                 if (wn < 0) break;
                 if ((size_t)wn >= sizeof(resp.val) - off) break;
                 off += (size_t)wn;
             }
         }
+        #undef VAL_STR
         resp.vlen = off;
     } else {
         nornd_dispatch(ctx->be, &req, &resp);

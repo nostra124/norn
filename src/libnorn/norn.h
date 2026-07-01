@@ -630,6 +630,16 @@ typedef struct {
  */
 int norn_dht_list(int want_immutable, norn_dht_item_t *out, int max);
 
+/**
+ * @brief Fetch the value of a DHT record this node is holding
+ *
+ * @param target  20-byte DHT key
+ * @param out     Output buffer for the value
+ * @param cap     Buffer capacity
+ * @return Value length on success, -1 if not held / error
+ */
+int norn_dht_get_value(const unsigned char *target, unsigned char *out, size_t cap);
+
 /* === Event loop integration === */
 
 /**

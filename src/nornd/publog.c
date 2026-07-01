@@ -8,7 +8,8 @@ void publog_init(publog_t *p) {
 }
 
 int publog_add(publog_t *p, const unsigned char *target, int immutable,
-               const char *name, size_t vlen, uint32_t seq) {
+               const char *name, const unsigned char *value, size_t vlen,
+               uint32_t seq) {
     if (!p || !target) return -1;
     /* Replace if the same target already logged. */
     for (int i = 0; i < PUBLOG_MAX; i++) {
@@ -18,6 +19,11 @@ int publog_add(publog_t *p, const unsigned char *target, int immutable,
             p->entries[i].vlen = vlen;
             p->entries[i].seq = seq;
             p->entries[i].published = time(NULL);
+            if (value && vlen <= PUBLOG_MAX_VAL) {
+                memcpy(p->entries[i].value, value, vlen);
+            } else {
+                p->entries[i].value[0] = '\0';
+            }
             if (name) {
                 strncpy(p->entries[i].name, name, sizeof(p->entries[i].name) - 1);
                 p->entries[i].name[sizeof(p->entries[i].name) - 1] = '\0';
@@ -35,6 +41,11 @@ int publog_add(publog_t *p, const unsigned char *target, int immutable,
         p->entries[i].seq = seq;
         p->entries[i].published = time(NULL);
         p->entries[i].used = 1;
+        if (value && vlen <= PUBLOG_MAX_VAL) {
+            memcpy(p->entries[i].value, value, vlen);
+        } else {
+            p->entries[i].value[0] = '\0';
+        }
         if (name) {
             strncpy(p->entries[i].name, name, sizeof(p->entries[i].name) - 1);
             p->entries[i].name[sizeof(p->entries[i].name) - 1] = '\0';

@@ -15,12 +15,14 @@
 #include <time.h>
 
 #define PUBLOG_MAX 256
+#define PUBLOG_MAX_VAL 1024
 
 typedef struct {
     unsigned char target[20];  /* DHT key the record was published under */
     int immutable;             /* 1 = immutable, 0 = mutable */
     char name[128];            /* the salt/name (mutable; "" for immutable) */
     size_t vlen;               /* value length */
+    unsigned char value[PUBLOG_MAX_VAL]; /* the published value */
     uint32_t seq;              /* sequence number (mutable only) */
     time_t published;          /* when published */
     int used;
@@ -34,7 +36,8 @@ void publog_init(publog_t *p);
 
 /* Record a publish. Returns 0 on success, -1 on overflow/bad args. */
 int publog_add(publog_t *p, const unsigned char *target, int immutable,
-               const char *name, size_t vlen, uint32_t seq);
+               const char *name, const unsigned char *value, size_t vlen,
+               uint32_t seq);
 
 /* Count entries. */
 int publog_count(const publog_t *p);

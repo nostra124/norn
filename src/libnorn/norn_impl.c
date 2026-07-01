@@ -519,6 +519,18 @@ int norn_dht_list(int want_immutable, norn_dht_item_t *out, int max) {
     return n;
 }
 
+int norn_dht_get_value(const unsigned char *target, unsigned char *out, size_t cap) {
+    if (!target || !out || cap == 0) return -1;
+    unsigned char k[32], sig[64], v[1024];
+    uint32_t seq;
+    size_t vlen;
+    int got = dhtstore_get_ex(target, k, &seq, v, sizeof(v) < cap ? sizeof(v) : cap,
+                              &vlen, sig, NULL);
+    if (got < 0) return -1;
+    memcpy(out, v, vlen);
+    return (int)vlen;
+}
+
 int norn_encode_mutable(const norn_mutable_t *rec,
                          unsigned char *out, size_t outcap) {
     if (!rec || !out) return -1;
