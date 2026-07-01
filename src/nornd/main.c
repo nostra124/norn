@@ -449,6 +449,19 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
         resp.has_val = 1;
         memcpy(resp.val, ctx->kp->public_key, 32);
         resp.vlen = 32;
+    } else if (strcmp(req.op, "node-id") == 0) {
+        /* `norn node id`: the node's 20-byte DHT node id (SHA1("k"‖pubkey)). */
+        unsigned char id[20];
+        if (norn_get_id(ctx->client, id) == 0) {
+            resp.ok = 1;
+            resp.has_val = 1;
+            memcpy(resp.val, id, 20);
+            resp.vlen = 20;
+        } else {
+            resp.ok = 0;
+            resp.has_err = 1;
+            strcpy(resp.err, "could not get node id");
+        }
     } else if (strcmp(req.op, "peer-public") == 0) {
         /* `norn peer public <node-id>`: resolve a peer's Ed25519 pubkey by
          * 40-hex DHT node id, from the local routing table (norn "pk"). */

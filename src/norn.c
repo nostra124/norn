@@ -672,6 +672,39 @@ static int do_peer_public(const char *nodeid_hex) {
     return 0;
 }
 
+static int do_node_id(int argc, char **argv) {
+    static struct option long_opts[] = {
+        {"help", no_argument, 0, 'h'},
+        {0, 0, 0, 0}
+    };
+    int opt;
+    optind = 3;
+    while ((opt = getopt_long(argc, argv, "+h", long_opts, NULL)) != -1) {
+        switch (opt) {
+            case 'h':
+                printf("Usage: norn node id\n"
+                       "\n"
+                       "Print the nornd node's DHT node id (20 hex bytes / 40 chars).\n"
+                       "This is SHA1(\"k\" || pubkey), the address used in the DHT.\n"
+                       "Requires a running nornd daemon.\n");
+                return 0;
+            default:
+                return 1;
+        }
+    }
+    unsigned char val[20];
+    size_t vlen = 0;
+    if (ipc_round_trip("node-id", val, &vlen, sizeof(val)) != 0) return 1;
+    if (vlen != 20) {
+        fprintf(stderr, "norn node id: unexpected response length\n");
+        return 1;
+    }
+    printf("%s", col_magenta());
+    for (size_t i = 0; i < 20; i++) printf("%02x", val[i]);
+    printf("%s\n", col_reset());
+    return 0;
+}
+
 /* `norn node <start|restart>` — drive the nornd systemd unit. Defaults to the
  * per-user unit (`systemctl --user`); `--system` targets the system unit. Execs
  * systemctl directly so its exit status is the verb's exit status. */
@@ -939,7 +972,7 @@ static int do_get(int argc, char **argv) {
         return 1;
     }
     /* Let the routing table populate before querying. */
-    dht_pump(client, 2000, NULL);
+    dht_pump(client, 500, NULL);
 
     struct dht_get_ctx ctx;
     memset(&ctx, 0, sizeof(ctx));
@@ -1023,14 +1056,14 @@ static int do_put_immutable(int argc, char **argv) {
         norn_free(client);
         return 1;
     }
-    dht_pump(client, 2000, NULL);
+    dht_pump(client, 500, NULL);
 
     if (norn_put_immutable(client, (const unsigned char *)value, value_len) != 0) {
         fprintf(stderr, "ERROR: DHT put failed\n");
         norn_free(client);
         return 1;
     }
-    dht_pump(client, timeout_ms, NULL);
+    dht_pump(client, 1000, NULL);
 
     /* The immutable target = SHA1(bencode(value)); compute it for display. */
     unsigned char target[20];
@@ -1104,7 +1137,7 @@ static int do_get_immutable(int argc, char **argv) {
         norn_free(client);
         return 1;
     }
-    dht_pump(client, 2000, NULL);
+    dht_pump(client, 500, NULL);
 
     struct dht_get_ctx ctx;
     memset(&ctx, 0, sizeof(ctx));
@@ -1216,7 +1249,7 @@ static int do_set(int argc, char **argv) {
         return 1;
     }
     /* Populate the routing table before publishing. */
-    dht_pump(client, 2000, NULL);
+    dht_pump(client, 500, NULL);
 
     if (norn_put_mutable_salt(client, pubkey, secret,
                               (const unsigned char *)value, value_len, seq,
@@ -1226,7 +1259,7 @@ static int do_set(int argc, char **argv) {
         return 1;
     }
     /* Give the announce time to reach the storing nodes. */
-    dht_pump(client, timeout_ms, NULL);
+    dht_pump(client, 1000, NULL);
 
     /* Compute the target so we can log the publish + show it. */
     unsigned char target[20];
@@ -1529,6 +1562,8 @@ int main(int argc, char **argv) {
                 return do_node_log(argc, argv);
             if (strcmp(sub, "public") == 0)
                 return do_node_public(argc, argv);
+            if (strcmp(sub, "id") == 0)
+                return do_node_id(argc, argv);
             if (strcmp(sub, "secret") == 0)
                 return do_node_secret(argc, argv);
             if (strcmp(sub, "keygen") == 0)
@@ -1543,6 +1578,7 @@ node_help:
                 "  restart        Restart the nornd daemon\n"
                 "  status         Node status (recfile)\n"
                 "  log            View daemon logs\n"
+                "  id             Print node's DHT node id (40 hex)\n"
                 "  public         Print node's Ed25519 public key\n"
                 "  secret         Print node's Ed25519 secret key\n"
                 "  set            Set a local served-KV key\n"
