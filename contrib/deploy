@@ -1,0 +1,415 @@
+#!/usr/bin/env bash
+# contrib/deploy — deploy norn to one or more remote hosts
+#
+# Usage: contrib/deploy [--parallel|--serial] [--jobs=N] user@host [user2@host2 ...]
+#
+# Three-phased:
+#   Phase 1 — probe all hosts in parallel to learn OS family and arch
+#   Phase 2 — build any missing/stale packages locally (one per OS/arch)
+#   Phase 3 — upload + install + start the daemon on each host
+#
+# Supported targets: Debian/Ubuntu (deb), Fedora/RHEL/SUSE (rpm), Alpine (apk),
+# OpenWrt (ipk), Synology DSM (spk), macOS (pkg). Packages land in packages/dist.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+VERSION="$(tr -d '\n' < "$ROOT_DIR/VERSION" 2>/dev/null || echo 0.13.0)"
+DIST="$ROOT_DIR/packages/dist"
+
+if command -v podman >/dev/null 2>&1; then
+    CONTAINER_RUNTIME="podman"
+elif command -v docker >/dev/null 2>&1; then
+    CONTAINER_RUNTIME="docker"
+else
+    CONTAINER_RUNTIME=""
+fi
+
+# Timestamp of the most-recent commit touching package-relevant files (freshness).
+GIT_HEAD_TS="$(git -C "$ROOT_DIR" log -1 --format='%ct' -- \
+    src VERSION Makefile.am configure.ac m4 contrib packages build-aux \
+    2>/dev/null || echo 0)"
+[ -z "$GIT_HEAD_TS" ] && GIT_HEAD_TS=0
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
+log()    { printf "${GREEN}[%s]${NC} %s\n"    "$1" "$2"; }
+warn()   { printf "${YELLOW}[%s]${NC} %s\n"   "$1" "$2"; }
+err()    { printf "${RED}[%s]${NC} %s\n"      "$1" "$2" >&2; }
+section(){ printf "${CYAN}[%s] ==> %s${NC}\n" "$1" "$2"; }
+
+# Remembered deploy targets. Kept OUTSIDE the repo (hostnames are private);
+# override with NORN_DEPLOY_HOSTS.
+HOSTS_FILE="${NORN_DEPLOY_HOSTS:-${XDG_CONFIG_HOME:-$HOME/.config}/norn/deploy-hosts}"
+
+cfg_list() { [ -f "$HOSTS_FILE" ] && grep -vE '^[[:space:]]*(#|$)' "$HOSTS_FILE" || true; }
+cfg_add() {
+    mkdir -p "$(dirname "$HOSTS_FILE")"; touch "$HOSTS_FILE"
+    for h in "$@"; do grep -qxF "$h" "$HOSTS_FILE" 2>/dev/null || echo "$h" >> "$HOSTS_FILE"; done
+}
+cfg_del() {
+    [ -f "$HOSTS_FILE" ] || return 0
+    for h in "$@"; do grep -vxF "$h" "$HOSTS_FILE" > "$HOSTS_FILE.tmp" 2>/dev/null || true; mv "$HOSTS_FILE.tmp" "$HOSTS_FILE"; done
+}
+
+usage() {
+    cat <<EOF
+Usage: $0 [subcommand] [--parallel|--serial] [--jobs=N] [user@host ...]
+
+Deploy norn $VERSION (deb/rpm/apk/ipk/spk/pkg) and remember the targets.
+
+Subcommands:
+  <user@host> ...          Deploy to the given hosts (and remember them).
+  all                      Deploy to all remembered hosts.
+  add <user@host> ...      Remember host(s) without deploying.
+  del <user@host> ...      Forget host(s) (does not uninstall remotely).
+  list                     List remembered hosts.
+  help                     Show this help.
+
+Options:
+  --parallel   Force parallel execution even for a single host.
+  --serial     Force sequential execution.
+  --jobs=N     Limit GNU parallel to N concurrent jobs.
+
+Remembered hosts file: $HOSTS_FILE
+EOF
+    exit "${1:-1}"
+}
+
+# Package filename for a given (os, pkg_arch) — matches packages/*/build-*.sh output.
+pkg_filename() {
+    local os="$1" arch="$2"
+    case "$os" in
+        deb) echo "norn_${VERSION}_${arch}.deb" ;;
+        rpm) echo "norn-${VERSION}-1.${arch}.rpm" ;;
+        apk) echo "norn-${VERSION}-r0.${arch}.apk" ;;
+        ipk) echo "norn_${VERSION}_${arch}.ipk" ;;
+        spk) echo "norn-${VERSION}-${arch}.spk" ;;
+        pkg) echo "norn-${VERSION}-macos-${arch}.pkg" ;;
+    esac
+}
+
+find_pkg() { # os arch -> path in packages/dist (or empty)
+    local p="$DIST/$(pkg_filename "$1" "$2")"
+    [ -f "$p" ] && echo "$p"
+}
+
+pkg_is_fresh() { # path
+    [ -f "$1" ] || return 1
+    local mtime
+    mtime="$(stat -c "%Y" "$1" 2>/dev/null || stat -f "%m" "$1" 2>/dev/null || echo 0)"
+    [ "$mtime" -ge "$GIT_HEAD_TS" ]
+}
+
+# Ensure the bootstrapped source tarball exists (rpm/apk/ipk/spk build from it).
+ensure_tarball() {
+    [ -f "$DIST/norn-${VERSION}.tar.gz" ] || sh "$ROOT_DIR/packages/make-tarball.sh" "$DIST" >/dev/null
+}
+
+# build_for_os <os> <arch> — build the package into packages/dist.
+build_for_os() {
+    local os="$1" arch="$2"
+    log "build" "Building $os/$arch package..."
+    local plat=amd64
+    case "$arch" in
+        aarch64*|arm64) plat=arm64 ;;          # OpenWrt aarch64_* / generic aarch64
+        arm_*|armv7*|armhf) plat=arm/v7 ;;
+        x86_64|amd64) plat=amd64 ;;
+    esac
+
+    # Native host arch — can build deb without a container if dpkg-buildpackage
+    # is available (e.g. no podman/docker on the build machine).
+    local host_arch; host_arch="$(uname -m)"
+    local host_pkg_arch
+    case "$host_arch" in x86_64) host_pkg_arch=amd64 ;; aarch64) host_pkg_arch=arm64 ;; *) host_pkg_arch=$host_arch ;; esac
+
+    case "$os" in
+        deb)
+            if [ -z "$CONTAINER_RUNTIME" ]; then
+                # No container runtime: fall back to native dpkg-buildpackage.
+                # Only works when build host arch matches target arch.
+                [ "$arch" = "$host_pkg_arch" ] || { err build "need podman/docker to cross-build deb/$arch on $host_pkg_arch"; return 1; }
+                command -v dpkg-buildpackage >/dev/null 2>&1 || { err build "need podman/docker or dpkg-buildpackage to build deb"; return 1; }
+                mkdir -p "$DIST"
+                (cd "$ROOT_DIR" && dpkg-buildpackage -us -uc -b >/dev/null 2>&1)
+                cp "$(dirname "$ROOT_DIR")"/norn_${VERSION}_${arch}.deb "$DIST/" 2>/dev/null || \
+                cp "$(dirname "$ROOT_DIR")"/norn_${VERSION}_amd64.deb "$DIST/norn_${VERSION}_${arch}.deb" 2>/dev/null || true
+            else
+                # Build on an OLD glibc baseline (debian:11 = glibc 2.31) so the .deb
+                # runs on virtually any current system (glibc is not forward-compatible).
+                $CONTAINER_RUNTIME run --rm --platform "linux/$plat" -v "$ROOT_DIR":/host:ro -v "$DIST":/out debian:11 sh -c '
+                    set -e; apt-get update -qq && apt-get install -y -qq build-essential autoconf automake libtool libsodium-dev pkg-config >/dev/null 2>&1
+                    cp -a /host /b && cd /b && sh packages/debian/build-deb.sh /out'
+            fi ;;
+        rpm)
+            [ -n "$CONTAINER_RUNTIME" ] || { err build "need podman/docker to build rpm"; return 1; }
+            ensure_tarball
+            $CONTAINER_RUNTIME run --rm --platform "linux/$plat" -v "$ROOT_DIR":/host:ro -v "$DIST":/out fedora:40 sh -c '
+                set -e; dnf install -y -q gcc make libsodium-devel pkgconfig rpm-build systemd-rpm-macros tar >/dev/null 2>&1
+                mkdir -p ~/rpmbuild/SOURCES && cp /out/norn-'"$VERSION"'.tar.gz ~/rpmbuild/SOURCES/
+                rpmbuild -bb --define "ver '"$VERSION"'" --define "dist %{nil}" /host/packages/rpm/norn.spec >/dev/null 2>&1
+                cp ~/rpmbuild/RPMS/*/norn-*.rpm /out/' ;;
+        apk)
+            [ -n "$CONTAINER_RUNTIME" ] || { err build "need podman/docker to build apk"; return 1; }
+            ensure_tarball
+            $CONTAINER_RUNTIME run --rm --platform "linux/$plat" -v "$ROOT_DIR":/host:ro -v "$DIST":/out alpine:3.20 sh -c '
+                set -e; apk update >/dev/null 2>&1; apk add --no-cache alpine-sdk libsodium-dev linux-headers pkgconf >/dev/null 2>&1
+                adduser -D b 2>/dev/null; addgroup b abuild 2>/dev/null || true
+                mkdir -p /home/b/p && cp /host/packages/alpine/APKBUILD /home/b/p/ && cp /out/norn-'"$VERSION"'.tar.gz /home/b/p/ && chown -R b /home/b
+                su b -c "cd ~/p && abuild-keygen -a -n >/dev/null 2>&1 && abuild checksum >/dev/null 2>&1 && abuild -F -r >/dev/null 2>&1" || true
+                f=$(find /home/b/packages -name "norn-'"$VERSION"'-r0.apk" | head -1); cp "$f" "/out/norn-'"$VERSION"'-r0.'"$arch"'.apk"' ;;
+        ipk)
+            [ -n "$CONTAINER_RUNTIME" ] || { err build "need podman/docker to build ipk"; return 1; }
+            $CONTAINER_RUNTIME run --rm --platform "linux/$plat" -v "$ROOT_DIR":/host:ro -v "$DIST":/out alpine:3.20 sh -c '
+                set -e; apk update >/dev/null 2>&1; apk add --no-cache build-base autoconf automake libtool pkgconf libsodium-dev libsodium-static linux-headers tar >/dev/null 2>&1
+                cp -a /host /b && cd /b && sh packages/openwrt/build-ipk.sh '"$arch"' /out' ;;
+        spk)
+            [ -n "$CONTAINER_RUNTIME" ] || { err build "need podman/docker to build spk"; return 1; }
+            $CONTAINER_RUNTIME run --rm --platform "linux/$plat" -v "$ROOT_DIR":/host:ro -v "$DIST":/out alpine:3.20 sh -c '
+                set -e; apk update >/dev/null 2>&1; apk add --no-cache build-base autoconf automake libtool pkgconf libsodium-dev libsodium-static linux-headers tar >/dev/null 2>&1
+                cp -a /host /b && cd /b && sh packages/synology/build-spk.sh '"$arch"' /out' ;;
+        pkg)
+            [ "$(uname -s)" = Darwin ] || { err build "macOS .pkg can only be built on macOS"; return 1; }
+            sh "$ROOT_DIR/packages/macos/build-pkg.sh" "$DIST" ;;
+        *) err build "unknown os: $os"; return 1 ;;
+    esac
+}
+
+# ── Phase 1: probe one host ──────────────────────────────────────────────────
+probe_host() {
+    local target="$1" probe_dir="$2"
+    local host="${target#*@}"
+    section "$host" "Probing OS and architecture"
+    local ssh_stderr probe
+    ssh_stderr="$(mktemp)"
+    probe="$(ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o ConnectTimeout=15 -o BatchMode=yes "$target" '
+        s=$(uname -s); m=$(uname -m)
+        if [ "$s" = "Darwin" ]; then echo "pkg $m"
+        elif [ -f /etc/synoinfo.conf ] || command -v synopkg >/dev/null 2>&1; then echo "spk $m"
+        elif [ -f /etc/openwrt_release ] || command -v opkg >/dev/null 2>&1; then
+            a=$(opkg print-architecture 2>/dev/null | grep -vE " (all|noarch) " | sort -k3 -rn | head -1 | cut -d" " -f2)
+            [ -n "$a" ] || a=$m
+            echo "ipk $a"
+        elif [ -f /etc/alpine-release ]; then echo "apk $m"
+        elif [ -f /etc/os-release ]; then
+            . /etc/os-release; like="${ID_LIKE:-$ID}"
+            case "$like" in
+                *debian*|*ubuntu*) echo "deb $m" ;;
+                *fedora*|*rhel*|*centos*|*suse*|*opensuse*) echo "rpm $m" ;;
+                *) echo "unknown $m" ;;
+            esac
+        else echo "unknown $m"; fi
+    ' 2>"$ssh_stderr")"
+
+    local os arch pkg_arch
+    os="$(echo "$probe" | awk '{print $1}')"
+    arch="$(echo "$probe" | awk '{print $2}')"
+
+    case "$os" in
+        deb) case "$arch" in x86_64) pkg_arch=amd64 ;; aarch64|arm64) pkg_arch=arm64 ;; *) pkg_arch=$arch ;; esac ;;
+        rpm|apk|spk) case "$arch" in x86_64) pkg_arch=x86_64 ;; aarch64|arm64) pkg_arch=aarch64 ;; *) pkg_arch=$arch ;; esac ;;
+        ipk) pkg_arch=$arch ;;   # probe already returned the device's real opkg arch
+        pkg) case "$arch" in x86_64) pkg_arch=x86_64 ;; aarch64|arm64) pkg_arch=arm64 ;; *) pkg_arch=$arch ;; esac ;;
+        *) pkg_arch=$arch ;;
+    esac
+
+    if [ -z "$os" ] || [ "$os" = "unknown" ]; then
+        [ -s "$ssh_stderr" ] && err "$host" "OS detection failed: $(head -1 "$ssh_stderr")" \
+                             || err "$host" "Unrecognised platform."
+        rm -f "$ssh_stderr"; return 1
+    fi
+    rm -f "$ssh_stderr"
+    log "$host" "os=$os arch=$pkg_arch"
+    printf '%s %s\n' "$os" "$pkg_arch" > "$probe_dir/${host}.probe"
+}
+
+# ── Phase 3: deploy one host ─────────────────────────────────────────────────
+deploy_host() {
+    local target="$1" probe_dir="$2"
+    local host="${target#*@}" probe_file
+    probe_file="$probe_dir/${host}.probe"
+    [ -f "$probe_file" ] || { err "$host" "No probe result."; return 1; }
+    local os pkg_arch
+    os="$(awk '{print $1}' "$probe_file")"; pkg_arch="$(awk '{print $2}' "$probe_file")"
+
+    local pkg; pkg="$(find_pkg "$os" "$pkg_arch")"
+    [ -n "$pkg" ] || { err "$host" "No $os/$pkg_arch package in packages/dist — Phase 2 may have failed."; return 1; }
+    log "$host" "Package: $(basename "$pkg")"
+
+    section "$host" "Uploading $(basename "$pkg")"
+    # Upload via an SSH 'cat' pipe, not scp: OpenWrt and Synology ship no
+    # sftp-server (scp fails outright), and Synology's SFTP chroots/permission-
+    # blocks writes. A shell pipe to /tmp works on every host (writable, not
+    # chrooted, needs only sh+cat on the remote).
+    local fname remote_pkg
+    fname="$(basename "$pkg")"
+    remote_pkg="/tmp/$fname"
+    if ! ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o BatchMode=yes "$target" "cat > '$remote_pkg'" < "$pkg"; then
+        err "$host" "upload failed"; return 1
+    fi
+
+    section "$host" "Installing and starting norn"
+    # sh, not bash — OpenWrt/busybox only has ash.
+    ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o BatchMode=yes "$target" sh <<ENDSSH
+set -e
+OS='$os'; PKG='$remote_pkg'
+SUDO=""; [ "\$(id -u)" = 0 ] || SUDO=sudo   # already root (e.g. OpenWrt)? no sudo needed
+
+# ---- pre-flight: fetch the new package + deps BEFORE purging anything, so a
+# network/dependency failure aborts while the OLD install is still intact, rather
+# than leaving the host with nothing. The real install below then reads from the cache.
+case "\$OS" in
+    deb) \$SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --download-only "\$PKG" ;;
+esac
+
+# Force a REINSTALL even when the version string is unchanged: VERSION is fixed per
+# milestone, so every build within a milestone ships the SAME package version. A plain
+# version-gated install would silently skip the new binary. --reinstall / -Uvh --force
+# replaces the on-disk binary regardless of version.
+case "\$OS" in
+    deb) \$SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --reinstall --allow-downgrades "\$PKG" ;;
+    rpm) command -v dnf >/dev/null 2>&1 && \$SUDO dnf reinstall -y "\$PKG" 2>/dev/null || \$SUDO rpm -Uvh --force "\$PKG" ;;
+    apk) \$SUDO apk add --allow-untrusted --force-overwrite "\$PKG" ;;
+    ipk) \$SUDO opkg install --force-reinstall "\$PKG" ;;
+    spk) \$SUDO /usr/syno/bin/synopkg install "\$PKG" || echo "synopkg install failed — install \$PKG via DSM Package Center -> Manual Install" ;;
+    pkg) \$SUDO installer -pkg "\$PKG" -target / ;;
+esac
+
+# ---- start the daemon ----
+case "\$OS" in
+    deb|rpm)
+        if [ -d /run/systemd/system ]; then
+            \$SUDO systemctl daemon-reload || true
+            \$SUDO systemctl enable --now nornd 2>/dev/null \
+                && { echo "==> nornd (system)"; \$SUDO systemctl status nornd --no-pager -l 2>/dev/null | head -6 || true; } \
+                || echo "Start manually: sudo systemctl enable --now nornd"
+        else
+            echo "No systemd; start manually: \$SUDO nornd &"
+        fi ;;
+    apk) echo "Alpine (OpenRC): start manually with '\$SUDO nornd &' (no init script bundled yet)." ;;
+    ipk)
+        \$SUDO /etc/init.d/nornd enable 2>/dev/null || true
+        \$SUDO /etc/init.d/nornd start  2>/dev/null && echo "==> nornd (procd) started" || echo "Start: /etc/init.d/nornd start" ;;
+    spk) \$SUDO /usr/syno/bin/synopkg start norn && echo "==> norn (Synology) started" || echo "Synology: 'synopkg start norn' (sudo) if not already running." ;;
+    pkg) echo "==> nornd loaded via LaunchDaemon (com.norn.daemon)." ;;
+esac
+
+# ---- per-USER daemon ----
+# Hosts run two nodes: the system (root) daemon — restarted above by systemd/launchd
+# — and a PERSISTENT per-user daemon. The package post-install enables it and
+# restarts it on the freshly-installed binary (user systemd service + linger on
+# Linux; a per-user LaunchDaemon on macOS), so it survives reboot + logout.
+echo "==> per-user daemon (persistent; managed by the init system)"
+systemctl --user is-enabled nornd 2>/dev/null \
+    && systemctl --user --no-pager --lines=0 status nornd 2>/dev/null | head -3 || true
+
+# ---- node identity ---- (confirmation; reads the local identity, no daemon needed)
+echo "==> norn node id"
+if command -v norn >/dev/null 2>&1; then norn node id || true
+else echo "norn not in PATH (check install)"; fi
+ENDSSH
+    log "$host" "Done."
+}
+
+# ── parallel/serial runner ───────────────────────────────────────────────────
+run_parallel_or_serial() {
+    local func="$1" probe_dir="$2"; shift 2; local hosts=("$@")
+    if [ "$USE_PARALLEL" = "yes" ]; then
+        # No --halt: a single bad host (lost key, down) must not kill the others'
+        # in-flight jobs. parallel returns the count of failed jobs; the caller
+        # decides what to do from the per-host .probe results.
+        local PARALLEL_ARGS=(--line-buffer --will-cite)
+        [ -n "$OPT_JOBS" ] && PARALLEL_ARGS+=(-j "$OPT_JOBS")
+        export -f "$func" find_pkg pkg_filename pkg_is_fresh ensure_tarball build_for_os probe_host deploy_host log warn err section
+        export VERSION DIST ROOT_DIR GIT_HEAD_TS CONTAINER_RUNTIME RED GREEN YELLOW CYAN NC
+        parallel "${PARALLEL_ARGS[@]}" "$func" {} "$probe_dir" ::: "${hosts[@]}"; return $?
+    fi
+    # Sequential when GNU parallel isn't used (keeps it bash-3.2 / macOS safe).
+    local failed=0 t
+    for t in "${hosts[@]}"; do "$func" "$t" "$probe_dir" || failed=$((failed+1)); done
+    return "$failed"
+}
+
+# ── Main ─────────────────────────────────────────────────────────────────────
+# Subcommands manage the remembered host inventory ($HOSTS_FILE, outside the repo).
+SUB="${1:-}"
+case "$SUB" in
+    list) cfg_list; exit 0 ;;
+    help|-h|--help) usage 0 ;;
+    add) shift; [ $# -gt 0 ] || { err deploy "add needs at least one user@host"; exit 1; }
+         cfg_add "$@"; log deploy "remembered $# host(s):"; cfg_list; exit 0 ;;
+    del) shift; [ $# -gt 0 ] || { err deploy "del needs at least one user@host"; exit 1; }
+         cfg_del "$@"; log deploy "forgot — remembered now:"; cfg_list; exit 0 ;;
+    all|release) shift; set -- ;;   # deploy to ALL remembered hosts (loaded below)
+esac
+
+OPT_PARALLEL=""; OPT_JOBS=""; HOSTS=()
+for arg in "$@"; do
+    case "$arg" in
+        --parallel) OPT_PARALLEL=yes ;;
+        --serial|--no-parallel) OPT_PARALLEL=no ;;
+        --jobs=*) OPT_JOBS="${arg#--jobs=}" ;;
+        -j[0-9]*) OPT_JOBS="${arg#-j}" ;;
+        --help|-h) usage 0 ;;
+        --*) warn deploy "Unknown flag: $arg"; usage ;;
+        *) HOSTS+=("$arg") ;;
+    esac
+done
+
+if [ ${#HOSTS[@]} -eq 0 ]; then
+    if [ "$SUB" = all ] || [ "$SUB" = release ]; then
+        while IFS= read -r _h; do [ -n "$_h" ] && HOSTS+=("$_h"); done <<EOF2
+$(cfg_list)
+EOF2
+        [ ${#HOSTS[@]} -gt 0 ] || { err deploy "no remembered hosts — add one: $0 add user@host"; exit 1; }
+        log deploy "deploying to all ${#HOSTS[@]} remembered host(s)"
+    else
+        usage
+    fi
+else
+    cfg_add "${HOSTS[@]}"   # remember every host we deploy to
+fi
+
+USE_PARALLEL=no
+if [ "$OPT_PARALLEL" = "yes" ] || { [ "$OPT_PARALLEL" != "no" ] && command -v parallel >/dev/null 2>&1 && [ ${#HOSTS[@]} -gt 1 ]; }; then
+    command -v parallel >/dev/null 2>&1 && USE_PARALLEL=yes
+fi
+
+PROBE_DIR="$(mktemp -d)"; trap 'rm -rf "$PROBE_DIR"' EXIT
+
+printf "${CYAN}==> Phase 1: probing %d host(s)${NC}\n" "${#HOSTS[@]}"
+probe_failed=0
+# Ignore parallel's exit (= count of failed jobs); the loop below counts skipped
+# hosts authoritatively from the per-host .probe files (no double-counting).
+run_parallel_or_serial probe_host "$PROBE_DIR" "${HOSTS[@]}" || true
+
+GOOD_HOSTS=()
+for t in "${HOSTS[@]}"; do
+    h="${t#*@}"
+    [ -f "$PROBE_DIR/${h}.probe" ] && GOOD_HOSTS+=("$t") || { err "$h" "Probe failed — skipping."; probe_failed=$((probe_failed+1)); }
+done
+[ ${#GOOD_HOSTS[@]} -eq 0 ] && { err deploy "All probes failed."; exit 1; }
+
+printf "${CYAN}==> Phase 2: building packages${NC}\n"
+NEED_BUILD=""
+for t in "${GOOD_HOSTS[@]}"; do
+    h="${t#*@}"; read -r os pkg_arch < "$PROBE_DIR/${h}.probe"
+    if ! pkg_is_fresh "$(find_pkg "$os" "$pkg_arch")"; then
+        case " $NEED_BUILD " in *" ${os}/${pkg_arch} "*) ;; *) NEED_BUILD="$NEED_BUILD ${os}/${pkg_arch}" ;; esac
+    fi
+done
+if [ -z "$NEED_BUILD" ]; then log deploy "All packages up-to-date."
+else
+    for key in $NEED_BUILD; do
+        build_for_os "${key%%/*}" "${key#*/}" || { err deploy "Build failed for $key."; exit 1; }
+    done
+fi
+
+printf "${CYAN}==> Phase 3: deploying to %d host(s)${NC}\n" "${#GOOD_HOSTS[@]}"
+deploy_failed=0
+run_parallel_or_serial deploy_host "$PROBE_DIR" "${GOOD_HOSTS[@]}" || deploy_failed=$?
+
+[ "$deploy_failed" -gt 0 ] && { err deploy "$deploy_failed host(s) failed."; exit 1; }
+[ "$probe_failed" -gt 0 ] && warn deploy "$probe_failed host(s) skipped (probe failed)."
+printf '\n'; log deploy "Deployed norn $VERSION to ${#GOOD_HOSTS[@]} host(s)."
