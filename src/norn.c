@@ -41,7 +41,6 @@ static int stdout_is_tty(void) {
 
 /* ANSI color helpers. Empty strings when not a tty so pipe output is plain. */
 static const char *col_cyan(void)    { return stdout_is_tty() ? "\033[36m" : ""; }
-static const char *col_green(void)   { return stdout_is_tty() ? "\033[32m" : ""; }
 static const char *col_magenta(void) { return stdout_is_tty() ? "\033[35m" : ""; }
 static const char *col_bold(void)    { return stdout_is_tty() ? "\033[1m"  : ""; }
 static const char *col_reset(void)   { return stdout_is_tty() ? "\033[0m"  : ""; }
@@ -174,54 +173,6 @@ static int do_version(void) {
     return 0;
 }
 
-static int do_keygen(int argc, char **argv) {
-    static struct option long_options[] = {
-        {"key", required_argument, 0, 'k'},
-        {"help", no_argument, 0, 'h'},
-        {0, 0, 0, 0}
-    };
-
-    int opt;
-    const char *key_path = NULL;
-
-    optind = 2;
-
-    while ((opt = getopt_long(argc, argv, "+k:h", long_options, NULL)) != -1) {
-        switch (opt) {
-            case 'k':
-                key_path = optarg;
-                break;
-            case 'h':
-                fprintf(stdout, "Usage: %s keygen [--key <path>]\n", prog_name);
-                fprintf(stdout, "\nGenerate an Ed25519 keypair and save to a file.\n");
-                return 0;
-            default:
-                return 1;
-        }
-    }
-
-    if (!key_path) key_path = key_file;
-    if (!key_path) key_path = getenv("NORN_KEY");
-
-    /* Send to nornd; nornd generates the keypair, saves it, returns the
-     * 32-byte public key. If key_path is given, pass it as the value. */
-    unsigned char pubkey[32];
-    size_t pklen = 0;
-    if (ipc_round_trip_kv_bin("node-keygen", NULL, 0,
-                              (const unsigned char *)key_path,
-                              key_path ? strlen(key_path) : 0,
-                              pubkey, &pklen, sizeof(pubkey)) != 0) {
-        return 1;
-    }
-    if (pklen != 32) {
-        fprintf(stderr, "norn keygen: unexpected response length\n");
-        return 1;
-    }
-    printf("%s", col_green());
-    for (int i = 0; i < 32; i++) printf("%02x", pubkey[i]);
-    printf("%s\n", col_reset());
-    return 0;
-}
 
 /* IPC helpers: socket path, connect, round-trip one request. */
 static const char *nornd_socket_path(char *buf, size_t cap) {
@@ -1309,8 +1260,6 @@ int main(int argc, char **argv) {
     
     if (strcmp(cmd, "version") == 0) {
         return do_version();
-    } else if (strcmp(cmd, "keygen") == 0) {
-        return do_keygen(argc, argv);
     } else if (strcmp(cmd, "bep44") == 0) {
         /* BEP-44 DHT records: norn bep44 <get|set|put> ...
          *   set <name> <value>   — mutable, signed, salted by name
@@ -1353,8 +1302,6 @@ int main(int argc, char **argv) {
                 return do_node_id(argc, argv);
             if (strcmp(sub, "secret") == 0)
                 return do_node_secret(argc, argv);
-            if (strcmp(sub, "keygen") == 0)
-                return do_keygen(argc, argv);
             if (strcmp(sub, "set") == 0)
                 return do_node_set(argc, argv);
         }
@@ -1368,8 +1315,7 @@ node_help:
                 "  id             Print node's DHT node id (40 hex)\n"
                 "  public         Print node's Ed25519 public key\n"
                 "  secret         Print node's Ed25519 secret key\n"
-                "  set            Set a local served-KV key\n"
-                "  keygen         Generate an Ed25519 keypair\n");
+                "  set            Set a local served-KV key\n");
         fprintf(stdout, "\nSee `%s --help` for top-level options.\n", prog_name);
         return optind + 1 < argc ? 0 : 1;
     } else if (strcmp(cmd, "peer") == 0) {

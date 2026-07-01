@@ -414,54 +414,6 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
         memcpy(resp.val, "pong", 4);
         resp.vlen = 4;
         resp.has_val = 1;
-    } else if (strcmp(req.op, "node-keygen") == 0) {
-        /* `norn keygen` / `norn node keygen`: generate an Ed25519 keypair and
-         * save to the path in req.val (or the default identity path). Returns
-         * the 32-byte public key. */
-        keypair_t newkp;
-        if (crypto_keypair_new(&newkp) != 0) {
-            resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "keypair generation failed");
-        } else {
-            /* Determine the path. */
-            char path[600];
-            if (req.has_val && req.vlen > 0 && req.vlen < sizeof(path)) {
-                memcpy(path, req.val, req.vlen);
-                path[req.vlen] = '\0';
-            } else {
-                const char *home = getenv("HOME");
-                if (!home) home = "/tmp";
-                snprintf(path, sizeof(path), "%s/.config/norn/key.pem", home);
-            }
-            /* Create parent dirs recursively. */
-            char dirtmp[600];
-            size_t pl = strlen(path);
-            if (pl >= sizeof(dirtmp)) { pl = sizeof(dirtmp) - 1; }
-            memcpy(dirtmp, path, pl);
-            dirtmp[pl] = '\0';
-            char *slash = dirtmp;
-            while ((slash = strchr(slash, '/')) != NULL) {
-                *slash = '\0';
-                if (dirtmp[0]) mkdir(dirtmp, 0700);
-                *slash = '/';
-                slash++;
-            }
-            if (access(path, F_OK) == 0) {
-                resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "key file already exists");
-            } else {
-                FILE *f = fopen(path, "wb");
-                if (!f) {
-                    resp.ok = 0; resp.has_err = 1;
-                    snprintf(resp.err, sizeof(resp.err), "cannot create key file");
-                } else {
-                    fwrite(&newkp, sizeof(newkp), 1, f);
-                    fclose(f);
-                    chmod(path, 0600);
-                    resp.ok = 1; resp.has_val = 1;
-                    memcpy(resp.val, newkp.public_key, 32);
-                    resp.vlen = 32;
-                }
-            }
-        }
     } else if (strcmp(req.op, "node-set") == 0) {
         /* `norn node set <name> <value>`: store a local (non-replicated) key in
          * the served store. req.key = name, req.val = value. */

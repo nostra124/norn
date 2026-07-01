@@ -72,59 +72,6 @@ setup() {
     [[ "$output" =~ [0-9]+\.[0-9]+\.[0-9]+ ]]
 }
 
-@test "norn keygen creates key file" {
-    # Remove existing key if present
-    rm -f "$WORK_DIR/.config/norn/key.pem"
-
-    run "$NORN_BIN" keygen
-    [ "$status" -eq 0 ]
-
-    # Key file should exist
-    [ -f "$WORK_DIR/.config/norn/key.pem" ]
-
-    # Key file should have correct permissions (0600)
-    perms=$(stat -c "%a" "$WORK_DIR/.config/norn/key.pem" 2>/dev/null || stat -f "%OLp" "$WORK_DIR/.config/norn/key.pem")
-    [ "$perms" = "600" ]
-}
-
-@test "norn keygen prints public key" {
-    rm -f "$WORK_DIR/.config/norn/key.pem"
-
-    run "$NORN_BIN" keygen
-    [ "$status" -eq 0 ]
-
-    # Should contain hex-encoded public key (64 chars)
-    [[ "$output" =~ [0-9a-f]{64} ]]
-}
-
-@test "norn keygen fails if key already exists" {
-    rm -f "$WORK_DIR/.config/norn/key.pem"
-
-    # First keygen should succeed
-    run "$NORN_BIN" keygen
-    [ "$status" -eq 0 ]
-
-    # Second keygen should fail
-    run "$NORN_BIN" keygen
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"already exists"* ]]
-}
-
-@test "norn keygen respects --key option" {
-    run "$NORN_BIN" --key "$WORK_DIR/custom-key.pem" keygen
-    [ "$status" -eq 0 ]
-
-    [ -f "$WORK_DIR/custom-key.pem" ]
-}
-
-@test "norn keygen respects NORN_KEY environment variable" {
-    export NORN_KEY="$WORK_DIR/env-key.pem"
-
-    run "$NORN_BIN" keygen
-    [ "$status" -eq 0 ]
-
-    [ -f "$WORK_DIR/env-key.pem" ]
-}
 
 @test "norn bep44 get (immutable) fails without hash" {
     run "$NORN_BIN" bep44 get
