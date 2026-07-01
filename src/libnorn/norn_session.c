@@ -210,10 +210,12 @@ typedef struct {
     void *user_data;
     dial_state_t state;
     norn_session_t *session;
-    uint32_t resolve_txn_id;  /* DHT transaction ID */
-    unsigned char ephemeral_pub[32];  /* FEAT-023: Ephemeral key for hole punch */
-    unsigned char ephemeral_sec[32];  /* FEAT-023: Ephemeral secret */
-    uint8_t rendezvous_pubkey[32];    /* FEAT-023: Rendezvous peer pubkey */
+    uint32_t resolve_txn_id;
+    unsigned char ephemeral_pub[32];
+    unsigned char ephemeral_sec[32];
+    uint8_t rendezvous_pubkey[32];
+    uint32_t rendezvous_ip;
+    uint16_t rendezvous_port;
 } dial_context_t;
 
 /**
@@ -230,34 +232,14 @@ int norn_session_from_probe(norn_client_t *client,
                              uint16_t from_port) {
     dial_context_t *ctx = (dial_context_t *)dial_ctx_ptr;
     if (!ctx || !ctx->callback) return -1;
-    
-    /* Create session */
-    norn_session_t *session = norn_session_new(client, ctx->suite);
-    if (!session) {
-        ctx->state = DIAL_FAILED;
-        ctx->callback(NULL, NORN_SESSION_CLOSED, ctx->user_data);
-        free(ctx);
-        return -1;
-    }
-    
-    session->is_initiator = 1;
-    session->peer_ip = from_ip;
-    session->peer_port = from_port;
-    memcpy(session->peer_pubkey, ctx->peer_pubkey, session->suite->pubkey_len);
-    
-    /* Set ephemeral keys from hole punch */
-    memcpy(session->channel.eph_pub, ctx->ephemeral_pub, 32);
-    memcpy(session->channel.eph_sec, ctx->ephemeral_sec, 32);
-    
-    /* Mark session as established (simplified - no full handshake) */
-    session->state = NORN_SESSION_ESTABLISHED;
-    session->channel.established = 1;
-    
-    /* Notify callback */
-    ctx->callback(session, NORN_SESSION_ESTABLISHED, ctx->user_data);
+
+    /* Probe confirmed the path is open — run the full channel handshake
+     * over it so the session gets a real derived key, not a fake one. */
+    norn_direct_endpoint_t ep = { .ip = from_ip, .port = from_port };
+    int ret = norn_dial_direct_async(client, &ep, ctx->peer_pubkey, ctx->suite,
+                                     ctx->callback, ctx->user_data);
     free(ctx);
-    
-    return 0;
+    return ret;
 }
 
 /**
@@ -341,13 +323,14 @@ static void on_endpoint_resolved(const norn_endpoint_t *endpoint, void *user_dat
         /* FEAT-023: Generate ephemeral key for this session */
         crypto_box_keypair(ctx->ephemeral_pub, ctx->ephemeral_sec);
         
-        /* Store rendezvous pubkey (endpoint itself is the rendezvous) */
         memcpy(ctx->rendezvous_pubkey, endpoint->pubkey, 32);
-        
-        /* Send hole punch request */
+        ctx->rendezvous_ip = endpoint->ip;
+        ctx->rendezvous_port = endpoint->port;
+
         int ret = norn_send_holepunch_req_async(ctx->client,
                                                  ctx->peer_pubkey,
-                                                 ctx->rendezvous_pubkey,
+                                                 ctx->rendezvous_ip,
+                                                 ctx->rendezvous_port,
                                                  ctx->ephemeral_pub,
                                                  on_holepunch_response,
                                                  ctx);
@@ -1324,52 +1307,75 @@ int norn_stream_peer_closed(const norn_stream_t *stream) {
     return streammux_peer_finished(stream->mux, stream->stream_id);
 }
 
-/* === NAT Traversal (FEAT-017, stub) === */
+/* === NAT Traversal (FEAT-023) === */
+
+/* Resolution callback used by norn_hole_punch_async when the rendezvous
+ * endpoint isn't already in the cache. */
+static void on_rendezvous_resolved(const norn_endpoint_t *ep, void *user_data) {
+    dial_context_t *ctx = (dial_context_t *)user_data;
+    if (!ep || ep->ip == 0) {
+        ctx->state = DIAL_FAILED;
+        ctx->callback(NULL, NORN_SESSION_CLOSED, ctx->user_data);
+        free(ctx);
+        return;
+    }
+    int ret = norn_send_holepunch_req_async(ctx->client,
+                                             ctx->peer_pubkey,
+                                             ep->ip, ep->port,
+                                             ctx->ephemeral_pub,
+                                             on_holepunch_response,
+                                             ctx);
+    if (ret != 0) {
+        ctx->state = DIAL_FAILED;
+        ctx->callback(NULL, NORN_SESSION_CLOSED, ctx->user_data);
+        free(ctx);
+    }
+}
 
 int norn_hole_punch_async(norn_client_t *client,
                           const unsigned char *target_pubkey,
                           const unsigned char *rendezvous_pubkey,
                           norn_session_callback_t callback,
                           void *user_data) {
-    if (!client || !target_pubkey || !rendezvous_pubkey) return -1;
-    if (!callback) return -1;
-    
-    /* TODO FEAT-017 Phase 3: Implement hole punching
-     * 
-     * Algorithm:
-     * 1. Send HolePunchRequest to rendezvous via DHT
-     * 2. Rendezvous coordinates with target
-     * 3. Both sides send simultaneous UDP probes
-     * 4. NAT creates mapping, connection established
-     * 
-     * Wire protocol (see FEAT-017-NAT.md):
-     * - HolePunchRequest (msg_type = 0x10)
-     * - HolePunchResponse (msg_type = 0x11)
-     */
-    
-    (void)callback;
-    (void)user_data;
-    return -1;
+    if (!client || !target_pubkey || !rendezvous_pubkey || !callback) return -1;
+
+    dial_context_t *ctx = calloc(1, sizeof(*ctx));
+    if (!ctx) return -1;
+
+    ctx->client = client;
+    ctx->suite = norn_suite_sodium();
+    ctx->callback = callback;
+    ctx->user_data = user_data;
+    ctx->state = DIAL_HOLEPUNCH;
+    memcpy(ctx->peer_pubkey, target_pubkey, ctx->suite->pubkey_len);
+    memcpy(ctx->rendezvous_pubkey, rendezvous_pubkey, 32);
+    crypto_box_keypair(ctx->ephemeral_pub, ctx->ephemeral_sec);
+
+    const norn_endpoint_t *cached =
+        norn_endpoint_cache_lookup(&client->endpoint_cache, rendezvous_pubkey);
+    if (cached && cached->ip != 0) {
+        int ret = norn_send_holepunch_req_async(client, target_pubkey,
+                                                 cached->ip, cached->port,
+                                                 ctx->ephemeral_pub,
+                                                 on_holepunch_response, ctx);
+        if (ret != 0) { free(ctx); return -1; }
+        return 0;
+    }
+
+    int ret = norn_resolve_endpoint_async(client, rendezvous_pubkey, ctx->suite,
+                                           on_rendezvous_resolved, ctx);
+    if (ret != 0) { free(ctx); return -1; }
+    return 0;
 }
 
 int norn_rendezvous_enable(norn_client_t *client,
                           void *callback,
                           void *user_data) {
-    if (!client) return -1;
-    if (!client->initialized) return -1;
-    
-    /* TODO FEAT-017 Phase 3: Implement rendezvous
-     * 
-     * When acting as rendezvous:
-     * 1. Listen for HolePunchRequest messages
-     * 2. Match pairs of peers wanting to connect
-     * 3. Send HolePunchResponse to both with peer's external address
-     * 4. Both peers send probes simultaneously
-     */
-    
-    (void)callback;
-    (void)user_data;
-    return -1;
+    if (!client || !client->initialized) return -1;
+    client->rendezvous_enabled = 1;
+    client->rendezvous_callback = callback;
+    client->rendezvous_user_data = user_data;
+    return 0;
 }
 
 int norn_relay_connect_async(norn_client_t *client,

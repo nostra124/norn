@@ -88,16 +88,18 @@ int norn_rendezvous_handle_req(norn_rendezvous_t *rv,
         rv->pending[idx].timestamp = now;
     }
     
-    if (memcmp(client->self_pub, req->target_pubkey, 32) == 0) {
+    /* Distinguish initiator from responder by checking which role matches
+     * client->self_pub in the already-stored pending entry. */
+    if (memcmp(client->self_pub, rv->pending[idx].responder_pubkey, 32) == 0) {
         if (rv->pending[idx].have_responder) return -1;
-        
+
         memcpy(rv->pending[idx].responder_ephemeral, req->my_ephemeral_pubkey, 32);
         rv->pending[idx].responder_ip = req->my_external_ip;
         rv->pending[idx].responder_port = req->my_external_port;
         rv->pending[idx].have_responder = 1;
     } else {
         if (rv->pending[idx].have_initiator) return -1;
-        
+
         memcpy(rv->pending[idx].initiator_ephemeral, req->my_ephemeral_pubkey, 32);
         rv->pending[idx].initiator_ip = req->my_external_ip;
         rv->pending[idx].initiator_port = req->my_external_port;
@@ -128,73 +130,48 @@ int norn_rendezvous_handle_req(norn_rendezvous_t *rv,
 
 int norn_send_holepunch_req_async(norn_client_t *client,
                                    const uint8_t *target_pubkey,
-                                   const uint8_t *rendezvous_pubkey,
+                                   uint32_t rendezvous_ip,
+                                   uint16_t rendezvous_port,
                                    const uint8_t *my_ephemeral,
                                    void (*callback)(norn_client_t *,
                                                     const norn_holepunch_resp_t *,
                                                     void *),
                                    void *user_data) {
-    if (!client || !target_pubkey || !rendezvous_pubkey || !my_ephemeral || !callback) {
-        return -1;
-    }
-    
-    /* FEAT-023: Find rendezvous peer endpoint
-     * In production, this would query the DHT if not cached.
-     * For now, we require the rendezvous endpoint to be cached.
-     */
-    const norn_endpoint_t *rendezvous_ep = norn_endpoint_cache_lookup(&client->endpoint_cache, 
-                                                                       rendezvous_pubkey);
-    if (!rendezvous_ep) {
-        /* Rendezvous peer not found in cache - would need DHT query
-         * FEAT-023: Add DHT query integration for rendezvous lookup */
-        return -1;
-    }
-    
-    if (rendezvous_ep->ip == 0) {
-        /* Rendezvous peer has no public IP - cannot use as rendezvous */
-        return -1;
-    }
-    
-    /* Construct hole punch request */
+    if (!client || !target_pubkey || !my_ephemeral || !callback) return -1;
+    if (rendezvous_ip == 0 || rendezvous_port == 0) return -1;
+
     norn_holepunch_req_t req;
     memset(&req, 0, sizeof(req));
-    
     req.msg_type = NORN_MSG_HOLEPUNCH_REQ;
     memcpy(req.target_pubkey, target_pubkey, 32);
     memcpy(req.my_ephemeral_pubkey, my_ephemeral, 32);
-    
-    /* Get our external endpoint (from DHT responses) */
+
     if (net_get_external_endpoint(&client->net, &req.my_external_ip, &req.my_external_port) != 0) {
         req.my_external_ip = 0;
         req.my_external_port = 0;
     }
-    
-    /* Sign request with our identity key */
-    bf_sign(req.signature, (const unsigned char *)&req, 
+
+    bf_sign(req.signature, (const unsigned char *)&req,
             offsetof(norn_holepunch_req_t, signature), client->self_sec);
-    
-    /* Encode request */
+
     uint8_t buf[NORN_HOLEPUNCH_REQ_LEN];
-    if (norn_encode_holepunch_req(&req, buf) != 0) {
+    if (norn_encode_holepunch_req(&req, buf) != 0) return -1;
+
+    if (net_send(&client->net, buf, sizeof(buf), rendezvous_ip, rendezvous_port) < 0)
         return -1;
+
+    /* Find a free slot; scan rather than append so slots are reused after deactivation. */
+    int idx = -1;
+    for (int i = 0; i < 8; i++) {
+        if (!client->holepunch_pending[i].active) { idx = i; break; }
     }
-    
-    /* Send to rendezvous peer via UDP */
-    ssize_t sent = net_send(&client->net, buf, sizeof(buf), 
-                            rendezvous_ep->ip, rendezvous_ep->port);
-    if (sent < 0) {
-        return -1;
-    }
-    
-    /* FEAT-023: Store callback for response handling */
-    if (client->holepunch_pending_count < 8) {
-        int idx = client->holepunch_pending_count++;
-        memcpy(client->holepunch_pending[idx].ephemeral_pubkey, my_ephemeral, 32);
-        client->holepunch_pending[idx].callback = callback;
-        client->holepunch_pending[idx].user_data = user_data;
-        client->holepunch_pending[idx].active = 1;
-    }
-    
+    if (idx < 0) return -1;  /* all 8 slots in use */
+
+    memcpy(client->holepunch_pending[idx].ephemeral_pubkey, my_ephemeral, 32);
+    client->holepunch_pending[idx].callback = callback;
+    client->holepunch_pending[idx].user_data = user_data;
+    client->holepunch_pending[idx].active = 1;
+
     return 0;
 }
 

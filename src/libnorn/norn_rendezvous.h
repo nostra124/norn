@@ -106,7 +106,8 @@ typedef void (*norn_holepunch_callback_t)(norn_client_t *client,
  *
  * @param client Norn client
  * @param target_pubkey Peer to connect to
- * @param rendezvous_pubkey Rendezvous peer
+ * @param rendezvous_ip Rendezvous peer IP (network byte order)
+ * @param rendezvous_port Rendezvous peer port (network byte order)
  * @param my_ephemeral Our ephemeral key for this session
  * @param callback Called when we receive HolePunchResponse
  * @param user_data User data for callback
@@ -114,7 +115,8 @@ typedef void (*norn_holepunch_callback_t)(norn_client_t *client,
  */
 int norn_send_holepunch_req_async(norn_client_t *client,
                                    const uint8_t *target_pubkey,
-                                   const uint8_t *rendezvous_pubkey,
+                                   uint32_t rendezvous_ip,
+                                   uint16_t rendezvous_port,
                                    const uint8_t *my_ephemeral,
                                    norn_holepunch_callback_t callback,
                                    void *user_data);
