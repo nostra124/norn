@@ -15,13 +15,33 @@ setup_file() {
     make install
 
     export NORN_BIN="$WORK_DIR/install/bin/norn"
+    export NORND_BIN="$WORK_DIR/install/bin/nornd"
     # Keep keygen's default ~/.norn under the work dir, and let the installed
     # binary find libnorn.so.
     export HOME="$WORK_DIR"
     export LD_LIBRARY_PATH="$WORK_DIR/install/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+    # Start nornd so keygen (and other IPC commands) have a daemon to talk to.
+    ssh-keygen -t ed25519 -N "" -C cli-sit -f "$WORK_DIR/id" >/dev/null 2>&1
+    export SOCK="$WORK_DIR/nornd.sock"
+    export NORN_SOCK="$SOCK"
+    "$NORND_BIN" --identity "$WORK_DIR/id" --socket "$SOCK" --class server \
+        >"$WORK_DIR/nornd.log" 2>&1 &
+    echo $! >"$WORK_DIR/nornd.pid"
+
+    # Wait (≤15s) for nornd to be ready (DNS bootstrap can take a few seconds).
+    for _ in $(seq 1 150); do
+        if "$NORN_BIN" node status >/dev/null 2>&1; then
+            break
+        fi
+        sleep 0.1
+    done
 }
 
 teardown_file() {
+    if [ -f "$WORK_DIR/nornd.pid" ]; then
+        kill "$(cat "$WORK_DIR/nornd.pid")" 2>/dev/null || true
+    fi
     rm -rf "$WORK_DIR"
 }
 

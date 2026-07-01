@@ -27,8 +27,10 @@
 #include "norn.h"
 #include "norn_cluster.h"
 #include "norn_raft.h"
+#include "peer_fetch.h"
 #include "peers.h"
 #include "publog.h"
+#include "served_proto.h"
 #include "served.h"
 #include "served_conn.h"
 #include "store.h"
@@ -430,12 +432,19 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
                 if (!home) home = "/tmp";
                 snprintf(path, sizeof(path), "%s/.config/norn/key.pem", home);
             }
-            /* Create parent dirs. */
-            char dir[600];
-            strncpy(dir, path, sizeof(dir) - 1);
-            dir[sizeof(dir) - 1] = '\0';
-            char *last = strrchr(dir, '/');
-            if (last) { *last = '\0'; mkdir(dir[0] ? dir : "/", 0700); }
+            /* Create parent dirs recursively. */
+            char dirtmp[600];
+            size_t pl = strlen(path);
+            if (pl >= sizeof(dirtmp)) { pl = sizeof(dirtmp) - 1; }
+            memcpy(dirtmp, path, pl);
+            dirtmp[pl] = '\0';
+            char *slash = dirtmp;
+            while ((slash = strchr(slash, '/')) != NULL) {
+                *slash = '\0';
+                if (dirtmp[0]) mkdir(dirtmp, 0700);
+                *slash = '/';
+                slash++;
+            }
             if (access(path, F_OK) == 0) {
                 resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "key file already exists");
             } else {
@@ -888,6 +897,37 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
         }
         #undef VAL_STR
         resp.vlen = off;
+    } else if (strcmp(req.op, "peer-fetch") == 0) {
+        /* `norn peer get/cat/connect <spec> <key>`: dial a remote peer and
+         * fetch a served-KV value. req.key = peer spec (64-hex pubkey, or
+         * 40-hex node-id, with optional @host:port). req.val = verb
+         * (get|cat|list|connect). req.expect = served-KV arg (key/hash/prefix).
+         * Blocks the daemon up to ~15s during the dial+fetch. */
+        char spec[160];
+        size_t sl = req.klen < sizeof(spec) - 1 ? req.klen : sizeof(spec) - 1;
+        memcpy(spec, req.key, sl);
+        spec[sl] = '\0';
+        char verb[16];
+        size_t vl = req.vlen < sizeof(verb) - 1 ? req.vlen : sizeof(verb) - 1;
+        memcpy(verb, req.val, vl);
+        verb[vl] = '\0';
+        char arg[NORND_SERVED_MAX_ARG + 1];
+        size_t al = req.elen < sizeof(arg) - 1 ? req.elen : sizeof(arg) - 1;
+        memcpy(arg, req.expect, al);
+        arg[al] = '\0';
+        size_t outlen = sizeof(resp.val);
+        if (nornd_peer_fetch(ctx->client, spec, verb, arg,
+                             resp.val, &outlen,
+                             resp.err, sizeof(resp.err)) == 0) {
+            resp.ok = 1;
+            resp.has_val = 1;
+            resp.vlen = outlen;
+        } else {
+            resp.ok = 0;
+            resp.has_err = 1;
+            if (!resp.err[0])
+                snprintf(resp.err, sizeof(resp.err), "peer fetch failed");
+        }
     } else {
         nornd_dispatch(ctx->be, &req, &resp);
     }
@@ -1090,7 +1130,23 @@ int main(int argc, char **argv) {
             snprintf(homebuf, sizeof(homebuf), "%s/.config/norn", home);
             base = homebuf;
         }
-        mkdir(base, 0700); /* ensure the parent exists before the object dir */
+        /* Create parent dirs recursively so mkdir doesn't fail on a missing
+     * intermediate directory (e.g. $HOME/.config when .config doesn't exist). */
+    {
+        char basebuf[600];
+        size_t bl = strlen(base);
+        if (bl >= sizeof(basebuf)) bl = sizeof(basebuf) - 1;
+        memcpy(basebuf, base, bl);
+        basebuf[bl] = '\0';
+        char *p = basebuf;
+        while ((p = strchr(p, '/')) != NULL) {
+            *p = '\0';
+            if (basebuf[0]) mkdir(basebuf, 0700);
+            *p = '/';
+            p++;
+        }
+    }
+    mkdir(base, 0700);
         /* The local served-KV store is always available for `norn node set`,
          * independent of the optional file-backed object store. */
         localstore_init(&serve.lstore);

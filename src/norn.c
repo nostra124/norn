@@ -15,7 +15,6 @@
 #include <sys/un.h>
 #include "config.h"
 #include "nornd/cli_cluster.h"
-#include "nornd/cli_peer.h"
 #include "nornd/ipc.h"
 
 #define DEFAULT_PORT 6881
@@ -444,6 +443,77 @@ static int ipc_round_trip_kv_bin(const char *op,
         memcpy(req.val, value, vlen);
         req.vlen = vlen;
         req.has_val = 1;
+    }
+    unsigned char wire[NORND_IPC_MAX_BODY + 4];
+    int wlen = nornd_ipc_encode_req(&req, wire, sizeof(wire));
+    if (wlen < 0 || write(fd, wire, (size_t)wlen) != wlen) {
+        close(fd);
+        return -1;
+    }
+    unsigned char frame[NORND_IPC_MAX_BODY + 4];
+    size_t got = 0;
+    while (got < 4) {
+        ssize_t n = read(fd, frame + got, 4 - got);
+        if (n <= 0) { close(fd); return -1; }
+        got += (size_t)n;
+    }
+    int64_t body = nornd_ipc_frame_len(frame, 4);
+    if (body < 0 || (size_t)body + 4 > sizeof(frame)) { close(fd); return -1; }
+    while (got < (size_t)body + 4) {
+        ssize_t n = read(fd, frame + got, (size_t)body + 4 - got);
+        if (n <= 0) { close(fd); return -1; }
+        got += (size_t)n;
+    }
+    close(fd);
+    nornd_ipc_resp_t resp;
+    size_t consumed = 0;
+    if (nornd_ipc_decode_resp(frame, got, &resp, &consumed) != 0) return -1;
+    if (!resp.ok) {
+        if (resp.has_err && resp.err[0])
+            fprintf(stderr, "norn: %s\n", resp.err);
+        return -1;
+    }
+    size_t n = resp.vlen;
+    if (n > resp_cap) n = resp_cap;
+    memcpy(resp_val, resp.val, n);
+    *resp_vlen = n;
+    return 0;
+}
+
+/* ipc_round_trip variant that sends op + key + val + expect (the latter three
+ * optional). Returns 0 on success and fills resp_val/resp_vlen; -1 on error. */
+static int ipc_round_trip_kv_expect(const char *op,
+                                    const unsigned char *key, size_t klen,
+                                    const unsigned char *val, size_t vlen,
+                                    const unsigned char *expect, size_t elen,
+                                    unsigned char *resp_val, size_t *resp_vlen,
+                                    size_t resp_cap) {
+    char pbuf[512];
+    const char *path = nornd_socket_path(pbuf, sizeof(pbuf));
+    int fd = ipc_connect(path);
+    if (fd < 0) {
+        fprintf(stderr, "norn: cannot reach nornd at %s. Is nornd running?\n", path);
+        return -1;
+    }
+    nornd_ipc_req_t req;
+    memset(&req, 0, sizeof(req));
+    strcpy(req.op, op);
+    if (key && klen) {
+        if (klen > sizeof(req.key)) klen = sizeof(req.key);
+        memcpy(req.key, key, klen);
+        req.klen = klen;
+    }
+    if (val && vlen) {
+        if (vlen > sizeof(req.val)) vlen = sizeof(req.val);
+        memcpy(req.val, val, vlen);
+        req.vlen = vlen;
+        req.has_val = 1;
+    }
+    if (expect && elen) {
+        if (elen > sizeof(req.expect)) elen = sizeof(req.expect);
+        memcpy(req.expect, expect, elen);
+        req.elen = elen;
+        req.has_expect = 1;
     }
     unsigned char wire[NORND_IPC_MAX_BODY + 4];
     int wlen = nornd_ipc_encode_req(&req, wire, sizeof(wire));
@@ -1106,9 +1176,15 @@ static int do_peer(int argc, char **argv, int optind) {
             fprintf(stderr, "Usage: %s peer connect <pubkey[@host:port]>\n", prog_name);
             return 1;
         }
-        /* Delegate to nornd_cli_peer with a dummy "get" to exercise the dial. */
-        char *pv[] = {sub_argv[1], (char *)"get", (char *)""};
-        return nornd_cli_peer(3, pv);
+        /* IPC peer-fetch with "connect" verb — dials and reports success. */
+        unsigned char dummy[1];
+        size_t dlen = 0;
+        if (ipc_round_trip_kv_expect("peer-fetch",
+                (const unsigned char *)sub_argv[1], strlen(sub_argv[1]),
+                (const unsigned char *)"connect", 7,
+                NULL, 0, dummy, &dlen, sizeof(dummy)) != 0)
+            return 1;
+        return 0;
     } else if (strcmp(sub, "public") == 0) {
         /* `norn peer public <node-id>` — print a peer's Ed25519 pubkey. */
         if (sub_argc < 2) {
@@ -1118,20 +1194,37 @@ static int do_peer(int argc, char **argv, int optind) {
         return do_peer_public(sub_argv[1]);
     } else if (strcmp(sub, "get") == 0) {
         /* `norn peer get <node-id> <key>` — resolve the peer by 40-hex DHT node
-         * id via the DHT, dial it, and fetch a served-KV value. */
+         * id via the daemon, dial it, and fetch a served-KV value. */
         if (sub_argc < 3) {
             fprintf(stderr, "Usage: %s peer get <node-id> <key>\n", prog_name);
             return 1;
         }
-        return nornd_cli_peer_get_by_nodeid(sub_argv[1], sub_argv[2]);
+        unsigned char body[NORND_IPC_MAX_VAL];
+        size_t blen = sizeof(body);
+        if (ipc_round_trip_kv_expect("peer-fetch",
+                (const unsigned char *)sub_argv[1], strlen(sub_argv[1]),
+                (const unsigned char *)"get", 3,
+                (const unsigned char *)sub_argv[2], strlen(sub_argv[2]),
+                body, &blen, sizeof(body)) != 0)
+            return 1;
+        fwrite(body, 1, blen, stdout);
+        return 0;
     } else if (strcmp(sub, "cat") == 0) {
         if (sub_argc < 3) {
             fprintf(stderr, "Usage: %s peer cat <pubkey[@host:port]> <hash>\n",
                     prog_name);
             return 1;
         }
-        char *pv[] = {sub_argv[1], (char *)"cat", sub_argv[2]};
-        return nornd_cli_peer(3, pv);
+        unsigned char body[NORND_IPC_MAX_VAL];
+        size_t blen = sizeof(body);
+        if (ipc_round_trip_kv_expect("peer-fetch",
+                (const unsigned char *)sub_argv[1], strlen(sub_argv[1]),
+                (const unsigned char *)"cat", 3,
+                (const unsigned char *)sub_argv[2], strlen(sub_argv[2]),
+                body, &blen, sizeof(body)) != 0)
+            return 1;
+        fwrite(body, 1, blen, stdout);
+        return 0;
     } else if (strcmp(sub, "--help") == 0 || strcmp(sub, "-h") == 0 || strcmp(sub, "help") == 0) {
         goto peer_help;
     }

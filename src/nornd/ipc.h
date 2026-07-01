@@ -15,7 +15,7 @@
 
 #define NORND_IPC_MAX_OP    24    /* verb string (NUL-terminated)           */
 #define NORND_IPC_MAX_KEY   256   /* key bytes                              */
-#define NORND_IPC_MAX_VAL   4096  /* control values; bulk data streams apart */
+#define NORND_IPC_MAX_VAL   64000 /* control values + peer-fetch body */
 #define NORND_IPC_ID_BYTES  32    /* target node pubkey for peer ops        */
 #define NORND_IPC_MAX_ITEMS 32    /* response list entries (members/ls)     */
 #define NORND_IPC_MAX_ITEM  256   /* bytes per response list entry          */

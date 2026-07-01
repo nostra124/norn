@@ -51,7 +51,7 @@ libnorn_la_LIBADD = $(SODIUM_LIBS) $(AVAHI_LIBS)
 # (not part of the library). Convenience lib so the daemon and its tests share
 # the same object code.
 noinst_LTLIBRARIES = libnornd.la
-libnornd_la_SOURCES = src/nornd/ipc.c src/nornd/identity.c src/nornd/dispatch.c src/nornd/client.c src/nornd/cli_cluster.c src/nornd/cli_peer.c src/nornd/served_proto.c src/nornd/store.c src/nornd/served.c src/nornd/served_conn.c src/nornd/localstore.c src/nornd/publog.c src/nornd/pubqueue.c src/nornd/dht_persist.c src/nornd/agent.c src/nornd/peers.c src/nornd/transport.c
+libnornd_la_SOURCES = src/nornd/ipc.c src/nornd/identity.c src/nornd/dispatch.c src/nornd/client.c src/nornd/cli_cluster.c src/nornd/peer_fetch.c src/nornd/served_proto.c src/nornd/store.c src/nornd/served.c src/nornd/served_conn.c src/nornd/localstore.c src/nornd/publog.c src/nornd/pubqueue.c src/nornd/dht_persist.c src/nornd/agent.c src/nornd/peers.c src/nornd/transport.c
 libnornd_la_LIBADD = libnorn.la
 libnornd_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 
@@ -59,7 +59,7 @@ libnornd_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_s
 # #included by the sources) so a VPATH/dist build can find them.
 noinst_HEADERS = src/nornd/ipc.h src/nornd/identity.h src/nornd/dispatch.h \
                  src/nornd/client.h src/nornd/cli_cluster.h \
-                 src/nornd/cli_peer.h \
+                 src/nornd/peer_fetch.h \
                 src/nornd/localstore.h src/nornd/publog.h src/nornd/pubqueue.h src/nornd/dht_persist.h src/nornd/served_proto.h src/nornd/store.h \
                 src/nornd/served.h src/nornd/served_conn.h src/nornd/agent.h \
                  src/nornd/peers.h src/nornd/transport.h \
@@ -105,7 +105,7 @@ bin_PROGRAMS = norn norn-forward nornd
 
 norn_SOURCES = src/norn.c
 norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
-norn_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
+norn_LDADD = libnornd.la $(SODIUM_LIBS)
 
 norn_forward_SOURCES = src/norn_forward_main.c
 norn_forward_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
