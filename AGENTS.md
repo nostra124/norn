@@ -20,8 +20,12 @@ All new code must have 100% line and branch coverage. The `make coverage` target
 ## File Organization
 ```
 src/libnorn/     — library implementation
+src/nornd/       — daemon (nornd)
 src/norn.c       — CLI (thin wrapper over library)
-tests/           — unit tests (one test_*.c per source file)
+tests/unit/      — unit tests (one test_*.c per source file)
+tests/sit/       — system integration tests (.bats)
+tests/pit/       — performance / load tests (.bats)
+contrib/         — deploy script, systemd units, launchd plists
 docs/            — architecture docs, BEP references
 ```
 
@@ -39,17 +43,35 @@ Conventions (inherited house style):
 
 ## Building
 ```
-./autogen.sh
+autoreconf -fi
 ./configure
-make
+make -j$(nproc)
 make check
-sudo make install
 ```
+
+## Installing
+
+**Preferred — Debian package (installs to /usr/bin, /usr/lib):**
+```
+dpkg-buildpackage -us -uc -b
+sudo dpkg -i ../norn_*.deb ../libnorn_*.deb ../libnorn-dev_*.deb
+```
+Do NOT use `sudo make install` — it installs to `/usr/local` and conflicts with the deb.
+
+**Deploying to remote hosts:**
+```
+contrib/deploy user@host          # probe + build + install on one host
+contrib/deploy all                # deploy to all remembered hosts
+NORN_DEPLOY_HOSTS=~/.config/norn/deploy-hosts contrib/deploy all
+```
+The deploy script (three-phase: probe/build/deploy) mirrors bifrost's `contrib/deploy`.
 
 ## Testing
 ```
-make check       # Run unit tests
-make coverage    # Generate coverage report (enforces 100%)
+make check           # Run unit tests (tests/unit/)
+contrib/pit/run.sh   # Performance / load tests
+contrib/sit/run.sh   # System integration tests
+make coverage        # Generate coverage report (enforces 100%)
 ```
 
 ## CLI Verb Conventions
