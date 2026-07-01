@@ -32,8 +32,9 @@ setup_file() {
         >"$WORK_DIR/nornd.log" 2>&1 &
     echo $! >"$WORK_DIR/nornd.pid"
 
-    # Wait (≤5s) for the lone server to elect itself.
-    for _ in $(seq 1 50); do
+    # Wait (≤15s) for the lone server to elect itself (DNS bootstrap can take
+    # a few seconds before the IPC socket is available).
+    for _ in $(seq 1 150); do
         if "$NORN" cluster status 2>/dev/null | grep -q "role=leader"; then
             break
         fi
