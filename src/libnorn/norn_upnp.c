@@ -269,6 +269,37 @@ static int soap_action(const char *device_url,
 
 /* ---- public UPnP API ---- */
 
+/* Fetch device description and locate the WAN service type + control URL. */
+static int upnp_get_wan_service(const char *device_url,
+                                char *svc_type, size_t svc_cap,
+                                char *ctrl_url, size_t ctrl_cap) {
+    char desc[MAX_RESPONSE];
+    if (http_get(device_url, desc, sizeof(desc)) < 0) return -1;
+
+    const char *svc_types[] = {
+        "urn:schemas-upnp-org:service:WANIPConnection:1",
+        "urn:schemas-upnp-org:service:WANPPPConnection:1",
+        NULL
+    };
+    for (int i = 0; svc_types[i]; i++) {
+        if (!strstr(desc, svc_types[i])) continue;
+        strncpy(svc_type, svc_types[i], svc_cap - 1);
+        svc_type[svc_cap - 1] = 0;
+        const char *svc = strstr(desc, svc_types[i]);
+        const char *cu = strstr(svc, "<controlURL>");
+        if (!cu) continue;
+        cu += 12; /* len("<controlURL>") */
+        const char *ce = strstr(cu, "</controlURL>");
+        if (!ce) continue;
+        size_t cl = ce - cu;
+        if (cl >= ctrl_cap) cl = ctrl_cap - 1;
+        memcpy(ctrl_url, cu, cl);
+        ctrl_url[cl] = 0;
+        return 0;
+    }
+    return -1;
+}
+
 int norn_upnp_discover(uint32_t timeout_ms, char *device_url) {
     (void)timeout_ms;
     return ssdp_discover(device_url, MAX_URL);
@@ -282,41 +313,10 @@ int norn_upnp_add_mapping(const char *device_url,
                            norn_upnp_result_t *result) {
     if (!device_url || !result) return -1;
 
-    /* Fetch device description */
-    char desc[MAX_RESPONSE];
-    if (http_get(device_url, desc, sizeof(desc)) < 0) return -1;
-
-    /* Find WANIPConnection or WANPPPConnection service */
-    const char *svc_types[] = {
-        "urn:schemas-upnp-org:service:WANIPConnection:1",
-        "urn:schemas-upnp-org:service:WANPPPConnection:1",
-        NULL
-    };
     char svc_type[256] = "";
     char ctrl_url[256] = "";
-    for (int i = 0; svc_types[i]; i++) {
-        if (strstr(desc, svc_types[i])) {
-            strncpy(svc_type, svc_types[i], sizeof(svc_type) - 1);
-            /* Extract controlURL from the service element */
-            const char *svc = strstr(desc, svc_types[i]);
-            if (svc) {
-                const char *cu = strstr(svc, "<controlURL>");
-                if (cu) {
-                    cu += 11;
-                    const char *ce = strstr(cu, "</controlURL>");
-                    if (ce) {
-                        size_t cl = ce - cu;
-                        if (cl < sizeof(ctrl_url)) {
-                            memcpy(ctrl_url, cu, cl);
-                            ctrl_url[cl] = 0;
-                        }
-                    }
-                }
-            }
-            break;
-        }
-    }
-    if (!svc_type[0] || !ctrl_url[0]) return -1;
+    if (upnp_get_wan_service(device_url, svc_type, sizeof(svc_type),
+                              ctrl_url, sizeof(ctrl_url)) < 0) return -1;
 
     /* Build SOAP AddPortMapping envelope */
     char soap_body[2048];
@@ -369,18 +369,61 @@ int norn_upnp_add_mapping(const char *device_url,
 int norn_upnp_remove_mapping(const char *device_url,
                               uint16_t external_port,
                               const char *protocol) {
-    (void)device_url;
-    (void)external_port;
-    (void)protocol;
-    /* TODO: implement DeletePortMapping if needed */
-    return -1;
+    if (!device_url || !protocol) return -1;
+
+    char svc_type[256] = "";
+    char ctrl_url[256] = "";
+    if (upnp_get_wan_service(device_url, svc_type, sizeof(svc_type),
+                              ctrl_url, sizeof(ctrl_url)) < 0) return -1;
+
+    char soap_body[1024];
+    int n = snprintf(soap_body, sizeof(soap_body),
+        "<?xml version=\"1.0\"?>"
+        "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" "
+        "s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
+        "<s:Body>"
+        "<u:DeletePortMapping xmlns:u=\"%s\">"
+        "<NewRemoteHost></NewRemoteHost>"
+        "<NewExternalPort>%u</NewExternalPort>"
+        "<NewProtocol>%s</NewProtocol>"
+        "</u:DeletePortMapping>"
+        "</s:Body>"
+        "</s:Envelope>",
+        svc_type, (unsigned int)external_port, protocol);
+    if (n <= 0) return -1;
+
+    char resp[MAX_RESPONSE];
+    return soap_action(device_url, svc_type, ctrl_url,
+                       "DeletePortMapping", soap_body, resp, sizeof(resp));
 }
 
 int norn_upnp_get_external_ip(const char *device_url, uint32_t *external_ip) {
-    (void)device_url;
-    (void)external_ip;
-    /* TODO: implement via GetExternalIPAddress SOAP call */
-    return -1;
+    if (!device_url || !external_ip) return -1;
+
+    char svc_type[256] = "";
+    char ctrl_url[256] = "";
+    if (upnp_get_wan_service(device_url, svc_type, sizeof(svc_type),
+                              ctrl_url, sizeof(ctrl_url)) < 0) return -1;
+
+    const char *soap_body =
+        "<?xml version=\"1.0\"?>"
+        "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" "
+        "s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
+        "<s:Body>"
+        "<u:GetExternalIPAddress xmlns:u=\"WANIPConnection:1\">"
+        "</u:GetExternalIPAddress>"
+        "</s:Body>"
+        "</s:Envelope>";
+
+    char resp[MAX_RESPONSE];
+    if (soap_action(device_url, svc_type, ctrl_url,
+                    "GetExternalIPAddress", soap_body,
+                    resp, sizeof(resp)) < 0) return -1;
+
+    char ip_str[64];
+    if (xml_get(resp, "NewExternalIPAddress", ip_str, sizeof(ip_str)) < 0) return -1;
+    *external_ip = inet_addr(ip_str);
+    return (*external_ip == 0) ? -1 : 0;
 }
 
 int norn_natpmp_add_mapping(uint32_t gateway_ip,
@@ -389,23 +432,33 @@ int norn_natpmp_add_mapping(uint32_t gateway_ip,
                              int protocol,
                              uint32_t lease_duration,
                              norn_upnp_result_t *result) {
-    (void)gateway_ip;
-    (void)internal_port;
-    (void)external_port;
-    (void)protocol;
-    (void)lease_duration;
-    (void)result;
-    /* NAT-PMP implemented in net.c via natpmp_map_udp() */
-    return -1;
+    if (!result) return -1;
+    (void)gateway_ip;  /* natpmp_map_udp auto-discovers the gateway */
+    (void)protocol;    /* only UDP supported by natpmp_map_udp */
+    (void)external_port; /* router assigns the external port */
+
+    uint16_t ext_port = 0;
+    uint32_t ext_ip = 0;
+    if (natpmp_map_udp(internal_port, lease_duration, &ext_port, &ext_ip) != 0)
+        return -1;
+
+    result->external_ip = ext_ip;
+    result->external_port = htons(ext_port);
+    result->internal_port = htons(internal_port);
+    result->lease_duration = lease_duration;
+    result->success = 1;
+    return 0;
 }
 
 int norn_natpmp_remove_mapping(uint32_t gateway_ip,
                                 uint16_t external_port,
                                 int protocol) {
     (void)gateway_ip;
-    (void)external_port;
     (void)protocol;
-    return -1;
+    /* NAT-PMP removes a mapping by requesting it with lifetime = 0. */
+    uint16_t dummy_port;
+    uint32_t dummy_ip;
+    return natpmp_map_udp(external_port, 0, &dummy_port, &dummy_ip);
 }
 
 int norn_auto_port_mapping(uint16_t internal_port,
