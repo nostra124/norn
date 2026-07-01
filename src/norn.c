@@ -178,26 +178,27 @@ static int do_version(void) {
 static const char *nornd_socket_path(char *buf, size_t cap) {
     const char *env = getenv("NORN_SOCK");
     if (env && env[0]) return env;
-    /* Prefer the per-user daemon socket, but fall back to the system nornd
-     * socket (/run/nornd/nornd.sock) when no user socket exists — so a
-     * desktop install talks to the system daemon by default. */
+    /* root talks to the system daemon; everyone else talks to their own user
+     * daemon. Never fall back to the system socket for non-root — the system
+     * socket is mode 0600/root-only and the user should not reach it. */
+    if (getuid() == 0) {
+        snprintf(buf, cap, "%s", "/run/nornd/nornd.sock");
+        return buf;
+    }
     const char *run = getenv("XDG_RUNTIME_DIR");
     if (run && run[0]) {
         snprintf(buf, cap, "%s/nornd.sock", run);
         if (access(buf, F_OK) == 0) return buf;
+        /* Return the XDG path even if the socket doesn't exist yet — gives a
+         * meaningful "Is nornd running?" error rather than a silent fallback
+         * to the system socket. */
+        return buf;
     }
     const char *home = getenv("HOME");
     if (home && home[0]) {
-        char ubuf[600];
-        snprintf(ubuf, sizeof(ubuf), "%s/.config/norn/nornd.sock", home);
-        if (access(ubuf, F_OK) == 0) {
-            size_t n = strlen(ubuf);
-            if (n >= cap) n = cap - 1;
-            memcpy(buf, ubuf, n); buf[n] = '\0';
-            return buf;
-        }
+        snprintf(buf, cap, "%s/.config/norn/nornd.sock", home);
+        return buf;
     }
-    /* System socket fallback. */
     snprintf(buf, cap, "%s", "/run/nornd/nornd.sock");
     return buf;
 }

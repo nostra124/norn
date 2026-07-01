@@ -324,15 +324,19 @@ case "\$OS" in
 esac
 
 # ---- per-USER daemon ----
-# Hosts run two nodes: the system (root) daemon — restarted above by systemd/launchd
-# — and a PERSISTENT per-user daemon. The package post-install enables it and
-# restarts it on the freshly-installed binary (user systemd service + linger on
-# Linux; a per-user LaunchDaemon on macOS), so it survives reboot + logout.
-echo "==> per-user daemon (persistent; managed by the init system)"
-systemctl --user is-enabled nornd 2>/dev/null \
-    && systemctl --user --no-pager --lines=0 status nornd 2>/dev/null | head -3 || true
+# Non-root users connect to their own user daemon (uid != 0 never reaches the
+# system socket). Ensure linger is set so it survives logout, then start the
+# socket unit so the daemon is immediately ready (it is socket-activated).
+if [ "\$(id -u)" != 0 ] && [ -d /run/systemd/system ]; then
+    loginctl enable-linger "\$(id -un)" 2>/dev/null || true
+    systemctl --user daemon-reload 2>/dev/null || true
+    systemctl --user enable --now nornd.socket 2>/dev/null || true
+    systemctl --user restart nornd.service 2>/dev/null || true
+    echo "==> per-user nornd"
+    systemctl --user --no-pager -l status nornd.service 2>/dev/null | head -6 || true
+fi
 
-# ---- node identity ---- (confirmation; reads the local identity, no daemon needed)
+# ---- node identity ---- (confirmation)
 echo "==> norn node id"
 if command -v norn >/dev/null 2>&1; then norn node id || true
 else echo "norn not in PATH (check install)"; fi
