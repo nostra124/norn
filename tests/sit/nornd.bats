@@ -107,8 +107,8 @@ teardown_file() {
     run "$NORN" cluster members
     [ "$status" -eq 0 ]
     # TSV: index\tnodeid  (header line + one data row)
-    [[ "$output" == $'index\tnodeid' ]]
-    [[ "$output" =~ $'\n0\t'[0-9a-f]{64} ]]
+    [[ "$output" == $'index\tnodeid\n'* ]]
+    [[ "$output" =~ 0$'\t'[0-9a-f]{64} ]]
 }
 
 @test "cluster leader prints the leader pubkey" {

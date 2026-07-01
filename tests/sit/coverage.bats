@@ -102,7 +102,8 @@ teardown() {
         [[ "$line" =~ ^#.* ]] && continue
         [[ -z "$line" ]] && continue
         
-        # File should exist
-        [ -f "src/libnorn/$line" ]
+        # File should exist (paths in coverage-tracked.txt are relative to
+        # the project root)
+        [ -f "$line" ]
     done < tests/coverage-tracked.txt
 }
