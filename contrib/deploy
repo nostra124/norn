@@ -90,6 +90,12 @@ pkg_filename() {
     esac
 }
 
+# For deb: also need libnorn (runtime dep of norn package).
+find_libnorn_deb() { # arch
+    local p="$DIST/libnorn_${VERSION}_${1}.deb"
+    [ -f "$p" ] && echo "$p"
+}
+
 find_pkg() { # os arch -> path in packages/dist (or empty)
     local p="$DIST/$(pkg_filename "$1" "$2")"
     [ -f "$p" ] && echo "$p"
@@ -139,8 +145,12 @@ build_for_os() {
                 # Build on an OLD glibc baseline (debian:11 = glibc 2.31) so the .deb
                 # runs on virtually any current system (glibc is not forward-compatible).
                 $CONTAINER_RUNTIME run --rm --platform "linux/$plat" -v "$ROOT_DIR":/host:ro -v "$DIST":/out debian:11 sh -c '
-                    set -e; apt-get update -qq && apt-get install -y -qq build-essential autoconf automake libtool libsodium-dev pkg-config >/dev/null 2>&1
-                    cp -a /host /b && cd /b && sh packages/debian/build-deb.sh /out'
+                    set -e
+                    apt-get update -qq && apt-get install -y -qq build-essential autoconf automake libtool libsodium-dev pkg-config devscripts debhelper doxygen >/dev/null 2>&1
+                    cp -a /host /build && cd /build
+                    autoreconf -fi >/dev/null 2>&1
+                    dpkg-buildpackage -us -uc -b >/dev/null 2>&1
+                    cp ../*.deb /out/'
             fi ;;
         rpm)
             [ -n "$CONTAINER_RUNTIME" ] || { err build "need podman/docker to build rpm"; return 1; }
@@ -237,6 +247,19 @@ deploy_host() {
     [ -n "$pkg" ] || { err "$host" "No $os/$pkg_arch package in packages/dist — Phase 2 may have failed."; return 1; }
     log "$host" "Package: $(basename "$pkg")"
 
+    # For deb: also upload libnorn (runtime dependency).
+    local libnorn_pkg="" remote_libnorn=""
+    if [ "$os" = deb ]; then
+        libnorn_pkg="$(find_libnorn_deb "$pkg_arch")"
+        if [ -n "$libnorn_pkg" ]; then
+            remote_libnorn="/tmp/$(basename "$libnorn_pkg")"
+            section "$host" "Uploading $(basename "$libnorn_pkg")"
+            if ! ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o BatchMode=yes "$target" "cat > '$remote_libnorn'" < "$libnorn_pkg"; then
+                err "$host" "libnorn upload failed"; return 1
+            fi
+        fi
+    fi
+
     section "$host" "Uploading $(basename "$pkg")"
     # Upload via an SSH 'cat' pipe, not scp: OpenWrt and Synology ship no
     # sftp-server (scp fails outright), and Synology's SFTP chroots/permission-
@@ -253,8 +276,13 @@ deploy_host() {
     # sh, not bash — OpenWrt/busybox only has ash.
     ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o BatchMode=yes "$target" sh <<ENDSSH
 set -e
-OS='$os'; PKG='$remote_pkg'
+OS='$os'; PKG='$remote_pkg'; LIBNORN_PKG='$remote_libnorn'
 SUDO=""; [ "\$(id -u)" = 0 ] || SUDO=sudo   # already root (e.g. OpenWrt)? no sudo needed
+
+# ---- install libnorn first (norn depends on it) ----
+case "\$OS" in
+    deb) [ -n "\$LIBNORN_PKG" ] && \$SUDO env DEBIAN_FRONTEND=noninteractive dpkg -i "\$LIBNORN_PKG" 2>/dev/null || true ;;
+esac
 
 # ---- pre-flight: fetch the new package + deps BEFORE purging anything, so a
 # network/dependency failure aborts while the OLD install is still intact, rather
