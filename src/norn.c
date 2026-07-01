@@ -15,6 +15,7 @@
 #include <sys/un.h>
 #include "config.h"
 #include "libnorn/norn.h"
+#include "libnorn/bep44.h"
 #include "libnorn/crypto.h"
 #include "libnorn/log.h"
 #include "nornd/cli_cluster.h"
@@ -159,7 +160,9 @@ static void usage(FILE *out) {
     static const char *cmds[][2] = {
         {"node",       "Manage the local nornd daemon"},
         {"peer",       "Interact with remote peers"},
-        {"bep44",      "DHT signed records"},
+        {"bep44",      "DHT mutable records (signed, named)"},
+        {"put",        "DHT immutable record (content-addressed)"},
+        {"get",        "DHT immutable record (by content hash)"},
         {"cluster",    "Cluster KV store"},
         {"version",    "Print version"},
     };
@@ -797,22 +800,23 @@ static void on_dht_value(void *ud, const unsigned char *value, size_t value_len)
     c->found = 1;
 }
 
+/* `norn bep44 get <node-id> <name>` — retrieve a salted mutable record.
+ * Resolve the publisher's Ed25519 pubkey from the 40-hex DHT node-id (via the
+ * running nornd's routing table, which learned it from the norn "pk"
+ * extension), then fetch the record named <name> under that pubkey. */
 static int do_get(int argc, char **argv) {
     static struct option long_options[] = {
         {"key", required_argument, 0, 'k'},
         {"timeout", required_argument, 0, 't'},
-        {"name", required_argument, 0, 'n'},
-        {"json", no_argument, 0, 'j'},
         {"help", no_argument, 0, 'h'},
         {0, 0, 0, 0}
     };
 
     int opt;
-    const char *name = NULL;
 
     optind = 2;
 
-    while ((opt = getopt_long(argc, argv, "+k:t:n:jh", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "+k:t:h", long_options, NULL)) != -1) {
         switch (opt) {
             case 'k':
                 key_file = optarg;
@@ -824,57 +828,61 @@ static int do_get(int argc, char **argv) {
                     return 1;
                 }
                 break;
-            case 'n':
-                name = optarg;
-                break;
-            case 'j':
-                /* JSON output - would format output as JSON */
-                break;
             case 'h':
-                fprintf(stdout, "Usage: %s get [OPTIONS] <key>\n", prog_name);
+                fprintf(stdout, "Usage: %s bep44 get [OPTIONS] <node-id> <name>\n", prog_name);
                 fprintf(stdout, "\n");
-                fprintf(stdout, "Retrieve a record from the DHT\n");
+                fprintf(stdout, "Retrieve a named mutable record from the DHT (BEP-44).\n");
+                fprintf(stdout, "The publisher's pubkey is resolved from the 40-hex\n");
+                fprintf(stdout, "DHT node-id via the running nornd.\n");
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Arguments:\n");
-                fprintf(stdout, "  <key>           64-char hex public key (mutable)\n");
+                fprintf(stdout, "  <node-id>       40-hex DHT node id of the publisher\n");
+                fprintf(stdout, "  <name>          Record name (the salt)\n");
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Options:\n");
                 fprintf(stdout, "  --key <path>      Key file path\n");
                 fprintf(stdout, "  --timeout <ms>    Query timeout (default: %d)\n", DEFAULT_TIMEOUT);
-                fprintf(stdout, "  --name <name>     Salt/name: fetch a named (salted) record\n");
-                fprintf(stdout, "  --json            Output as JSON\n");
                 fprintf(stdout, "  --help            Show this help\n");
                 return 0;
             default:
                 return 1;
         }
     }
-    
-    if (optind >= argc) {
-        fprintf(stderr, "ERROR: Missing key argument\n");
-        fprintf(stderr, "Usage: %s get <key>\n", prog_name);
-        return 1;
-    }
-    
-    const char *key_str = argv[optind];
 
-    if (strlen(key_str) != 64) {
-        fprintf(stderr, "ERROR: Key must be 64 hex characters (got %zu)\n", strlen(key_str));
+    if (optind + 1 >= argc) {
+        fprintf(stderr, "ERROR: missing <node-id> and/or <name>\n");
+        fprintf(stderr, "Usage: %s bep44 get <node-id> <name>\n", prog_name);
         return 1;
     }
 
-    unsigned char target[32];
-    for (int i = 0; i < 32; i++) {
-        unsigned int byte;
-        if (sscanf(key_str + i*2, "%2x", &byte) != 1) {
-            fprintf(stderr, "ERROR: Invalid hex in key at position %d\n", i*2);
-            return 1;
-        }
-        target[i] = (unsigned char)byte;
+    const char *nodeid_str = argv[optind];
+    const char *name = argv[optind + 1];
+
+    if (strlen(nodeid_str) != 40) {
+        fprintf(stderr, "ERROR: node-id must be 40 hex characters (got %zu)\n",
+                strlen(nodeid_str));
+        return 1;
+    }
+    unsigned char node_id[20];
+    if (sodium_hex2bin(node_id, sizeof(node_id), nodeid_str, 40, NULL, NULL, NULL) != 0) {
+        fprintf(stderr, "ERROR: invalid hex in node-id\n");
+        return 1;
     }
 
-    unsigned char pubkey[32], secret[64];
-    if (load_keypair(pubkey, secret) != 0) {
+    /* Resolve the publisher's pubkey from the node-id via nornd. */
+    unsigned char peer_pk[32];
+    size_t pklen = 0;
+    if (ipc_round_trip_key("peer-public", node_id, 20, peer_pk, &pklen, sizeof(peer_pk)) != 0) {
+        fprintf(stderr, "norn: could not resolve pubkey for node %s\n", nodeid_str);
+        return 1;
+    }
+    if (pklen != 32) {
+        fprintf(stderr, "norn: unexpected pubkey response length\n");
+        return 1;
+    }
+
+    unsigned char self_pub[32], self_sec[64];
+    if (load_keypair(self_pub, self_sec) != 0) {
         return 1;
     }
 
@@ -882,7 +890,7 @@ static int do_get(int argc, char **argv) {
     memset(&cfg, 0, sizeof(cfg));
     cfg.version = NORN_VERSION;
 
-    norn_client_t *client = norn_new(pubkey, secret, &cfg);
+    norn_client_t *client = norn_new(self_pub, self_sec, &cfg);
     if (!client) {
         fprintf(stderr, "ERROR: Failed to create DHT client\n");
         return 1;
@@ -898,14 +906,9 @@ static int do_get(int argc, char **argv) {
 
     struct dht_get_ctx ctx;
     memset(&ctx, 0, sizeof(ctx));
-    int gerr;
-    if (name)
-        gerr = norn_get_mutable_salt(client, target,
-                                     (const unsigned char *)name, strlen(name),
-                                     on_dht_value, &ctx);
-    else
-        gerr = norn_get_mutable(client, target, on_dht_value, &ctx);
-    if (gerr != 0) {
+    if (norn_get_mutable_salt(client, peer_pk,
+                              (const unsigned char *)name, strlen(name),
+                              on_dht_value, &ctx) != 0) {
         fprintf(stderr, "ERROR: Failed to start DHT get\n");
         norn_free(client);
         return 1;
@@ -918,7 +921,7 @@ static int do_get(int argc, char **argv) {
         fputc('\n', stdout);
         rc = 0;
     } else {
-        fprintf(stderr, "norn: no value found for %s\n", key_str);
+        fprintf(stderr, "norn: no value found for %s/%s\n", nodeid_str, name);
         rc = 1;
     }
 
@@ -926,11 +929,174 @@ static int do_get(int argc, char **argv) {
     return rc;
 }
 
+/* `norn put <value>` — publish an immutable BEP-44 record (content-addressed:
+ * key = SHA1(bencode(value))). Returns the 40-hex hash to retrieve it by. */
+static int do_put_immutable(int argc, char **argv) {
+    static struct option long_options[] = {
+        {"key", required_argument, 0, 'k'},
+        {"timeout", required_argument, 0, 't'},
+        {"help", no_argument, 0, 'h'},
+        {0, 0, 0, 0}
+    };
+    int opt;
+    optind = 2;
+    while ((opt = getopt_long(argc, argv, "+k:t:h", long_options, NULL)) != -1) {
+        switch (opt) {
+            case 'k': key_file = optarg; break;
+            case 't':
+                timeout_ms = atoi(optarg);
+                if (timeout_ms <= 0) { fprintf(stderr, "ERROR: Invalid timeout: %s\n", optarg); return 1; }
+                break;
+            case 'h':
+                printf("Usage: %s put [OPTIONS] <value>\n", prog_name);
+                printf("\n");
+                printf("Publish an immutable record to the DHT (BEP-44). The key is\n");
+                printf("SHA1(bencode(value)) — content-addressed, self-verifying, no\n");
+                printf("signature. Retrieve with `norn get <hash>`.\n");
+                printf("\nOptions:\n");
+                printf("  --key <path>      Key file path\n");
+                printf("  --timeout <ms>    Query timeout (default: %d)\n", DEFAULT_TIMEOUT);
+                printf("  --help            Show this help\n");
+                return 0;
+            default: return 1;
+        }
+    }
+    if (optind >= argc) {
+        fprintf(stderr, "ERROR: missing <value>\n");
+        fprintf(stderr, "Usage: %s put <value>\n", prog_name);
+        return 1;
+    }
+    const char *value = argv[optind];
+    size_t value_len = strlen(value);
+    if (value_len > MAX_VALUE_SIZE) {
+        fprintf(stderr, "ERROR: Value too large (%zu > %d bytes)\n", value_len, MAX_VALUE_SIZE);
+        return 1;
+    }
+
+    unsigned char self_pub[32], self_sec[64];
+    if (load_keypair(self_pub, self_sec) != 0) return 1;
+
+    norn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.version = NORN_VERSION;
+    norn_client_t *client = norn_new(self_pub, self_sec, &cfg);
+    if (!client) { fprintf(stderr, "ERROR: Failed to create DHT client\n"); return 1; }
+    if (norn_bootstrap(client) != 0) {
+        fprintf(stderr, "ERROR: DHT bootstrap failed (no network?)\n");
+        norn_free(client);
+        return 1;
+    }
+    dht_pump(client, 2000, NULL);
+
+    if (norn_put_immutable(client, (const unsigned char *)value, value_len) != 0) {
+        fprintf(stderr, "ERROR: DHT put failed\n");
+        norn_free(client);
+        return 1;
+    }
+    dht_pump(client, timeout_ms, NULL);
+
+    /* The immutable target = SHA1(bencode(value)); compute it for display. */
+    unsigned char target[20];
+    bep44_immutable_target((const unsigned char *)value, value_len, target);
+    printf("%s", col_magenta());
+    for (int i = 0; i < 20; i++) printf("%02x", target[i]);
+    printf("%s\n", col_reset());
+
+    norn_free(client);
+    return 0;
+}
+
+/* `norn get <hash>` — retrieve an immutable BEP-44 record by its 40-hex SHA1
+ * content hash. The value is self-verifying (hash matches the content). */
+static int do_get_immutable(int argc, char **argv) {
+    static struct option long_options[] = {
+        {"key", required_argument, 0, 'k'},
+        {"timeout", required_argument, 0, 't'},
+        {"help", no_argument, 0, 'h'},
+        {0, 0, 0, 0}
+    };
+    int opt;
+    optind = 2;
+    while ((opt = getopt_long(argc, argv, "+k:t:h", long_options, NULL)) != -1) {
+        switch (opt) {
+            case 'k': key_file = optarg; break;
+            case 't':
+                timeout_ms = atoi(optarg);
+                if (timeout_ms <= 0) { fprintf(stderr, "ERROR: Invalid timeout: %s\n", optarg); return 1; }
+                break;
+            case 'h':
+                printf("Usage: %s get [OPTIONS] <hash>\n", prog_name);
+                printf("\n");
+                printf("Retrieve an immutable record from the DHT (BEP-44) by its\n");
+                printf("40-hex SHA1 content hash.\n");
+                printf("\nOptions:\n");
+                printf("  --key <path>      Key file path\n");
+                printf("  --timeout <ms>    Query timeout (default: %d)\n", DEFAULT_TIMEOUT);
+                printf("  --help            Show this help\n");
+                return 0;
+            default: return 1;
+        }
+    }
+    if (optind >= argc) {
+        fprintf(stderr, "ERROR: missing <hash>\n");
+        fprintf(stderr, "Usage: %s get <hash>\n", prog_name);
+        return 1;
+    }
+    const char *hash_str = argv[optind];
+    if (strlen(hash_str) != 40) {
+        fprintf(stderr, "ERROR: hash must be 40 hex characters (got %zu)\n", strlen(hash_str));
+        return 1;
+    }
+    unsigned char key[20];
+    if (sodium_hex2bin(key, sizeof(key), hash_str, 40, NULL, NULL, NULL) != 0) {
+        fprintf(stderr, "ERROR: invalid hex in hash\n");
+        return 1;
+    }
+
+    unsigned char self_pub[32], self_sec[64];
+    if (load_keypair(self_pub, self_sec) != 0) return 1;
+
+    norn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.version = NORN_VERSION;
+    norn_client_t *client = norn_new(self_pub, self_sec, &cfg);
+    if (!client) { fprintf(stderr, "ERROR: Failed to create DHT client\n"); return 1; }
+    if (norn_bootstrap(client) != 0) {
+        fprintf(stderr, "ERROR: DHT bootstrap failed (no network?)\n");
+        norn_free(client);
+        return 1;
+    }
+    dht_pump(client, 2000, NULL);
+
+    struct dht_get_ctx ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    if (norn_get_immutable(client, key, on_dht_value, &ctx) != 0) {
+        fprintf(stderr, "ERROR: Failed to start DHT get\n");
+        norn_free(client);
+        return 1;
+    }
+    dht_pump(client, timeout_ms, &ctx.found);
+
+    int rc;
+    if (ctx.found) {
+        fwrite(ctx.value, 1, ctx.len, stdout);
+        fputc('\n', stdout);
+        rc = 0;
+    } else {
+        fprintf(stderr, "norn: no value found for %s\n", hash_str);
+        rc = 1;
+    }
+    norn_free(client);
+    return rc;
+}
+
+/* `norn bep44 set <name> <value>` — publish a salted mutable record.
+ * The name is the BEP-44 salt (a public label, not a secret); the record is
+ * addressed by target = SHA1("k" ‖ pubkey ‖ name). One keypair, many names. */
 static int do_set(int argc, char **argv) {
     static struct option long_options[] = {
         {"key", required_argument, 0, 'k'},
         {"seq", required_argument, 0, 's'},
-        {"name", required_argument, 0, 'n'},
         {"help", no_argument, 0, 'h'},
         {0, 0, 0, 0}
     };
@@ -938,11 +1104,10 @@ static int do_set(int argc, char **argv) {
     int opt;
     int seq_given = 0;
     uint32_t seq = 0;
-    const char *name = NULL;
 
     optind = 2;
 
-    while ((opt = getopt_long(argc, argv, "+k:s:n:h", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "+k:s:h", long_options, NULL)) != -1) {
         switch (opt) {
             case 'k':
                 key_file = optarg;
@@ -951,25 +1116,21 @@ static int do_set(int argc, char **argv) {
                 seq = (uint32_t)strtoul(optarg, NULL, 10);
                 seq_given = 1;
                 break;
-            case 'n':
-                name = optarg;
-                break;
             case 'h':
-                fprintf(stdout, "Usage: %s set [OPTIONS] <value>\n", prog_name);
+                fprintf(stdout, "Usage: %s bep44 set [OPTIONS] <name> <value>\n", prog_name);
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Publish a signed mutable record to the DHT (BEP-44).\n");
-                fprintf(stdout, "The record is addressed by your public key (and the\n");
-                fprintf(stdout, "salt name if --name is given); retrieve it with\n");
-                fprintf(stdout, "`%s bep44 get <your-public-key> [--name <name>]`.\n", prog_name);
+                fprintf(stdout, "The record is named by <name> (the BEP-44 salt) and\n");
+                fprintf(stdout, "addressed by your public key; retrieve it with\n");
+                fprintf(stdout, "`%s bep44 get <your-node-id> <name>`.\n", prog_name);
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Arguments:\n");
+                fprintf(stdout, "  <name>          Record name (the salt; one keypair, many records)\n");
                 fprintf(stdout, "  <value>         Value to store (max %d bytes)\n", MAX_VALUE_SIZE);
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Options:\n");
                 fprintf(stdout, "  --key <path>    Key file path\n");
                 fprintf(stdout, "  --seq <n>       Sequence number (default: current unix time)\n");
-                fprintf(stdout, "  --name <name>   Salt/name: publish a distinct named record\n");
-                fprintf(stdout, "                  (one keypair, many records)\n");
                 fprintf(stdout, "  --help          Show this help\n");
                 return 0;
             default:
@@ -977,13 +1138,14 @@ static int do_set(int argc, char **argv) {
         }
     }
 
-    if (optind >= argc) {
-        fprintf(stderr, "ERROR: Missing value argument\n");
-        fprintf(stderr, "Usage: %s set <value>\n", prog_name);
+    if (optind + 1 >= argc) {
+        fprintf(stderr, "ERROR: missing <name> and/or <value>\n");
+        fprintf(stderr, "Usage: %s bep44 set <name> <value>\n", prog_name);
         return 1;
     }
 
-    const char *value = argv[optind];
+    const char *name = argv[optind];
+    const char *value = argv[optind + 1];
     size_t value_len = strlen(value);
     if (value_len > MAX_VALUE_SIZE) {
         fprintf(stderr, "ERROR: Value too large (%zu > %d bytes)\n", value_len, MAX_VALUE_SIZE);
@@ -1020,8 +1182,7 @@ static int do_set(int argc, char **argv) {
 
     if (norn_put_mutable_salt(client, pubkey, secret,
                               (const unsigned char *)value, value_len, seq,
-                              (const unsigned char *)name,
-                              name ? strlen(name) : 0) != 0) {
+                              (const unsigned char *)name, strlen(name)) != 0) {
         fprintf(stderr, "ERROR: DHT put failed\n");
         norn_free(client);
         return 1;
@@ -1029,15 +1190,13 @@ static int do_set(int argc, char **argv) {
     /* Give the announce time to reach the storing nodes. */
     dht_pump(client, timeout_ms, NULL);
 
-    /* recfile output: key=<hex>\n[seq=<n>\n][name=<name>\n] */
+    /* recfile output: key=<hex>\nseq=<n>\nname=<name>\n */
     char rec[160];
     int rn = 0;
     rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "key=");
     for (int i = 0; i < 32; i++)
         rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "%02x", pubkey[i]);
-    rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "\nseq=%u\n", seq);
-    if (name)
-        rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "name=%s\n", name);
+    rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "\nseq=%u\nname=%s\n", seq, name);
     print_recfile_pretty((const unsigned char *)rec, (size_t)rn);
 
     norn_free(client);
@@ -1050,8 +1209,8 @@ static int do_set(int argc, char **argv) {
 static void bep44_help(FILE *out, const char *prog) {
     fprintf(out, "Usage: %s bep44 <get|set> [ARGS...]\n", prog);
     fprintf(out, "\nSubcommands:\n"
-            "  get <pubkey> [--name <name>]  Retrieve a mutable record (salted if --name)\n"
-            "  set <value>  [--name <name>]  Publish a mutable record (salted if --name)\n");
+            "  get <node-id> <name>   Retrieve a named mutable record (by publisher node-id)\n"
+            "  set <name> <value>     Publish a named mutable record (keyed by your pubkey)\n");
 }
 
 static int do_bep44(int argc, char **argv, int sub_idx) {
@@ -1241,12 +1400,12 @@ int main(int argc, char **argv) {
     } else if (strcmp(cmd, "keygen") == 0) {
         return do_keygen(argc, argv);
     } else if (strcmp(cmd, "bep44") == 0) {
-        /* Namespaced direct-DHT verbs: norn bep44 <get|set> ... */
+        /* Namespaced direct-DHT verbs: norn bep44 <get|set> ... (mutable) */
         return do_bep44(argc, argv, optind + 1);
     } else if (strcmp(cmd, "get") == 0) {
-        return do_get(argc, argv); /* deprecated alias for `bep44 get` */
-    } else if (strcmp(cmd, "set") == 0) {
-        return do_set(argc, argv); /* deprecated alias for `bep44 set` */
+        return do_get_immutable(argc, argv); /* immutable: norn get <hash> */
+    } else if (strcmp(cmd, "put") == 0) {
+        return do_put_immutable(argc, argv); /* immutable: norn put <value> */
     } else if (strcmp(cmd, "cluster") == 0) {
         if (optind + 1 >= argc) {
             fprintf(stdout, "Usage: %s cluster <subcommand> [ARGS...]\n", prog_name);
