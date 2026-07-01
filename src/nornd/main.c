@@ -21,6 +21,7 @@
 #include "identity.h"
 #include "ipc.h"
 #include "localstore.h"
+#include "dht_persist.h"
 #include "norn.h"
 #include "norn_cluster.h"
 #include "norn_raft.h"
@@ -594,6 +595,16 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
         }
         #undef APPEND_ROW
         resp.vlen = off;
+    } else if (strcmp(req.op, "bep44-del") == 0) {
+        /* `norn bep44 del <target>`: delete a held DHT record by its 20-byte
+         * target hash. req.key = target. */
+        if (req.klen != 20) {
+            resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "key must be 20 bytes");
+        } else if (norn_dht_del(req.key) != 0) {
+            resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "not held");
+        } else {
+            resp.ok = 1;
+        }
     } else if (strcmp(req.op, "bep44-list") == 0) {
         /* `norn bep44 list`: two sections — records this node PUBLISHED (from
          * the publog) and records this node is HOLDING for the DHT (from the
@@ -602,7 +613,7 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
         resp.has_val = 1;
         size_t off = 0;
         int wn = snprintf((char *)resp.val + off, sizeof(resp.val) - off,
-            "Target\tType\tSize\tSeq\tStored\tName\tValue\tSource\n");
+            "Key\tType\tSize\tSeq\tStored\tName\tValue\tSource\n");
         if (wn > 0) off += (size_t)wn;
         /* Helper: render a value as a truncated printable string (max 60 chars,
          * non-printable → '.'). */
@@ -878,6 +889,19 @@ int main(int argc, char **argv) {
         /* DHT routing-table persistence path. */
         snprintf(dht_nodes_path, sizeof(dht_nodes_path), "%s/dht_nodes", base);
     }
+    /* DHT store + publog persistence path (nornd-only, not libnorn). */
+    char dht_persist_path[640];
+    {
+        const char *base = data_dir;
+        char homebuf[600];
+        if (!base) {
+            const char *home = getenv("HOME");
+            if (!home) home = "/tmp";
+            snprintf(homebuf, sizeof(homebuf), "%s/.config/norn", home);
+            base = homebuf;
+        }
+        snprintf(dht_persist_path, sizeof(dht_persist_path), "%s/dht_store", base);
+    }
     /* Load previously saved DHT routing-table nodes so we re-join the
      * network faster than a full re-bootstrap. Best-effort: if the file
      * doesn't exist (first start) or is corrupt, we simply start fresh. */
@@ -886,6 +910,8 @@ int main(int argc, char **argv) {
         if (loaded > 0)
             fprintf(stderr, "nornd: loaded %d cached DHT nodes\n", loaded);
     }
+    /* Restore the DHT store + publog from the last run. */
+    dht_persist_load(dht_persist_path, &serve.publog);
 
     fprintf(stderr, "nornd: serving %s (identity %s)\n",
             activated ? "socket-activated fd" : sockpath, idpath);
@@ -931,6 +957,8 @@ int main(int argc, char **argv) {
             if (now - last_dht_save >= 300) {
                 int saved = norn_save_dht_nodes(client, dht_nodes_path);
                 if (saved > 0) last_dht_save = now;
+                /* Also persist the DHT store + publog. */
+                dht_persist_save(dht_persist_path, &serve.publog);
             }
             /* Announce ourselves under our node-id info_hash so peers can
              * resolve us via get_peers(node-id) and dial for served-KV. The
@@ -977,6 +1005,7 @@ int main(int argc, char **argv) {
     /* Save routing table one final time so the most recent node set is
      * available on next start. */
     norn_save_dht_nodes(client, dht_nodes_path);
+    dht_persist_save(dht_persist_path, &serve.publog);
     norn_free(client);
     return 0;
 }

@@ -640,6 +640,47 @@ int norn_dht_list(int want_immutable, norn_dht_item_t *out, int max);
  */
 int norn_dht_get_value(const unsigned char *target, unsigned char *out, size_t cap);
 
+/**
+ * @brief Get full metadata + value of a held DHT record (for persistence)
+ *
+ * @param target       20-byte DHT key
+ * @param pubkey_out   32-byte Ed25519 pubkey (mutable; zeroed for immutable)
+ * @param seq_out      sequence number (mutable; 0 for immutable)
+ * @param val_out      value buffer
+ * @param vcap         buffer capacity
+ * @param vlen_out     actual value length
+ * @param sig_out      64-byte signature (mutable; zeroed for immutable)
+ * @param immutable_out 1 if immutable, 0 if mutable
+ * @return 1 if found, 0 if not found, -1 on error
+ */
+int norn_dht_get_full(const unsigned char *target, unsigned char *pubkey_out,
+                      uint32_t *seq_out, unsigned char *val_out, size_t vcap,
+                      size_t *vlen_out, unsigned char *sig_out, int *immutable_out);
+
+/**
+ * @brief Restore a mutable record into the local DHT store (on restart)
+ *
+ * @return 0 on success, -1 on error
+ */
+int norn_dht_restore_mutable(const unsigned char *target, const unsigned char *pubkey,
+                             uint32_t seq, const unsigned char *value, size_t vlen,
+                             const unsigned char *sig);
+
+/**
+ * @brief Restore an immutable record into the local DHT store (on restart)
+ *
+ * @return 0 on success, -1 on error
+ */
+int norn_dht_restore_immutable(const unsigned char *value, size_t vlen);
+
+/**
+ * @brief Delete a DHT record this node is holding
+ *
+ * @param target  20-byte DHT key
+ * @return 0 on success, -1 if not found / error
+ */
+int norn_dht_del(const unsigned char *target);
+
 /* === Event loop integration === */
 
 /**

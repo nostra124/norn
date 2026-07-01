@@ -531,6 +531,31 @@ int norn_dht_get_value(const unsigned char *target, unsigned char *out, size_t c
     return (int)vlen;
 }
 
+int norn_dht_get_full(const unsigned char *target, unsigned char *pubkey_out,
+                      uint32_t *seq_out, unsigned char *val_out, size_t vcap,
+                      size_t *vlen_out, unsigned char *sig_out, int *immutable_out) {
+    if (!target) return -1;
+    return dhtstore_get_ex(target, pubkey_out ? pubkey_out : (unsigned char[32]){0},
+                           seq_out, val_out, vcap, vlen_out, sig_out, immutable_out);
+}
+
+int norn_dht_restore_mutable(const unsigned char *target, const unsigned char *pubkey,
+                             uint32_t seq, const unsigned char *value, size_t vlen,
+                             const unsigned char *sig) {
+    if (!target || !pubkey || !value || !sig) return -1;
+    return dhtstore_put(target, pubkey, seq, value, vlen, sig, NULL, 0, 0);
+}
+
+int norn_dht_restore_immutable(const unsigned char *value, size_t vlen) {
+    if (!value || vlen == 0) return -1;
+    return dhtstore_put_immutable(value, vlen, 0, NULL);
+}
+
+int norn_dht_del(const unsigned char *target) {
+    if (!target) return -1;
+    return dhtstore_del(target);
+}
+
 int norn_encode_mutable(const norn_mutable_t *rec,
                          unsigned char *out, size_t outcap) {
     if (!rec || !out) return -1;

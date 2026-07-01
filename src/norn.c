@@ -1250,15 +1250,16 @@ static int do_set(int argc, char **argv) {
  * get/set handlers, which expect the verb at argv[1]; present them a shifted
  * view that drops the "bep44" token. `argv[sub_idx]` is the sub-verb. */
 static void bep44_help(FILE *out, const char *prog) {
-    fprintf(out, "Usage: %s bep44 <get|set|put|list> [ARGS...]\n", prog);
+    fprintf(out, "Usage: %s bep44 <get|set|put|list|del> [ARGS...]\n", prog);
     fprintf(out, "\nSubcommands (mutable — signed, named):\n"
             "  set <name> <value>     Publish a named mutable record (keyed by your pubkey)\n"
             "  get <node-id> <name>   Retrieve a named mutable record (by publisher node-id)\n"
             "\nSubcommands (immutable — content-addressed):\n"
             "  put <value>            Publish an immutable record; prints the content hash\n"
             "  get <hash>             Retrieve an immutable record by its 40-hex SHA1 hash\n"
-            "\nSubcommands (enumeration):\n"
-            "  list                   List DHT records this node is holding (TSV)\n");
+            "\nSubcommands (enumeration / management):\n"
+            "  list                   List DHT records (published + held) as a TSV table\n"
+            "  del <key>              Delete a held DHT record by its 40-hex key\n");
 }
 
 static int do_bep44(int argc, char **argv, int sub_idx) {
@@ -1297,6 +1298,31 @@ static int do_bep44(int argc, char **argv, int sub_idx) {
             print_tsv_pretty(buf, vlen);
             rc = 0;
         }
+    } else if (strcmp(sub, "del") == 0) {
+        /* `norn bep44 del <key>` — delete a held DHT record by 40-hex key. */
+        if (sub_idx + 1 >= argc) {
+            fprintf(stderr, "Usage: %s bep44 del <key>\n", prog_name);
+            free(view);
+            return 1;
+        }
+        const char *tgt_str = argv[sub_idx + 1];
+        if (strlen(tgt_str) != 40) {
+            fprintf(stderr, "norn bep44 del: key must be 40 hex chars\n");
+            free(view);
+            return 2;
+        }
+        unsigned char target[20];
+        if (sodium_hex2bin(target, sizeof(target), tgt_str, 40, NULL, NULL, NULL) != 0) {
+            fprintf(stderr, "norn bep44 del: bad 40-hex key\n");
+            free(view);
+            return 2;
+        }
+        unsigned char dummy[1];
+        size_t dl = 0;
+        if (ipc_round_trip_key("bep44-del", target, 20, dummy, &dl, sizeof(dummy)) != 0)
+            rc = 1;
+        else
+            rc = 0;
     } else if (strcmp(sub, "get") == 0) {
         /* Disambiguate by positional arg count: `get <node-id> <name>` (two
          * args) is mutable; `get <hash>` (one arg) is immutable. */
