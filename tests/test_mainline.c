@@ -597,20 +597,20 @@ static void test_update_node_info(void) {
     assert(mainline_add_node(&state, nid, 0x01020304, 6881) == 1);
 
     /* NULL state / id → -1 */
-    assert(mainline_update_node_info(NULL, nid, "0.12", "wyrd") == -1);
-    assert(mainline_update_node_info(&state, NULL, "0.12", "wyrd") == -1);
+    assert(mainline_update_node_info(NULL, nid, "0.12", "wyrd", NULL) == -1);
+    assert(mainline_update_node_info(&state, NULL, "0.12", "wyrd", NULL) == -1);
 
     /* unknown id → -1 */
     unsigned char unknown[20] = {0};
-    assert(mainline_update_node_info(&state, unknown, "0.12", "wyrd") == -1);
+    assert(mainline_update_node_info(&state, unknown, "0.12", "wyrd", NULL) == -1);
 
     /* set both fields */
-    assert(mainline_update_node_info(&state, nid, "0.12", "wyrd") == 0);
+    assert(mainline_update_node_info(&state, nid, "0.12", "wyrd", NULL) == 0);
     assert(strcmp(state.nodes[0].pv, "0.12") == 0);
     assert(strcmp(state.nodes[0].app, "wyrd") == 0);
 
     /* refresh with empty strings preserves previously-learned values */
-    assert(mainline_update_node_info(&state, nid, "", "") == 0);
+    assert(mainline_update_node_info(&state, nid, "", "", NULL) == 0);
     assert(state.nodes[0].pv[0] != '\0');
     assert(state.nodes[0].app[0] != '\0');
 
@@ -665,7 +665,7 @@ static void test_preferred_admission(void) {
     unsigned char pref_id[20];
     memset(pref_id, 0x11, 20);
     assert(mainline_add_node(&state, pref_id, htonl(0x01020304u), 6881) == 1);
-    assert(mainline_update_node_info(&state, pref_id, "0.12", "norn-node") == 0);
+    assert(mainline_update_node_info(&state, pref_id, "0.12", "norn-node", NULL) == 0);
     assert(state.nodes[0].is_preferred == 1);
 
     /* Fill the rest with generic nodes (distinct /24s). */
@@ -738,7 +738,7 @@ static void test_preferred_subnet_cap(void) {
         assert(mainline_add_node(&state, nid, base + htonl((uint32_t)i), 6881) == 1);
         /* mark each preferred */
         char pv[8]; snprintf(pv, sizeof(pv), "0.%d", i);
-        assert(mainline_update_node_info(&state, nid, pv, "norn-node") == 0);
+        assert(mainline_update_node_info(&state, nid, pv, "norn-node", NULL) == 0);
         assert(state.nodes[i].is_preferred == 1);
     }
     unsigned char gen[20];

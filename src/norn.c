@@ -489,6 +489,59 @@ static int ipc_round_trip_kv(const char *op, const char *key, const char *value)
     return 0;
 }
 
+/* ipc_round_trip with a binary key (for ops like peer-public that take a
+ * 20-byte node-id). Sends req.key=klen bytes; reads a binary value into val. */
+static int ipc_round_trip_key(const char *op, const unsigned char *key, size_t klen,
+                              unsigned char *val, size_t *vlen, size_t cap) {
+    char pbuf[512];
+    const char *path = nornd_socket_path(pbuf, sizeof(pbuf));
+    int fd = ipc_connect(path);
+    if (fd < 0) {
+        fprintf(stderr, "norn: cannot reach nornd at %s. Is nornd running?\n", path);
+        return -1;
+    }
+    nornd_ipc_req_t req;
+    memset(&req, 0, sizeof(req));
+    strcpy(req.op, op);
+    if (klen > sizeof(req.key)) klen = sizeof(req.key);
+    memcpy(req.key, key, klen);
+    req.klen = klen;
+    unsigned char wire[NORND_IPC_MAX_BODY + 4];
+    int wlen = nornd_ipc_encode_req(&req, wire, sizeof(wire));
+    if (wlen < 0 || write(fd, wire, (size_t)wlen) != wlen) {
+        close(fd);
+        return -1;
+    }
+    unsigned char frame[NORND_IPC_MAX_BODY + 4];
+    size_t got = 0;
+    while (got < 4) {
+        ssize_t n = read(fd, frame + got, 4 - got);
+        if (n <= 0) { close(fd); return -1; }
+        got += (size_t)n;
+    }
+    int64_t body = nornd_ipc_frame_len(frame, 4);
+    if (body < 0 || (size_t)body + 4 > sizeof(frame)) { close(fd); return -1; }
+    while (got < (size_t)body + 4) {
+        ssize_t n = read(fd, frame + got, (size_t)body + 4 - got);
+        if (n <= 0) { close(fd); return -1; }
+        got += (size_t)n;
+    }
+    close(fd);
+    nornd_ipc_resp_t resp;
+    size_t consumed = 0;
+    if (nornd_ipc_decode_resp(frame, got, &resp, &consumed) != 0) return -1;
+    if (!resp.ok) {
+        if (resp.has_err && resp.err[0])
+            fprintf(stderr, "norn: %s\n", resp.err);
+        return -1;
+    }
+    size_t n = resp.vlen;
+    if (n > cap) n = cap;
+    memcpy(val, resp.val, n);
+    *vlen = n;
+    return 0;
+}
+
 static int do_node_secret(int argc, char **argv) {
     static struct option long_opts[] = {
         {"help", no_argument, 0, 'h'},
@@ -548,6 +601,33 @@ static int do_node_public(int argc, char **argv) {
     }
     printf("%s", col_magenta());
     for (size_t i = 0; i < 32; i++) printf("%02x", val[i]);
+    printf("%s\n", col_reset());
+    return 0;
+}
+
+/* `norn peer public <node-id>` — print a peer's Ed25519 pubkey (64 hex),
+ * resolved by 40-hex DHT node-id from the local routing table (norn "pk").
+ * Only norn peers expose a pubkey; vanilla Mainline nodes don't. */
+static int do_peer_public(const char *nodeid_hex) {
+    if (!nodeid_hex || strlen(nodeid_hex) != 40) {
+        fprintf(stderr, "norn peer public: node-id must be 40 hex chars\n");
+        return 2;
+    }
+    unsigned char node_id[20];
+    if (sodium_hex2bin(node_id, sizeof(node_id), nodeid_hex, 40, NULL, NULL, NULL) != 0) {
+        fprintf(stderr, "norn peer public: bad 40-hex node-id\n");
+        return 2;
+    }
+    unsigned char pk[32];
+    size_t plen = 0;
+    if (ipc_round_trip_key("peer-public", node_id, 20, pk, &plen, sizeof(pk)) != 0)
+        return 1;
+    if (plen != 32) {
+        fprintf(stderr, "norn peer public: unexpected response length\n");
+        return 1;
+    }
+    printf("%s", col_magenta());
+    for (size_t i = 0; i < 32; i++) printf("%02x", pk[i]);
     printf("%s\n", col_reset());
     return 0;
 }
@@ -1035,6 +1115,13 @@ static int do_peer(int argc, char **argv, int optind) {
         /* Delegate to nornd_cli_peer with a dummy "get" to exercise the dial. */
         char *pv[] = {sub_argv[1], (char *)"get", (char *)""};
         return nornd_cli_peer(3, pv);
+    } else if (strcmp(sub, "public") == 0) {
+        /* `norn peer public <node-id>` — print a peer's Ed25519 pubkey. */
+        if (sub_argc < 2) {
+            fprintf(stderr, "Usage: %s peer public <node-id>\n", prog_name);
+            return 1;
+        }
+        return do_peer_public(sub_argv[1]);
     } else if (strcmp(sub, "get") == 0) {
         /* `norn peer get <node-id> <key>` — resolve the peer by 40-hex DHT node
          * id via the DHT, dial it, and fetch a served-KV value. */
@@ -1061,6 +1148,7 @@ peer_help:
     fprintf(stdout, "Usage: %s peer <subcommand> [ARGS...]\n", prog_name);
     fprintf(stdout, "\nSubcommands:\n");
     fprintf(stdout, "  list                   List known peers\n");
+    fprintf(stdout, "  public <node-id>       Print a peer's Ed25519 pubkey\n");
     fprintf(stdout, "  connect <pubkey[@h]>   Dial a remote peer\n");
     fprintf(stdout, "  get <node-id> <key>    Fetch a served-KV value from a peer\n");
     fprintf(stdout, "  cat <pubkey[@h]> <h>   Fetch a served-KV blob\n");

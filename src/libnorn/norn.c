@@ -139,7 +139,8 @@ int mainline_add_node(mainline_state_t *state, const unsigned char *id, uint32_t
  * field the caller left empty (so a refresh that omits the version info doesn't
  * wipe a previously-learned version). */
 int mainline_update_node_info(mainline_state_t *state, const unsigned char *id,
-                               const char *pv, const char *app) {
+                                const char *pv, const char *app,
+                                const unsigned char *pubkey) {
     if (!state || !id) return -1;
     for (int i = 0; i < state->node_count; i++) {
         if (memcmp(state->nodes[i].id, id, 20) != 0) continue;
@@ -150,6 +151,10 @@ int mainline_update_node_info(mainline_state_t *state, const unsigned char *id,
         if (app && app[0]) {
             strncpy(state->nodes[i].app, app, sizeof(state->nodes[i].app) - 1);
             state->nodes[i].app[sizeof(state->nodes[i].app) - 1] = '\0';
+        }
+        if (pubkey) {
+            memcpy(state->nodes[i].pubkey, pubkey, 32);
+            state->nodes[i].have_pubkey = 1;
         }
         /* Mark preferred: a norn peer (advertises pv) or a peer running our own
          * application (app == self_app). Such peers implement norn's better
@@ -472,6 +477,9 @@ int mainline_find_node(mainline_state_t *state, const unsigned char *target, uin
      * us. The BEP-5 "v" vendor field is added at the top level by mainline_tag_v. */
     if (state->have_self_pv && state->self_pv[0])
         bencode_dict_add(args, "pv", bencode_string_new(state->self_pv, strlen(state->self_pv)));
+    /* our Ed25519 pubkey (norn "pk" extension), so a queried peer learns it. */
+    if (state->have_self_pub)
+        bencode_dict_add(args, "pk", bencode_string_new((const char *)state->self_pub, 32));
     bencode_dict_add(dict, "t", bencode_string_new(tid, 4));
     bencode_dict_add(dict, "y", bencode_string_new("q", 1));
     mainline_tag_ro(state, dict); mainline_tag_v(state, dict);
@@ -1385,9 +1393,18 @@ int mainline_process_packet(mainline_state_t *state, const uint8_t *data, size_t
                 memcpy(app, vv->val.str_val.data, vv->val.str_val.len);
                 app[vv->val.str_val.len] = '\0';
             }
-            if (pv[0] || app[0])
+            /* norn "pk": the peer's 32-byte Ed25519 pubkey. Only norn peers
+             * send it; we store it so callers can resolve node-id → pubkey. */
+            unsigned char peer_pk[32];
+            const unsigned char *pk_ptr = NULL;
+            bencode_value_t *vpk = bencode_dict_get(r, "pk");
+            if (vpk && vpk->type == BENCODE_STRING && vpk->val.str_val.len == 32) {
+                memcpy(peer_pk, vpk->val.str_val.data, 32);
+                pk_ptr = peer_pk;
+            }
+            if (pv[0] || app[0] || pk_ptr)
                 mainline_update_node_info(state, (const unsigned char *)rid->val.str_val.data,
-                                          pv, app);
+                                          pv, app, pk_ptr);
         }
         
         /* BEP-42: the "ip" field is a top-level key holding our reflexive
@@ -1471,9 +1488,17 @@ int mainline_process_packet(mainline_state_t *state, const uint8_t *data, size_t
                 memcpy(app, vv->val.str_val.data, vv->val.str_val.len);
                 app[vv->val.str_val.len] = '\0';
             }
-            if (pv[0] || app[0])
+            /* norn "pk": the pinger's 32-byte Ed25519 pubkey. */
+            unsigned char peer_pk[32];
+            const unsigned char *pk_ptr = NULL;
+            bencode_value_t *vpk = bencode_dict_get(a, "pk");
+            if (vpk && vpk->type == BENCODE_STRING && vpk->val.str_val.len == 32) {
+                memcpy(peer_pk, vpk->val.str_val.data, 32);
+                pk_ptr = peer_pk;
+            }
+            if (pv[0] || app[0] || pk_ptr)
                 mainline_update_node_info(state, (const unsigned char *)qid->val.str_val.data,
-                                          pv, app);
+                                          pv, app, pk_ptr);
         }
 
         bencode_value_t *t_val = bencode_dict_get(msg, "t");
@@ -1508,6 +1533,10 @@ int mainline_process_packet(mainline_state_t *state, const uint8_t *data, size_t
             if (state->have_self_pv && state->self_pv[0])
                 bencode_dict_add(r, "pv", bencode_string_new(state->self_pv,
                                                              strlen(state->self_pv)));
+            /* our Ed25519 pubkey (norn "pk" extension), so a pinger learns it
+             * without a separate get_peers lookup. */
+            if (state->have_self_pub)
+                bencode_dict_add(r, "pk", bencode_string_new((const char *)state->self_pub, 32));
         } else if (qlen == 9 && memcmp(q, "find_node", 9) == 0) {
             bencode_value_t *t = bencode_dict_get(a, "target");
             const unsigned char *target =

@@ -487,6 +487,20 @@ int norn_routing_lookup(const norn_client_t *client, const unsigned char *node_i
     return 0;
 }
 
+int norn_routing_pubkey(const norn_client_t *client, const unsigned char *node_id,
+                        unsigned char *pubkey_out) {
+    if (!client || !node_id || !pubkey_out) return -1;
+    const struct norn_client *c = (const struct norn_client *)client;
+    for (int i = 0; i < c->ml.node_count; i++) {
+        if (memcmp(c->ml.nodes[i].id, node_id, 20) == 0) {
+            if (!c->ml.nodes[i].have_pubkey) return 0;
+            memcpy(pubkey_out, c->ml.nodes[i].pubkey, 32);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int norn_encode_mutable(const norn_mutable_t *rec,
                          unsigned char *out, size_t outcap) {
     if (!rec || !out) return -1;

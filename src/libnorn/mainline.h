@@ -25,6 +25,8 @@ typedef struct {
     char pv[8];    /* peer's norn (protocol) version, major.minor (e.g. "0.12"); "" if unknown */
     char app[24];  /* peer's application name, from BEP-5 "v" (e.g. "norn-node", "Transmission"); "" if unknown */
     int is_preferred;  /* 1 if this peer runs norn (pv set) or our own application (app==self_app) */
+    unsigned char pubkey[32];  /* peer's Ed25519 pubkey (norn "pk" extension); zeroed if unknown */
+    int have_pubkey;    /* 1 if pubkey is valid (the peer speaks norn and sent pk) */
 } mainline_node_t;
 
 typedef struct mainline_transaction_t {
@@ -95,12 +97,14 @@ void mainline_cleanup(mainline_state_t *state);
 int mainline_add_node(mainline_state_t *state, const unsigned char *id, uint32_t ip, uint16_t port);
 int mainline_get_node_count(mainline_state_t *state);
 
-/* Update the version/application metadata on a known routing-table node.
- * Called after mainline_add_node() when peer version info (from a ping/find_node
- * reply) is available. Empty strings are ignored so a refresh doesn't clobber
- * previously-learned versions. Returns 0 if the node was found, -1 otherwise. */
+/* Update the version/application/pubkey metadata on a known routing-table node.
+ * Called after mainline_add_node() when peer info (from a ping/find_node reply,
+ * or the BEP-5 "v"/norn "pk"/"pv" extensions) is available. Empty strings / NULL
+ * are ignored so a refresh doesn't clobber previously-learned values. Returns 0
+ * if the node was found, -1 otherwise. */
 int mainline_update_node_info(mainline_state_t *state, const unsigned char *id,
-                               const char *pv, const char *app);
+                                const char *pv, const char *app,
+                                const unsigned char *pubkey);
 
 /* Drop routing-table nodes not heard from in `max_age_secs` (BEP-5 marks a node
  * "questionable" after ~15 min). Keeps the table fresh and bounded; the periodic

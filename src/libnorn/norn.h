@@ -585,6 +585,24 @@ int norn_resolve_node(norn_client_t *client, const unsigned char *node_id,
 int norn_routing_lookup(const norn_client_t *client, const unsigned char *node_id,
                         uint32_t *ip_out, uint16_t *port_out);
 
+/**
+ * @brief Look up a peer's Ed25519 public key by DHT node id
+ *
+ * Returns the 32-byte Ed25519 pubkey the peer advertised (via the norn "pk"
+ * extension) during DHT contact, if it is in the local routing table and known
+ * to speak norn. Vanilla Mainline DHT nodes don't send `pk`, so this returns 0
+ * for them (the node-id is a one-way hash of the pubkey and can't be reversed).
+ *
+ * @param client   Client handle
+ * @param node_id  20-byte DHT node id
+ * @param pubkey_out  Filled with the 32-byte Ed25519 pubkey on success
+ * @return 1 if found and known, 0 if not in the table / pubkey unknown, -1 on error
+ *
+ * @note NULL-safe: returns -1 if client, node_id, or pubkey_out is NULL
+ */
+int norn_routing_pubkey(const norn_client_t *client, const unsigned char *node_id,
+                        unsigned char *pubkey_out);
+
 /* === Event loop integration === */
 
 /**
