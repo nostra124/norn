@@ -516,23 +516,34 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
         }
     } else if (strcmp(req.op, "peer-public") == 0) {
         /* `norn peer public <node-id>`: resolve a peer's Ed25519 pubkey by
-         * 40-hex DHT node id, from the local routing table (norn "pk"). */
+         * 40-hex DHT node id. Checks the local routing table (norn "pk") first;
+         * if the node-id is our own, returns our own pubkey. */
         if (req.klen != 20) {
             resp.ok = 0;
             resp.has_err = 1;
             strcpy(resp.err, "node-id must be 20 bytes");
         } else {
-            unsigned char pk[32];
-            int found = norn_routing_pubkey(ctx->client, req.key, pk);
-            if (found == 1) {
+            /* Check if this is our own node-id. */
+            unsigned char self_id[20];
+            if (norn_get_id(ctx->client, self_id) == 0 &&
+                memcmp(req.key, self_id, 20) == 0) {
                 resp.ok = 1;
                 resp.has_val = 1;
-                memcpy(resp.val, pk, 32);
+                memcpy(resp.val, ctx->kp->public_key, 32);
                 resp.vlen = 32;
             } else {
-                resp.ok = 0;
-                resp.has_err = 1;
-                strcpy(resp.err, found == 0 ? "pubkey unknown (not a norn peer)" : "lookup error");
+                unsigned char pk[32];
+                int found = norn_routing_pubkey(ctx->client, req.key, pk);
+                if (found == 1) {
+                    resp.ok = 1;
+                    resp.has_val = 1;
+                    memcpy(resp.val, pk, 32);
+                    resp.vlen = 32;
+                } else {
+                    resp.ok = 0;
+                    resp.has_err = 1;
+                    strcpy(resp.err, found == 0 ? "pubkey unknown (not a norn peer)" : "lookup error");
+                }
             }
         }
     } else if (strcmp(req.op, "node-secret") == 0) {
