@@ -514,6 +514,31 @@ static void test_external_addr(void) {
     printf("OK\n");
 }
 
+/* norn_resolve_node: NULL/arg safety. A live lookup is network-dependent and
+ * exercised by the served-KV PIT; here we only assert the error paths. */
+static void test_resolve_node_null(void) {
+    printf("  test_resolve_node_null: ");
+
+    unsigned char node_id[20] = {0};
+    uint32_t ip = 0; uint16_t port = 0; unsigned char pub[32];
+    /* NULL client */
+    assert(norn_resolve_node(NULL, node_id, &ip, &port, pub, 1000) == -1);
+    /* NULL node_id / outputs */
+    unsigned char pk[32], sk[64];
+    crypto_sign_keypair(pk, sk);
+    norn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.version = "test";
+    norn_client_t *client = norn_new(pk, sk, &cfg);
+    assert(client != NULL);
+    assert(norn_resolve_node(client, NULL, &ip, &port, pub, 1000) == -1);
+    assert(norn_resolve_node(client, node_id, NULL, &port, pub, 1000) == -1);
+    assert(norn_resolve_node(client, node_id, &ip, NULL, pub, 1000) == -1);
+    norn_free(client);
+
+    printf("OK\n");
+}
+
 int main(void) {
     if (sodium_init() < 0) {
         fprintf(stderr, "Failed to initialize libsodium\n");
@@ -550,6 +575,7 @@ int main(void) {
     test_routing_nodes();
     test_routing_nodes_null();
     test_external_addr();
+    test_resolve_node_null();
     
     printf("test_norn: OK\n");
     return 0;

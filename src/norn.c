@@ -1010,13 +1010,21 @@ static int do_peer(int argc, char **argv, int optind) {
         /* Delegate to nornd_cli_peer with a dummy "get" to exercise the dial. */
         char *pv[] = {sub_argv[1], (char *)"get", (char *)""};
         return nornd_cli_peer(3, pv);
-    } else if (strcmp(sub, "get") == 0 || strcmp(sub, "cat") == 0) {
+    } else if (strcmp(sub, "get") == 0) {
+        /* `norn peer get <node-id> <key>` — resolve the peer by 40-hex DHT node
+         * id via the DHT, dial it, and fetch a served-KV value. */
         if (sub_argc < 3) {
-            fprintf(stderr, "Usage: %s peer %s <pubkey[@host:port]> <arg>\n",
-                    prog_name, sub);
+            fprintf(stderr, "Usage: %s peer get <node-id> <key>\n", prog_name);
             return 1;
         }
-        char *pv[] = {sub_argv[1], (char *)sub, sub_argv[2]};
+        return nornd_cli_peer_get_by_nodeid(sub_argv[1], sub_argv[2]);
+    } else if (strcmp(sub, "cat") == 0) {
+        if (sub_argc < 3) {
+            fprintf(stderr, "Usage: %s peer cat <pubkey[@host:port]> <hash>\n",
+                    prog_name);
+            return 1;
+        }
+        char *pv[] = {sub_argv[1], (char *)"cat", sub_argv[2]};
         return nornd_cli_peer(3, pv);
     } else if (strcmp(sub, "--help") == 0 || strcmp(sub, "-h") == 0 || strcmp(sub, "help") == 0) {
         goto peer_help;

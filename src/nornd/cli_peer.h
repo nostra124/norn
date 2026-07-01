@@ -18,4 +18,9 @@
  * Returns 0 on success, 1 on error, 2 on usage error. */
 int nornd_cli_peer(int argc, char **argv);
 
+/* Resolve a peer by 40-hex DHT node id, dial it, and fetch a served-KV key.
+ * argv: [0]=<40-hex node-id>, [1]=<key>. Returns 0 on success, 1 on error,
+ * 2 on usage error. Socket/dial glue — excluded from unit coverage. */
+int nornd_cli_peer_get_by_nodeid(const char *nodeid_hex, const char *key);
+
 #endif /* NORND_CLI_PEER_H */

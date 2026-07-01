@@ -173,7 +173,10 @@ int norn_dial_async(norn_client_t *client,
  *
  * @param client Client handle
  * @param endpoint Direct endpoint (IP + port)
- * @param pubkey Peer's public key (for handshake)
+ * @param pubkey Peer's public key (for handshake). May be NULL for an
+ *               "unauthenticated" dial that learns the peer pubkey from the
+ *               handshake; the caller must then verify it (e.g. against a
+ *               known DHT node id via bep44_target_for_pubkey).
  * @param suite Crypto suite (NULL for default)
  * @param callback State change callback
  * @param user_data User data passed to callback

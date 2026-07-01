@@ -785,6 +785,9 @@ int main(int argc, char **argv) {
     int nclients = 0;
     int nfd = norn_get_fd(client);
     time_t last_dht_save = 0;         /* last time we persisted the routing table */
+    time_t last_announce = 0;          /* last time we announced under our node-id */
+    unsigned char self_nodeid[20];
+    int have_self_nodeid = (norn_get_id(client, self_nodeid) == 0);
 
     while (!g_stop) {
         struct pollfd pfds[2 + MAX_CLIENTS];
@@ -818,6 +821,14 @@ int main(int argc, char **argv) {
             if (now - last_dht_save >= 300) {
                 int saved = norn_save_dht_nodes(client, dht_nodes_path);
                 if (saved > 0) last_dht_save = now;
+            }
+            /* Announce ourselves under our node-id info_hash so peers can
+             * resolve us via get_peers(node-id) and dial for served-KV. The
+             * norn pk extension is published with the announce. */
+            if (have_self_nodeid && now - last_announce >= 300 &&
+                norn_routing_size(client) > 0) {
+                norn_announce(client, self_nodeid);
+                last_announce = now;
             }
         }
 

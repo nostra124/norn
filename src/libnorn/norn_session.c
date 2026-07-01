@@ -437,7 +437,11 @@ int norn_dial_direct_async(norn_client_t *client,
                            const norn_crypto_suite_t *suite,
                            norn_session_callback_t callback,
                            void *user_data) {
-    if (!client || !endpoint || !pubkey) return -1;
+    if (!client || !endpoint) return -1;
+    /* pubkey may be NULL: an "unauthenticated" dial that learns the peer's
+     * pubkey from the handshake (channel_hs_confirm extracts it). The caller
+     * is then responsible for verifying the learned pubkey (e.g. that its
+     * BEP-44 target matches a known DHT node id). */
 
     norn_session_t *session = norn_session_new(client, suite);
     if (!session) return -1;
@@ -447,7 +451,8 @@ int norn_dial_direct_async(norn_client_t *client,
      * node it expects (e.g. a cluster member) — not a throwaway key. */
     norn_session_set_identity(session, client->self_pub, client->self_sec);
     norn_session_set_signer(session, client->signer, client->signer_ud);
-    memcpy(session->peer_pubkey, pubkey, session->suite->pubkey_len);
+    if (pubkey)
+        memcpy(session->peer_pubkey, pubkey, session->suite->pubkey_len);
     
     session->peer_ip = endpoint->ip;
     session->peer_port = endpoint->port;

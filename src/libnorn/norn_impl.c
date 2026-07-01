@@ -14,6 +14,7 @@
 #include <sodium.h>
 #include <string.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
 
@@ -439,8 +440,30 @@ int norn_discover(norn_client_t *client,
     txn->peer_callback = callback;
     txn->user_data = user_data;
     
-    return mainline_lookup(&client->ml, info_hash, 0, 0,
-                          NULL, NULL, 0, NULL);
+    return 0;
+}
+
+int norn_resolve_node(norn_client_t *client, const unsigned char *node_id,
+                      uint32_t *ip_out, uint16_t *port_out,
+                      unsigned char *pubkey_out, int timeout_ms) {
+    if (!client || !client->initialized || !node_id || !ip_out || !port_out)
+        return -1;
+    return mainline_lookup_ex(&client->ml, node_id, 0, 0,
+                              ip_out, port_out, pubkey_out, timeout_ms, NULL);
+}
+
+int norn_routing_lookup(const norn_client_t *client, const unsigned char *node_id,
+                        uint32_t *ip_out, uint16_t *port_out) {
+    if (!client || !node_id || !ip_out || !port_out) return -1;
+    const struct norn_client *c = (const struct norn_client *)client;
+    for (int i = 0; i < c->ml.node_count; i++) {
+        if (memcmp(c->ml.nodes[i].id, node_id, 20) == 0) {
+            *ip_out = c->ml.nodes[i].ip;
+            *port_out = ntohs(c->ml.nodes[i].port);
+            return 1;
+        }
+    }
+    return 0;
 }
 
 int norn_encode_mutable(const norn_mutable_t *rec,

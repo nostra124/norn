@@ -10,12 +10,15 @@
 
 #include "cli_peer.h"
 
+#include "config.h"
 #include "crypto.h"
 #include "norn.h"
 #include "norn_session.h"
+#include "bep44.h"
 #include "served_proto.h"
 
 #include <arpa/inet.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -223,6 +226,164 @@ int nornd_cli_peer(int argc, char **argv) {
         clock_gettime(CLOCK_MONOTONIC, &now);
         if ((now.tv_sec - t0.tv_sec) >= 10) {
             fprintf(stderr, "norn peer: timed out\n");
+            ctx.rc = 1;
+            break;
+        }
+        usleep(2000);
+    }
+
+    norn_free(client);
+    return ctx.rc;
+}
+
+/* Resolve a peer by 40-hex DHT node id, dial it, and fetch one served-KV key.
+ *
+ * Two-tier resolve:
+ *  1. Try the local routing table (instant, no DHT query): dial the known
+ *     endpoint unauthenticated (pubkey learned from the handshake), then verify
+ *     bep44_target_for_pubkey(learned_pubkey) == node_id.
+ *  2. If the direct dial doesn't establish in time, fall back to a full DHT
+ *     get_peers lookup (norn_resolve_node) — the node may be temporarily
+ *     offline or its routing-table entry stale. The DHT path returns the
+ *     peer's published pk, so the dial is authenticated.
+ */
+int nornd_cli_peer_get_by_nodeid(const char *nodeid_hex, const char *key) {
+    if (!nodeid_hex || !key) return 2;
+    if (strlen(nodeid_hex) != 40) {
+        fprintf(stderr, "norn peer get: node-id must be 40 hex chars\n");
+        return 2;
+    }
+    unsigned char node_id[20];
+    if (sodium_hex2bin(node_id, sizeof(node_id), nodeid_hex, 40, NULL, NULL, NULL) != 0) {
+        fprintf(stderr, "norn peer get: bad 40-hex node-id\n");
+        return 2;
+    }
+    if (!key[0]) {
+        fprintf(stderr, "norn peer get: missing key\n");
+        return 2;
+    }
+
+    keypair_t kp;
+    if (load_key(&kp) != 0) return 1;
+
+    norn_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.version = "norn-node/" NORN_VERSION;
+    norn_client_t *client = norn_new(kp.public_key, kp.secret_key, &cfg);
+    if (!client) {
+        fprintf(stderr, "norn peer: failed to create client\n");
+        return 1;
+    }
+    /* Bootstrap so the routing table populates and we can fall back to DHT. */
+    if (norn_bootstrap(client) != 0) {
+        fprintf(stderr, "norn peer: DHT bootstrap failed (no network?)\n");
+        norn_free(client);
+        return 1;
+    }
+    int fd = norn_get_fd(client);
+    for (int spent = 0; spent < 2000; spent += 100) {
+        struct pollfd pfd = { .fd = fd, .events = POLLIN, .revents = 0 };
+        poll(&pfd, 1, 100);
+        norn_tick(client);
+    }
+
+    char reqline[NORND_SERVED_MAX_ARG + 8];
+    int rlen = nornd_served_encode_req(NORND_SERVED_GET, key, reqline, sizeof(reqline));
+    if (rlen < 0) {
+        fprintf(stderr, "norn peer get: bad key (oversized?)\n");
+        norn_free(client);
+        return 2;
+    }
+
+    /* ---- Tier 1: local routing-table endpoint + unauthenticated dial ---- */
+    uint32_t lip = 0; uint16_t lport = 0;
+    int have_local = norn_routing_lookup(client, node_id, &lip, &lport);
+    if (have_local == 1) {
+        node_ctx_t ctx;
+        memset(&ctx, 0, sizeof(ctx));
+        ctx.rc = 1;
+        ctx.reqline = (const unsigned char *)reqline;
+        ctx.reqlen = (size_t)rlen;
+        norn_direct_endpoint_t ep;
+        memset(&ep, 0, sizeof(ep));
+        ep.ip = lip;
+        ep.port = htons(lport);
+        /* Unauthenticated dial (pubkey=NULL); the handshake presents the peer
+         * pubkey, which we verify hashes to the requested node id. */
+        int dialed = norn_dial_direct_async(client, &ep, NULL, NULL, on_session, &ctx);
+        if (dialed == 0) {
+            struct timespec t0;
+            clock_gettime(CLOCK_MONOTONIC, &t0);
+            while (!ctx.done) {
+                norn_tick(client);
+                pump_rx(&ctx);
+                struct timespec now;
+                clock_gettime(CLOCK_MONOTONIC, &now);
+                if ((now.tv_sec - t0.tv_sec) >= 8) {
+                    ctx.rc = 1;     /* direct dial timed out — fall back to DHT */
+                    break;
+                }
+                usleep(2000);
+            }
+            /* Verify the learned peer pubkey hashes to the requested node id.
+             * If it doesn't match, the endpoint didn't own that node id. */
+            if (ctx.rc == 0 && ctx.stream) {
+                unsigned char got_pub[32];
+                norn_session_t *sess = norn_stream_session(ctx.stream);
+                if (sess && norn_session_get_peer(sess, got_pub) == 0) {
+                    unsigned char derived[20];
+                    bep44_target_for_pubkey(derived, got_pub);
+                    if (memcmp(derived, node_id, 20) != 0) {
+                        fprintf(stderr, "norn peer get: node-id mismatch (wrong peer)\n");
+                        ctx.rc = 1;
+                    }
+                }
+            }
+            if (ctx.rc == 0) {
+                norn_free(client);
+                return 0;   /* served-KV GET succeeded via the local route */
+            }
+        }
+        /* dial failed or timed out — fall through to the DHT path. */
+    }
+
+    /* ---- Tier 2: full DHT get_peers lookup (authenticated) ---- */
+    uint32_t ip = 0;
+    uint16_t port = 0;
+    unsigned char peer_pub[32];
+    int found = norn_resolve_node(client, node_id, &ip, &port, peer_pub, 10000);
+    if (found != 1) {
+        fprintf(stderr, "norn peer get: could not resolve node %s (not announced?)\n",
+                nodeid_hex);
+        norn_free(client);
+        return 1;
+    }
+
+    node_ctx_t ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.rc = 1;
+    ctx.reqline = (const unsigned char *)reqline;
+    ctx.reqlen = (size_t)rlen;
+    norn_direct_endpoint_t ep;
+    memset(&ep, 0, sizeof(ep));
+    ep.ip = ip;
+    ep.port = htons(port);
+    int dialed = norn_dial_direct_async(client, &ep, peer_pub, NULL, on_session, &ctx);
+    if (dialed != 0) {
+        fprintf(stderr, "norn peer get: dial failed\n");
+        norn_free(client);
+        return 1;
+    }
+
+    struct timespec t0;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    while (!ctx.done) {
+        norn_tick(client);
+        pump_rx(&ctx);
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        if ((now.tv_sec - t0.tv_sec) >= 15) {
+            fprintf(stderr, "norn peer get: timed out\n");
             ctx.rc = 1;
             break;
         }

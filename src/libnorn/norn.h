@@ -496,6 +496,48 @@ int norn_discover(norn_client_t *client,
                   const unsigned char *info_hash,
                   norn_peer_callback_t callback, void *user_data);
 
+/**
+ * @brief Resolve a node's endpoint and Ed25519 pubkey by DHT node id
+ *
+ * Performs a get_peers lookup on info_hash = node_id (norn nodes announce
+ * under their node id). On success, fills *ip_out, *port_out, and — if the
+ * peer published the norn `pk` extension — *pubkey_out (32 bytes). The pubkey
+ * is needed to dial an authenticated norn session.
+ *
+ * @param client   Client handle
+ * @param node_id  20-byte DHT node id to resolve
+ * @param ip_out       Filled with the peer IP (network byte order) on success
+ * @param port_out     Filled with the peer port (host byte order) on success
+ * @param pubkey_out   Filled with the 32-byte Ed25519 pubkey on success (may be
+ *                     left untouched if the peer didn't publish one)
+ * @param timeout_ms   Lookup timeout
+ * @return 1 if found, 0 if not found, -1 on error
+ *
+ * @note NULL-safe: returns -1 if client or node_id is NULL
+ */
+int norn_resolve_node(norn_client_t *client, const unsigned char *node_id,
+                      uint32_t *ip_out, uint16_t *port_out,
+                      unsigned char *pubkey_out, int timeout_ms);
+
+/**
+ * @brief Look up a node's endpoint in the local DHT routing table
+ *
+ * Returns the ip/port the routing table holds for `node_id`, without any
+ * network round-trip. Used to dial a known peer directly (e.g. for served-KV):
+ * the caller dials the endpoint, learns the peer's Ed25519 pubkey from the
+ * session handshake, and verifies `bep44_target_for_pubkey(pubkey) == node_id`.
+ *
+ * @param client  Client handle
+ * @param node_id 20-byte DHT node id
+ * @param ip_out    Filled with the peer IP (network byte order) if found
+ * @param port_out  Filled with the peer port (host byte order) if found
+ * @return 1 if found in the local routing table, 0 if not, -1 on error
+ *
+ * @note NULL-safe: returns -1 if client, node_id, ip_out, or port_out is NULL
+ */
+int norn_routing_lookup(const norn_client_t *client, const unsigned char *node_id,
+                        uint32_t *ip_out, uint16_t *port_out);
+
 /* === Event loop integration === */
 
 /**
