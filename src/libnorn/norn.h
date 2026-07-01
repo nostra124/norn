@@ -658,6 +658,49 @@ int norn_dht_get_full(const unsigned char *target, unsigned char *pubkey_out,
                       size_t *vlen_out, unsigned char *sig_out, int *immutable_out);
 
 /**
+ * @brief Actively fetch a mutable BEP-44 record from the DHT network
+ *
+ * Performs an iterative DHT walk toward the target, querying nodes for
+ * the BEP-44 `get` response. Blocks for up to timeout_ms (synchronous).
+ *
+ * @param client     Initialized norn client
+ * @param target     20-byte salted target (SHA1(pubkey ‖ salt))
+ * @param pubkey     32-byte Ed25519 public key for signature verification
+ * @param salt       Salt string (may be NULL if unsalted)
+ * @param saltlen    Salt length
+ * @param value_out  Buffer for the retrieved value
+ * @param vlen_out   Set to actual value length on success
+ * @param vcap       Capacity of value_out
+ * @param timeout_ms Max milliseconds to wait (15000 recommended)
+ * @return 1 if found, 0 if not found, -1 on error
+ */
+int norn_dht_get_mutable(norn_client_t *client,
+                          const unsigned char *target,
+                          const unsigned char *pubkey,
+                          const unsigned char *salt, size_t saltlen,
+                          unsigned char *value_out, size_t *vlen_out, size_t vcap,
+                          int timeout_ms);
+
+/**
+ * @brief Actively fetch an immutable BEP-44 record from the DHT network
+ *
+ * Performs an iterative DHT walk toward the content-addressed key.
+ * Blocks for up to timeout_ms (synchronous).
+ *
+ * @param client     Initialized norn client
+ * @param key        20-byte SHA1 of the value
+ * @param value_out  Buffer for the retrieved value
+ * @param vlen_out   Set to actual value length on success
+ * @param vcap       Capacity of value_out
+ * @param timeout_ms Max milliseconds to wait (15000 recommended)
+ * @return 1 if found, 0 if not found, -1 on error
+ */
+int norn_dht_get_immutable(norn_client_t *client,
+                            const unsigned char *key,
+                            unsigned char *value_out, size_t *vlen_out, size_t vcap,
+                            int timeout_ms);
+
+/**
  * @brief Restore a mutable record into the local DHT store (on restart)
  *
  * @return 0 on success, -1 on error
@@ -840,6 +883,17 @@ int norn_routing_size(const norn_client_t *client);
  */
 int norn_routing_nodes(const norn_client_t *client, norn_routing_node_t *out,
                        int cap);
+
+/**
+ * @brief Refresh the DHT routing table by querying known nodes
+ *
+ * Sends find_node queries to routing-table entries, keeping the table
+ * fresh and populating app/pv metadata for Bonjour-discovered peers.
+ * Called periodically by the daemon.
+ *
+ * @param client Client handle
+ */
+void norn_crawl(norn_client_t *client);
 
 /* === DHT state persistence === */
 

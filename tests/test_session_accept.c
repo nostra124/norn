@@ -66,14 +66,19 @@ int main(void) {
     assert(crypto_keypair_new(&ks) == 0);
     assert(crypto_keypair_new(&kc) == 0);
 
-    norn_config_t cfg;
-    memset(&cfg, 0, sizeof(cfg));
-    cfg.version = "test/accept";
-    norn_client_t *srv = norn_new(ks.public_key, ks.secret_key, &cfg);
-    norn_client_t *cli = norn_new(kc.public_key, kc.secret_key, &cfg);
+    norn_config_t scfg, ccfg;
+    memset(&scfg, 0, sizeof(scfg));
+    memset(&ccfg, 0, sizeof(ccfg));
+    scfg.version = "test/accept";
+    scfg.local_port = 45077;
+    ccfg.version = "test/accept";
+    norn_client_t *srv = norn_new(ks.public_key, ks.secret_key, &scfg);
+    norn_client_t *cli = norn_new(kc.public_key, kc.secret_key, &ccfg);
     assert(srv && cli);
 
-    /* Server listens; client dials it directly by its real pubkey. */
+    /* Server listens; client dials it directly by its real pubkey.
+     * The DHT socket is already bound to 45077 via scfg.local_port, so
+     * norn_listen_async just stores the accept callback on the shared fd. */
     uint16_t port = htons(45077);
     assert(norn_listen_async(srv, port, NULL, on_accept, NULL) == 0);
 

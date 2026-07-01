@@ -4,6 +4,10 @@
 #include "norn_internal.h"
 #include "mainline.h"
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #ifdef HAVE_AVAHI
 #include <avahi-client/client.h>
 #include <avahi-client/publish.h>
@@ -12,17 +16,25 @@
 #include <avahi-common/strlst.h>
 #include <avahi-common/malloc.h>
 #include <avahi-common/error.h>
+#include <sodium.h>
 #include <stdio.h>
+#include <arpa/inet.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "sha1.h"
+
 #define NORN_SERVICE_TYPE "_norn._udp"
-#define NORN_SERVICE_NAME "norn node"
+/* Service name includes short pubkey suffix to disambiguate multiple daemons
+ * on the same host (e.g. system + user). Only applies to announcement; browse
+ * is by type alone so the callback catches all regardless of name. */
+#define NORN_SERVICE_NAME_PFX "norn-"
 
 struct norn_bonjour {
     struct norn_client *client;
     uint16_t port;
     unsigned char pubkey[32];
+    char name[44]; /* "norn-" + 8 hex chars + NUL */
 
     AvahiThreadedPoll *threaded_poll;
     AvahiClient *avahi_client;
@@ -45,12 +57,12 @@ static void resolve_callback(AvahiServiceResolver *r,
                              AvahiStringList *txt,
                              AvahiLookupResultFlags flags,
                              void *userdata) {
+    (void)interface;
     (void)protocol;
     (void)name;
     (void)type;
     (void)domain;
     (void)host_name;
-    (void)txt;
     (void)flags;
 
     norn_bonjour_t *bj = userdata;
@@ -60,7 +72,35 @@ static void resolve_callback(AvahiServiceResolver *r,
             ip = address->data.ipv4.address;
         }
         if (ip != 0 && port != 0) {
-            mainline_add_bootstrap(&bj->client->ml, ip, port);
+                /* Try to extract pubkey from TXT record (key=<64-hex>) for a
+             * full routing-table entry. Fall back to bootstrap-only if
+             * the TXT record is absent (older version). */
+            unsigned char pubkey[32];
+            int got_key = 0;
+            for (AvahiStringList *e = txt; e; e = e->next) {
+                if (e->size >= 5 && memcmp(e->text, "key=", 4) == 0) {
+                    size_t vlen = e->size - 4;
+                    if (vlen == 64 &&
+                        sodium_hex2bin(pubkey, sizeof(pubkey),
+                                       (const char *)e->text + 4, 64,
+                                       NULL, NULL, NULL) == 0) {
+                        got_key = 1;
+                    }
+                    break;
+                }
+            }
+            if (got_key) {
+                unsigned char node_id[20];
+                unsigned char tmp[33];
+                tmp[0] = 'k';
+                memcpy(tmp + 1, pubkey, 32);
+                sha1(tmp, 33, node_id);
+                int r = mainline_add_node(&bj->client->ml, node_id, ip, htons(port));
+                if (r >= 0)
+                    mainline_update_node_info(&bj->client->ml, node_id, NULL, NULL, pubkey);
+            } else {
+                mainline_add_bootstrap(&bj->client->ml, ip, port);
+            }
         }
     }
     if (r) avahi_service_resolver_free(r);
@@ -86,9 +126,9 @@ static void browse_callback(AvahiServiceBrowser *b,
     switch (event) {
     case AVAHI_BROWSER_NEW:
         avahi_service_resolver_new(bj->avahi_client, interface, protocol,
-                                   name, type, domain,
-                                   AVAHI_PROTO_UNSPEC, (AvahiLookupFlags)0,
-                                   resolve_callback, bj);
+                                    name, type, domain,
+                                    AVAHI_PROTO_UNSPEC, (AvahiLookupFlags)0,
+                                    resolve_callback, bj);
         break;
     case AVAHI_BROWSER_REMOVE:
     case AVAHI_BROWSER_CACHE_EXHAUSTED:
@@ -120,13 +160,18 @@ static void client_callback(AvahiClient *c,
             bj->entry_group = avahi_entry_group_new(c, entry_group_callback, bj);
         }
         if (bj->entry_group) {
+            char keytxt[72];
+            snprintf(keytxt, sizeof(keytxt), "key=");
+            for (int bi = 0; bi < 32; bi++)
+                snprintf(keytxt + 4 + bi * 2, 3, "%02x", bj->pubkey[bi]);
             AvahiStringList *txt = avahi_string_list_new(
                 "proto=norn-dht",
+                keytxt,
                 NULL);
-            avahi_entry_group_add_service(
+            avahi_entry_group_add_service_strlst(
                 bj->entry_group,
                 AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, (AvahiPublishFlags)0,
-                NORN_SERVICE_NAME, NORN_SERVICE_TYPE, NULL, NULL,
+                bj->name, NORN_SERVICE_TYPE, NULL, NULL,
                 bj->port, txt);
             avahi_entry_group_commit(bj->entry_group);
             avahi_string_list_free(txt);
@@ -164,7 +209,13 @@ norn_bonjour_t *norn_bonjour_new(struct norn_client *client,
 
     bj->client = client;
     bj->port = port;
-    if (pubkey) memcpy(bj->pubkey, pubkey, 32);
+    if (pubkey) {
+        memcpy(bj->pubkey, pubkey, 32);
+        snprintf(bj->name, sizeof(bj->name), NORN_SERVICE_NAME_PFX "%02x%02x%02x%02x",
+                 pubkey[0], pubkey[1], pubkey[2], pubkey[3]);
+    } else {
+        snprintf(bj->name, sizeof(bj->name), NORN_SERVICE_NAME_PFX "00000000");
+    }
 
     bj->threaded_poll = avahi_threaded_poll_new();
     if (!bj->threaded_poll) {

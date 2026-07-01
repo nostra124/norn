@@ -6,9 +6,8 @@ PartOf=nornd.service
 [Socket]
 # The norn CLI connects here; the daemon is socket-activated on first use.
 ListenStream=/run/nornd/nornd.sock
-SocketMode=0660
+SocketMode=0600
 SocketUser=norn
-SocketGroup=norn
 RuntimeDirectory=nornd
 RuntimeDirectoryMode=0755
 

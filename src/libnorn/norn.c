@@ -161,6 +161,7 @@ int mainline_update_node_info(mainline_state_t *state, const unsigned char *id,
          * functionality and are retained over generic mainline nodes. */
         int pref = 0;
         if (state->nodes[i].pv[0]) pref = 1;
+        if (state->nodes[i].have_pubkey) pref = 1;
         if (state->self_app[0] && state->nodes[i].app[0] &&
             strcmp(state->nodes[i].app, state->self_app) == 0) pref = 1;
         state->nodes[i].is_preferred = pref;
@@ -353,11 +354,11 @@ void mainline_crawl_network(mainline_state_t *state) {
 
     for (int i = 0; i < state->node_count && queries_sent < max_queries; i++) {
         if (state->nodes[i].ip != 0 && state->nodes[i].port != 0) {
-            mainline_find_node(state, state->self_id, state->nodes[i].ip, state->nodes[i].port);
+            mainline_find_node(state, state->self_id, state->nodes[i].ip, ntohs(state->nodes[i].port));
             if (to < sizeof(targets) - 32)
                 to += snprintf(targets + to, sizeof(targets) - to, "%s%s:%u",
                                to ? ", " : "", net_ip_to_str(state->nodes[i].ip),
-                               state->nodes[i].port);
+                               ntohs(state->nodes[i].port));
             queries_sent++;
         }
     }
@@ -422,8 +423,9 @@ int mainline_bootstrap(mainline_state_t *state) {
 
     /* Local bootstrap: try the system nornd on 127.0.0.1:6881 first so
      * user-mode instances discover the local daemon immediately. Harmless
-     * self-query when the daemon itself is on that port. */
-    {
+     * self-query when the daemon itself is on that port. Skip in private
+     * overlay mode (fleet-only bootstrapping). */
+    if (!state->private_mode) {
         uint32_t local_ip = htonl(0x7F000001); /* 127.0.0.1 */
         mainline_find_node(state, state->self_id, local_ip, 6881);
     }
@@ -674,7 +676,7 @@ int mainline_lookup_ex(mainline_state_t *state, const unsigned char *info_hash,
     if (!cand) return -1;
     int count = 0;
     for (int i = 0; i < state->node_count; i++) {
-        look_insert(cand, &count, state, info_hash, state->nodes[i].id, state->nodes[i].ip, state->nodes[i].port);
+        look_insert(cand, &count, state, info_hash, state->nodes[i].id, state->nodes[i].ip, ntohs(state->nodes[i].port));
     }
     if (count == 0) {
         if (logf) logf("dht lookup: routing table empty, cannot search");
@@ -895,7 +897,7 @@ int mainline_lookup_mutable(mainline_state_t *state, const unsigned char *target
     if (!cand) return -1;
     int count = 0;
     for (int i = 0; i < state->node_count; i++)
-        look_insert(cand, &count, state, target, state->nodes[i].id, state->nodes[i].ip, state->nodes[i].port);
+        look_insert(cand, &count, state, target, state->nodes[i].id, state->nodes[i].ip, ntohs(state->nodes[i].port));
     if (count == 0) { free(cand); return 0; }
 
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -1072,7 +1074,7 @@ int mainline_resolve_node(mainline_state_t *state, const unsigned char *node_id,
     if (!cand) return 0;
     int count = 0;
     for (int i = 0; i < state->node_count; i++)
-        look_insert(cand, &count, state, node_id, state->nodes[i].id, state->nodes[i].ip, state->nodes[i].port);
+        look_insert(cand, &count, state, node_id, state->nodes[i].id, state->nodes[i].ip, ntohs(state->nodes[i].port));
     if (count == 0) { free(cand); return 0; }
 
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -1310,8 +1312,7 @@ static char *serve_compact_closest(mainline_state_t *s, const unsigned char *tar
         char *p = buf + a * 26;
         memcpy(p, s->nodes[idx[a]].id, 20);
         memcpy(p + 20, &s->nodes[idx[a]].ip, 4);
-        uint16_t pt = htons(s->nodes[idx[a]].port);
-        memcpy(p + 24, &pt, 2);
+        memcpy(p + 24, &s->nodes[idx[a]].port, 2);  /* port already in network byte order */
     }
     free(idx);
     *out_len = (size_t)max * 26;
@@ -1364,10 +1365,12 @@ int mainline_process_packet(mainline_state_t *state, const uint8_t *data, size_t
         }
 
         /* Learn the responder itself (it answered us, so it's alive) — unless it
-         * is read-only (BEP-43). */
+         * is read-only (BEP-43). from_port arrives in host byte order from
+         * net_recv (which applies ntohs), but mainline_add_node expects network
+         * byte order. */
         bencode_value_t *rid = bencode_dict_get(r, "id");
         if (!incoming_ro && rid && rid->type == BENCODE_STRING && rid->val.str_val.len >= 20) {
-            mainline_add_node(state, (const unsigned char *)rid->val.str_val.data, from_ip, from_port);
+            mainline_add_node(state, (const unsigned char *)rid->val.str_val.data, from_ip, htons(from_port));
             /* Learn the responder's protocol/application version if it tags the
              * reply with pv/app. Empty strings are ignored by the helper so
              * a refresh without these fields keeps any previously-learned value. */
@@ -1428,8 +1431,7 @@ int mainline_process_packet(mainline_state_t *state, const uint8_t *data, size_t
                 memcpy(node_id, nodes->val.str_val.data + i, 20);
                 uint32_t node_ip;
                 memcpy(&node_ip, nodes->val.str_val.data + i + 20, 4);
-                uint16_t np_be; memcpy(&np_be, nodes->val.str_val.data + i + 24, 2);  /* BUG-116: unaligned → SIGBUS on ARM */
-                uint16_t node_port = ntohs(np_be);
+                uint16_t node_port; memcpy(&node_port, nodes->val.str_val.data + i + 24, 2);  /* BUG-116: unaligned → SIGBUS on ARM */
                 
                 parsed_count++;
                 int result = mainline_add_node(state, node_id, node_ip, node_port);
@@ -1462,10 +1464,11 @@ int mainline_process_packet(mainline_state_t *state, const uint8_t *data, size_t
         }
 
         /* Learn the querier (it contacted us) — essential for the overlay to
-         * form — unless it is read-only (BEP-43). */
+         * form — unless it is read-only (BEP-43). from_port is host byte order
+         * from net_recv, but mainline_add_node expects network byte order. */
         bencode_value_t *qid = bencode_dict_get(a, "id");
         if (!incoming_ro && qid && qid->type == BENCODE_STRING && qid->val.str_val.len >= 20) {
-            mainline_add_node(state, (const unsigned char *)qid->val.str_val.data, from_ip, from_port);
+            mainline_add_node(state, (const unsigned char *)qid->val.str_val.data, from_ip, htons(from_port));
             /* Learn the pinger's norn protocol version (pv) and application.
              * The application comes from the BEP-5 "v" vendor field (top level)
              * or our norn-specific "app" in the args. */

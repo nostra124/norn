@@ -117,4 +117,11 @@ int norn_session_send_pending(norn_session_t *session);
 /* Internal - check handshake timeout (called from norn_tick) */
 int norn_session_check_timeout(norn_session_t *session, uint32_t now_ms);
 
+/* Internal - dispatch a UDP datagram to session accept/route. Called from
+ * norn_tick's dispatch_response when the DHT and session sockets are unified.
+ * Returns 0 if the packet was handled (matched an existing session or was a
+ * valid INIT), -1 otherwise (so the caller can fall through to DHT). */
+int norn_session_dispatch_udp(norn_client_t *client, const unsigned char *buf,
+                                size_t len, uint32_t ip, uint16_t port);
+
 #endif /* NORN_SESSION_INTERNAL_H */

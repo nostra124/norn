@@ -4,6 +4,7 @@
 #include "config.h"
 #include "norn.h"
 #include "norn_internal.h"
+#include "norn_session_internal.h"
 #include "norn_transaction.h"
 #include "norn_rendezvous.h"
 #include "norn_nat.h"
@@ -44,8 +45,9 @@ norn_client_t *norn_new(const unsigned char *self_pub,
     unsigned char node_id[20];
     bep44_target_for_pubkey(node_id, self_pub);
     
-    /* Initialize network */
-    if (net_init(&client->net, 0) != 0) {
+    /* Initialize network: use configured local port (0 = kernel-assigned). */
+    uint16_t net_port = (cfg && cfg->local_port) ? cfg->local_port : 0;
+    if (net_init(&client->net, net_port) != 0) {
         free(client);
         return NULL;
     }
@@ -253,6 +255,12 @@ int norn_routing_size(const norn_client_t *client) {
      * mainline_get_node_count doesn't modify the state, so the const cast is safe. */
     const struct norn_client *c = (const struct norn_client *)client;
     return mainline_get_node_count((mainline_state_t *)&c->ml);
+}
+
+void norn_crawl(norn_client_t *client) {
+    if (!client) return;
+    struct norn_client *c = (struct norn_client *)client;
+    mainline_crawl_network(&c->ml);
 }
 
 int norn_routing_nodes(const norn_client_t *client, norn_routing_node_t *out,
@@ -556,6 +564,32 @@ int norn_dht_del(const unsigned char *target) {
     return dhtstore_del(target);
 }
 
+int norn_dht_get_mutable(norn_client_t *client,
+                          const unsigned char *target,
+                          const unsigned char *pubkey,
+                          const unsigned char *salt, size_t saltlen,
+                          unsigned char *value_out, size_t *vlen_out, size_t vcap,
+                          int timeout_ms) {
+    if (!client || !client->initialized || !target || !pubkey || !value_out || !vlen_out) return -1;
+    if (vcap == 0) return -1;
+    return mainline_lookup_mutable(&client->ml, target, 0, pubkey, 0,
+                                    NULL, 0, NULL, salt, saltlen, 0,
+                                    value_out, vlen_out, vcap,
+                                    timeout_ms, NULL);
+}
+
+int norn_dht_get_immutable(norn_client_t *client,
+                            const unsigned char *key,
+                            unsigned char *value_out, size_t *vlen_out, size_t vcap,
+                            int timeout_ms) {
+    if (!client || !client->initialized || !key || !value_out || !vlen_out) return -1;
+    if (vcap == 0) return -1;
+    return mainline_lookup_mutable(&client->ml, key, 0, NULL, 0,
+                                    NULL, 0, NULL, NULL, 0, 1,
+                                    value_out, vlen_out, vcap,
+                                    timeout_ms, NULL);
+}
+
 int norn_encode_mutable(const norn_mutable_t *rec,
                          unsigned char *out, size_t outcap) {
     if (!rec || !out) return -1;
@@ -594,6 +628,12 @@ static void dispatch_response(norn_client_t *client,
                               const uint8_t *data, size_t len,
                               uint32_t from_ip, uint16_t from_port) {
     if (len < 1) return;
+    
+    /* Try the session layer first: this matches packets from known session
+     * peers (established encrypted traffic) and new INIT packets ("DHCH").
+     * Returns 0 if handled, -1 to fall through to DHT/binary-protocol. */
+    if (norn_session_dispatch_udp(client, data, len, from_ip, htons(from_port)) == 0)
+        return;
     
     /* Route binary protocol messages */
     if (data[0] >= 0x10 && data[0] <= 0x2F) {

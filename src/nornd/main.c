@@ -389,7 +389,7 @@ typedef struct {
     const keypair_t *kp;
     norn_client_t *client;
     time_t start_time;
-    uint16_t listen_port;   /* the DHT UDP port we listen on (for the self row) */
+    uint16_t listen_port;   /* the DHT UDP port we listen on */
     localstore_t *lstore;    /* `norn node set` keys (the served local store) */
     publog_t *publog;        /* `norn bep44 set/put` publish log */
     pubqueue_t *pubqueue;    /* queued DHT publishes (drained async by the main loop) */
@@ -627,15 +627,14 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
     } else if (strcmp(req.op, "peer-list") == 0) {
         /* Render the DHT routing table as TSV: a header line, then one row
          * per node (Node-Id, IP, Port, Age, Norn-Version, Application,
-         * App-Version). The local nornd is emitted as the first data row so
-         * the node sees itself. Application/App-Version come from the BEP-5
-         * "v" vendor field (split on the first space: name, then version);
+         * App-Version). Application/App-Version come from the BEP-5 "v"
+         * vendor field (split on the first space: name, then version);
          * "mainline" is the fallback when a peer advertises nothing. Output
          * is capped to resp.val capacity; nodes that don't fit are omitted. */
         resp.ok = 1;
         resp.has_val = 1;
-        norn_routing_node_t nodes[64];
-        int n = norn_routing_nodes(ctx->client, nodes, 64);
+        norn_routing_node_t nodes[256];
+        int n = norn_routing_nodes(ctx->client, nodes, 256);
         if (n < 0) n = 0;
         time_t now = time(NULL);
         size_t off = 0;
@@ -677,36 +676,6 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
                 if ((size_t)wn >= sizeof(resp.val) - off) break; \
                 off += (size_t)wn; \
             } while (0)
-
-        /* Self row: the local nornd. The application version is the full
-         * norn version (NORN_VERSION), since the user-agent is "norn-node/<v>". */
-        unsigned char self_id[20];
-        if (norn_get_id(ctx->client, self_id) == 0) {
-            char idhex[41];
-            for (int b = 0; b < 20; b++) snprintf(idhex + b * 2, 3, "%02x", self_id[b]);
-            uint32_t extip = 0; uint16_t extport = 0; int have_ext = 0;
-            norn_external_addr(ctx->client, &extip, &extport, &have_ext);
-            char ipbuf[INET_ADDRSTRLEN] = "0.0.0.0";
-            if (have_ext) {
-                struct in_addr a; a.s_addr = extip;
-                inet_ntop(AF_INET, &a, ipbuf, sizeof(ipbuf));
-            }
-            char self_pv[8] = {0};
-            /* self_pv = major.minor of NORN_VERSION (e.g. "0.12" from "0.12.1"). */
-            {
-                const char *pv = NORN_VERSION;
-                const char *d1 = strchr(pv, '.');
-                const char *end = d1 ? strchr(d1 + 1, '.') : NULL;
-                size_t l = end ? (size_t)(end - pv) : strlen(pv);
-                if (l >= sizeof(self_pv)) l = sizeof(self_pv) - 1;
-                memcpy(self_pv, pv, l); self_pv[l] = '\0';
-            }
-            /* norn-node/<NORN_VERSION> so the macro's '/'-split yields the
-             * full version as App-Version. */
-            char self_app[40];
-            snprintf(self_app, sizeof(self_app), "norn-node/%s", NORN_VERSION);
-            APPEND_ROW(idhex, ipbuf, ctx->listen_port, 0, self_pv, self_app);
-        }
 
         for (int i = 0; i < n && off + 1 < sizeof(resp.val); i++) {
             char ipbuf[INET_ADDRSTRLEN];
@@ -780,9 +749,23 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
                     }
                 }
                 if (!found) {
-                    resp.ok = 0;
-                    resp.has_err = 1;
-                    strcpy(resp.err, "not found locally (DHT lookup not yet supported via IPC)");
+                    int dht_ret = norn_dht_get_mutable(ctx->client, target, pk,
+                                                        req.val, req.vlen,
+                                                        resp.val, &resp.vlen, sizeof(resp.val),
+                                                        15000);
+                    if (dht_ret > 0) {
+                        resp.ok = 1;
+                        resp.has_val = 1;
+                        found = 1;
+                    } else if (dht_ret == 0) {
+                        resp.ok = 0;
+                        resp.has_err = 1;
+                        strcpy(resp.err, "not found (local or DHT)");
+                    } else {
+                        resp.ok = 0;
+                        resp.has_err = 1;
+                        strcpy(resp.err, "DHT lookup error");
+                    }
                 }
             }
         }
@@ -820,8 +803,19 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
                 }
             }
             if (!found) {
-                resp.ok = 0; resp.has_err = 1;
-                strcpy(resp.err, "not found locally");
+                int dht_ret = norn_dht_get_immutable(ctx->client, req.key,
+                                                      resp.val, &resp.vlen, sizeof(resp.val),
+                                                      15000);
+                if (dht_ret > 0) {
+                    resp.ok = 1;
+                    resp.has_val = 1;
+                } else if (dht_ret == 0) {
+                    resp.ok = 0; resp.has_err = 1;
+                    strcpy(resp.err, "not found (local or DHT)");
+                } else {
+                    resp.ok = 0; resp.has_err = 1;
+                    strcpy(resp.err, "DHT lookup error");
+                }
             }
         }
     } else if (strcmp(req.op, "bep44-del") == 0) {
@@ -1047,6 +1041,7 @@ int main(int argc, char **argv) {
     norn_config_t ncfg;
     memset(&ncfg, 0, sizeof(ncfg));
     ncfg.version = "nornd/0.12";
+    ncfg.local_port = listen_port;
     norn_client_t *client = norn_new(kp.public_key, kp.secret_key, &ncfg);
     if (!client) {
         fprintf(stderr, "nornd: failed to create norn client\n");
@@ -1054,6 +1049,27 @@ int main(int argc, char **argv) {
     }
     /* Route handshake signing through ssh-agent when so configured. */
     if (use_agent) norn_set_signer(client, agent_sign_cb, &agentsig);
+
+    /* Load DHT routing-table cache BEFORE staring transport/Bonjour, so cached
+     * node entries are in-place before Bonjour resolves them — otherwise cache
+     * would overwrite Bonjour-discovered IPs/ports with stale data. */
+    char dht_nodes_path[640];
+    {
+        const char *base = data_dir;
+        char homebuf[600];
+        if (!base) {
+            const char *home = getenv("HOME");
+            if (!home) home = "/tmp";
+            snprintf(homebuf, sizeof(homebuf), "%s/.config/norn", home);
+            base = homebuf;
+        }
+        snprintf(dht_nodes_path, sizeof(dht_nodes_path), "%s/dht_nodes", base);
+    }
+    {
+        int loaded = norn_load_dht_nodes(client, dht_nodes_path);
+        if (loaded > 0)
+            fprintf(stderr, "nornd: loaded %d cached DHT nodes\n", loaded);
+    }
 
     /* Multi-node frame transport over norn sessions (single-node: no peers). */
     nornd_transport_t *xport =
@@ -1119,7 +1135,6 @@ int main(int argc, char **argv) {
     serve_host_t serve;
     memset(&serve, 0, sizeof(serve));
     static nornd_store_t serve_store;
-    char dht_nodes_path[640];
     {
         char objdir[640];
         const char *base = data_dir;
@@ -1164,8 +1179,6 @@ int main(int argc, char **argv) {
             norn_register_stream_service(client, NORN_SVC_SERVED_KV,
                                          on_served_accept, &serve);
         }
-        /* DHT routing-table persistence path. */
-        snprintf(dht_nodes_path, sizeof(dht_nodes_path), "%s/dht_nodes", base);
     }
     /* DHT store + publog persistence path (nornd-only, not libnorn). */
     char dht_persist_path[640];
@@ -1180,14 +1193,6 @@ int main(int argc, char **argv) {
         }
         snprintf(dht_persist_path, sizeof(dht_persist_path), "%s/dht_store", base);
     }
-    /* Load previously saved DHT routing-table nodes so we re-join the
-     * network faster than a full re-bootstrap. Best-effort: if the file
-     * doesn't exist (first start) or is corrupt, we simply start fresh. */
-    {
-        int loaded = norn_load_dht_nodes(client, dht_nodes_path);
-        if (loaded > 0)
-            fprintf(stderr, "nornd: loaded %d cached DHT nodes\n", loaded);
-    }
     /* Restore the DHT store + publog from the last run. */
     dht_persist_load(dht_persist_path, &serve.publog);
 
@@ -1200,6 +1205,7 @@ int main(int argc, char **argv) {
     int nfd = norn_get_fd(client);
     time_t last_dht_save = 0;         /* last time we persisted the routing table */
     time_t last_announce = 0;          /* last time we announced under our node-id */
+    time_t last_crawl = 0;             /* last DHT routing-table refresh */
     unsigned char self_nodeid[20];
     int have_self_nodeid = (norn_get_id(client, self_nodeid) == 0);
 
@@ -1256,6 +1262,13 @@ int main(int argc, char **argv) {
                 if (saved > 0) last_dht_save = now;
                 /* Also persist the DHT store + publog. */
                 dht_persist_save(dht_persist_path, &serve.publog);
+            }
+            /* Periodically refresh the DHT routing table by querying known
+             * nodes. This populates app/pv metadata for Bonjour-discovered
+             * peers and keeps entries fresh. Every 60s. */
+            if (now - last_crawl >= 60) {
+                norn_crawl(client);
+                last_crawl = now;
             }
             /* Announce ourselves under our node-id info_hash so peers can
              * resolve us via get_peers(node-id) and dial for served-KV. The

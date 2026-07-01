@@ -517,30 +517,14 @@ int norn_listen_async(norn_client_t *client,
                       void *user_data) {
     if (!client || !callback) return -1;
     
-    /* Bind UDP socket */
-    int fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (fd < 0) return -1;
+    /* Reuse the DHT socket (client->net.fd) for session traffic too.
+     * DHT (bencoded) and norn (binary) packets are distinguished by
+     * dispatch_response in norn_tick. Avoids a second UDP socket on the
+     * same port (which Linux delivers to only one of anyway). */
+    if (client->net.fd < 0) return -1;
     
-    int opt = 1;
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = port;
-    
-    if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
-        close(fd);
-        return -1;
-    }
-    
-    /* Set non-blocking */
-    int flags = fcntl(fd, F_GETFL, 0);
-    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-    
-    /* Store listener in client */
-    client->listen_fd = fd;
+    /* Store listener callback + suite on the shared DHT socket */
+    client->listen_fd = client->net.fd;
     client->listen_callback = callback;
     client->listen_user_data = user_data;
     client->listen_suite = suite ? suite : norn_suite_sodium();
@@ -556,8 +540,9 @@ int norn_listen_async(norn_client_t *client,
      * so that nodes on the same LAN find each other automatically. Best-effort:
      * if Avahi is not running, this silently fails. */
     if (!client->bonjour) {
-        client->bonjour = norn_bonjour_new(client, ntohs(port),
-                                            client->self_pub);
+        uint16_t dht_port = net_get_bound_port(&client->net);
+        if (dht_port == 0) dht_port = ntohs(port);
+        client->bonjour = norn_bonjour_new(client, dht_port, client->self_pub);
     }
 
     /* NAT traversal: try NAT-PMP first, then UPnP, to map the UDP port on
@@ -569,8 +554,10 @@ int norn_listen_async(norn_client_t *client,
     {
         norn_upnp_result_t nat;
         memset(&nat, 0, sizeof(nat));
-        if (norn_auto_port_mapping(ntohs(port), "UDP", &nat) == 0 && nat.success) {
-            uint16_t local_port = ntohs(port);
+        uint16_t actual_port = net_get_bound_port(&client->net);
+        if (actual_port == 0) actual_port = ntohs(port);
+        if (norn_auto_port_mapping(actual_port, "UDP", &nat) == 0 && nat.success) {
+            uint16_t local_port = actual_port;
             net_set_mapped_endpoint(&client->net, nat.external_ip,
                                      nat.external_port);
             fprintf(stderr, "norn: NAT-PMP/UPnP mapped port %u -> %s:%u\n",
@@ -791,21 +778,26 @@ int norn_client_remove_session(norn_client_t *client, norn_session_t *session) {
  * existing inbound session (matched by peer endpoint), feed it there; otherwise
  * treat it as a new peer's INIT: spin up a responder session bound to the shared
  * listen fd, run the handshake, and hand it to the accept callback. */
-static void accept_or_route(norn_client_t *client, const unsigned char *buf,
+static int accept_or_route(norn_client_t *client, const unsigned char *buf,
                             size_t len, uint32_t ip, uint16_t port) {
     for (int i = 0; i < client->session_count; i++) {
         norn_session_t *s = client->sessions[i];
         if (s->shared_fd && s->state != NORN_SESSION_CLOSED &&
             s->peer_ip == ip && s->peer_port == port) {
             norn_session_process_packet(s, buf, len, ip, port);
-            return;
+            return 0;
         }
     }
 
-    if (!client->listen_callback) return; /* not listening for new peers */
+    if (!client->listen_callback) return -1; /* not listening for new peers */
+
+    /* Only treat as a new INIT if the packet starts with CHANNEL_MAGIC ("DHCH").
+     * This avoids creating zombie sessions for DHT/binary-protocol packets that
+     * happen to arrive from an address that has no session yet. */
+    if (len < 4 || memcmp(buf, "DHCH", 4) != 0) return -1;
 
     norn_session_t *s = norn_session_new(client, client->listen_suite);
-    if (!s) return;
+    if (!s) return -1;
     s->fd = client->listen_fd;
     s->shared_fd = 1; /* shared socket: never closed/recv-drained by the session */
     s->is_initiator = 0;
@@ -818,11 +810,18 @@ static void accept_or_route(norn_client_t *client, const unsigned char *buf,
     if (channel_gen_ephemeral(&s->channel) != 0 ||
         norn_client_add_session(client, s) != 0) {
         norn_session_free(s);
-        return;
+        return -1;
     }
     /* Consume the INIT we already read (sends RESP back via the shared fd). */
     norn_session_process_packet(s, buf, len, ip, port);
     client->listen_callback(s, client->listen_user_data);
+    return 0;
+}
+
+int norn_session_dispatch_udp(norn_client_t *client, const unsigned char *buf,
+                                size_t len, uint32_t ip, uint16_t port) {
+    if (!client || !buf || len == 0) return -1;
+    return accept_or_route(client, buf, len, ip, port);
 }
 
 int norn_client_tick_sessions(norn_client_t *client) {
@@ -872,21 +871,8 @@ int norn_client_tick_sessions(norn_client_t *client) {
         }
     }
 
-    /* Process listener socket: demux datagrams to inbound sessions / accept new
-     * peers. Drain all queued datagrams so a burst is handled in one tick. */
-    if (client->listen_fd >= 0) {
-        unsigned char buf[4096];
-        struct sockaddr_in from;
-        socklen_t fromlen = sizeof(from);
-
-        ssize_t len;
-        while ((len = recvfrom(client->listen_fd, buf, sizeof(buf), MSG_DONTWAIT,
-                               (struct sockaddr *)&from, &fromlen)) > 0) {
-            accept_or_route(client, buf, (size_t)len, from.sin_addr.s_addr,
-                            from.sin_port);
-            processed++;
-        }
-    }
+    /* Session packets now arrive via norn_tick → dispatch_response (which
+     * calls norn_session_dispatch_udp). No separate listen_fd recvfrom here. */
 
     return processed;
 }
@@ -899,12 +885,8 @@ int norn_get_session_fds(norn_client_t *client,
     
     int count = 0;
     
-    /* Add listener socket */
-    if (client->listen_fd >= 0 && count < max_fds) {
-        fds[count] = client->listen_fd;
-        events[count] = POLLIN;
-        count++;
-    }
+    /* listen_fd is now the same as net.fd (unified socket); norn_tick already
+     * polls net.fd, so we don't add it here to avoid duplicate poll entries. */
     
     /* Add session sockets (inbound sessions share the listen fd, already added) */
     for (int i = 0; i < client->session_count && count < max_fds; i++) {

@@ -1,5 +1,19 @@
+norn (0.13.0) unstable; urgency=medium
+
+  [ norn maintainers ]
+  * BUG-003: fix norn peer connect (skip reqline encoding for just_dial)
+  * FEAT-013: unit+SIT tests for peer-fetch IPC; coverage tracking
+  * Debian package: restart user nornd daemons on upgrade
+  * FEAT-014: DHT network lookup for bep44 get via IPC
+    Add norn_dht_get_mutable() / norn_dht_get_immutable() synchronous
+    wrappers; IPC handler now falls back to active DHT walk when local
+    store misses.
+
+ -- norn maintainers <16991612+nostra124@users.noreply.github.com>  Wed, 01 Jul 2026 12:32:23 +0000
+
 norn (0.12.1) unstable; urgency=medium
 
+  [ norn maintainers ]
   * UPnP/NAT-PMP auto port mapping with SSDP discovery and SOAP
     AddPortMapping; tries NAT-PMP first, falls back to UPnP.
   * NAT traversal integrated into norn_listen_async() — mapped external

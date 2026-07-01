@@ -1161,7 +1161,7 @@ static int do_peer(int argc, char **argv, int optind) {
     char **sub_argv = argv + optind;
 
     if (strcmp(sub, "list") == 0) {
-        unsigned char buf[4096];
+        unsigned char buf[65536];
         size_t vlen = 0;
         if (ipc_round_trip("peer-list", buf, &vlen, sizeof(buf)) != 0) {
             fprintf(stderr, "nornd is not running\n");
