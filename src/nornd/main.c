@@ -630,6 +630,10 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
             } while (0)
 
         for (int i = 0; i < n && off + 1 < sizeof(resp.val); i++) {
+            /* Skip loopback — 127.0.0.0/8 is never a routable peer; it just
+             * means the local daemon was discovered via mDNS on loopback. */
+            uint32_t ip_h = ntohl(nodes[i].ip);
+            if ((ip_h >> 24) == 127) continue;
             char ipbuf[INET_ADDRSTRLEN];
             struct in_addr a; a.s_addr = nodes[i].ip;
             inet_ntop(AF_INET, &a, ipbuf, sizeof(ipbuf));
