@@ -25,10 +25,19 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sodium.h>
+
+/* Monotonic millisecond clock used for stream timing and session timeouts.
+ * Returns a uint32_t that wraps after ~49 days — sufficient for RTT/RTO. */
+static uint32_t norn_now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint32_t)((uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000);
+}
 
 /* === Internal Session Management === */
 
@@ -579,11 +588,16 @@ int norn_session_close_async(norn_session_t *session,
     session->state = NORN_SESSION_CLOSING;
     session->callback = callback;
     session->user_data = user_data;
-    
-    /* TODO: Send close notification to peer */
-    
+
+    /* Send wire close notification so the peer tears down its session slot
+     * immediately rather than waiting for its own timeout (BUG-003). */
+    if (session->peer_ip != 0) {
+        uint8_t pkt[1] = { NORN_MSG_SESSION_CLOSE };
+        session_dgram_send(session, pkt, sizeof(pkt));
+    }
+
     /* Close socket */
-    if (session->fd >= 0) {
+    if (session->fd >= 0 && !session->shared_fd) {
         close(session->fd);
         session->fd = -1;
     }
@@ -720,10 +734,11 @@ int norn_session_send_pending(norn_session_t *session) {
         if (sent != init_len) return -1;
         
         session->hs_state = HS_INIT_SENT;
+        session->connect_start_ms = norn_now_ms(); /* start timeout clock (BUG-002) */
         memcpy(session->last_msg, init_msg, init_len);
         session->last_msg_len = init_len;
         session->retry_count = 0;
-        
+
         return 0;
     }
     
@@ -733,10 +748,17 @@ int norn_session_send_pending(norn_session_t *session) {
 int norn_session_check_timeout(norn_session_t *session, uint32_t now_ms) {
     if (!session) return -1;
     if (session->state != NORN_SESSION_CONNECTING) return 0;
-    
-    /* TODO: Implement timeout with retransmit */
-    /* For now, just return success */
-    (void)now_ms;
+
+    /* Enforce 30 s CONNECTING timeout (BUG-002). Handles uint32_t wrap correctly
+     * because subtraction in unsigned arithmetic gives the elapsed interval. */
+    if (session->connect_start_ms != 0 &&
+        (uint32_t)(now_ms - session->connect_start_ms) > 30000) {
+        session->state = NORN_SESSION_CLOSED;
+        if (session->callback)
+            session->callback(session, NORN_SESSION_CLOSED, session->user_data);
+        norn_session_free(session);
+        return 1; /* timed out */
+    }
     return 0;
 }
 
@@ -827,7 +849,7 @@ int norn_client_tick_sessions(norn_client_t *client) {
     if (!client) return -1;
 
     int processed = 0;
-    uint32_t now_ms = 0; /* TODO: Get actual time */
+    uint32_t now_ms = norn_now_ms();
 
     /* Process each registered session */
     for (int i = 0; i < client->session_count; i++) {
@@ -1111,7 +1133,7 @@ int norn_announce_endpoint_async(norn_client_t *client,
                                 const norn_endpoint_t *endpoint,
                                 const unsigned char *secret,
                                 const norn_crypto_suite_t *suite,
-                                void *callback,
+                                norn_announce_callback_t callback,
                                 void *user_data) {
     if (!client || !endpoint || !secret) return -1;
     if (!client->initialized) return -1;
@@ -1136,16 +1158,21 @@ int norn_announce_endpoint_async(norn_client_t *client,
     
     txn->user_data = user_data;
     txn->suite = suite;
-    (void)callback; /* TODO: Add announce callback type */
-    
-    /* Store in DHT (this triggers async announce) */
-    /* Sequence number should be tracked per-key (TODO) */
-    uint32_t seq = 1;
-    
+
+    /* Increment per-client sequence number so DHT nodes accept re-announces
+     * (BEP-44 rejects put with seq <= stored_seq — BUG-004). */
+    uint32_t seq = (uint32_t)++client->announce_seq;
+
     int ret = mainline_lookup_mutable(&client->ml, target, 1, NULL, 0,
                                        value, value_len, NULL, NULL, seq, 1,
                                        NULL, NULL, 0, 0, NULL);
-    
+
+    /* Deliver completion callback: signals that the announce was submitted to
+     * the DHT walk (BUG-005). DHT puts are fire-and-forget; this is the only
+     * acknowledgement we can give. */
+    if (callback)
+        callback(ret >= 0 ? 0 : -1, user_data);
+
     return ret;
 }
 
@@ -1265,10 +1292,8 @@ int norn_stream_write(norn_stream_t *stream,
     if (!stream || !data || len == 0) return -1;
     if (stream->closed) return -1;
     
-    uint32_t now_ms = 0;  /* TODO: Get actual time */
-    
     return streammux_write(stream->mux, stream->stream_id,
-                          data, len, now_ms);
+                          data, len, norn_now_ms());
 }
 
 int norn_stream_read(norn_stream_t *stream,
@@ -1290,9 +1315,7 @@ int norn_stream_close(norn_stream_t *stream) {
     if (!stream) return -1;
     if (stream->closed) return -1;
     
-    uint32_t now_ms = 0;  /* TODO: Get actual time */
-    
-    streammux_finish(stream->mux, stream->stream_id, now_ms);
+    streammux_finish(stream->mux, stream->stream_id, norn_now_ms());
     stream->closed = 1;
     
     /* Notify callback */
@@ -1394,6 +1417,43 @@ int norn_rendezvous_enable(norn_client_t *client,
     return 0;
 }
 
+/* Helper: send RelayCreate to relay at (ip, port) using already-allocated slot. */
+static int relay_do_send_create(norn_client_t *client, int slot,
+                                 uint32_t relay_ip, uint16_t relay_port) {
+    norn_relay_create_t req;
+    req.msg_type = NORN_MSG_RELAY_CREATE;
+    memcpy(req.target_pubkey, client->relay_pending[slot].peer_pubkey, 32);
+    memcpy(req.session_id, client->relay_pending[slot].session_id,
+           NORN_RELAY_SESSION_ID_LEN);
+    bf_sign(req.signature, (const unsigned char *)&req,
+            offsetof(norn_relay_create_t, signature), client->self_sec);
+    uint8_t buf[NORN_RELAY_CREATE_LEN];
+    if (norn_encode_relay_create(&req, buf) != 0) return -1;
+    if (net_send(&client->net, buf, sizeof(buf), relay_ip, relay_port) < 0) return -1;
+    client->relay_pending[slot].relay_ip = relay_ip;
+    client->relay_pending[slot].relay_port = relay_port;
+    client->relay_pending[slot].active = 1;
+    return 0;
+}
+
+/* Resolve callback used by norn_relay_connect_async when the relay endpoint
+ * is not already cached (BUG-006). */
+static void on_relay_ep_resolved(const norn_endpoint_t *ep, void *user_data) {
+    /* user_data encodes the client pointer in the high bits and slot in low 8. */
+    uintptr_t packed = (uintptr_t)user_data;
+    int slot = (int)(packed & 0xFF);
+    norn_client_t *client = (norn_client_t *)(packed >> 8);
+
+    if (!ep || ep->ip == 0) {
+        norn_session_callback_t cb = client->relay_pending[slot].callback;
+        void *ud = client->relay_pending[slot].user_data;
+        client->relay_pending[slot].active = 0;
+        if (cb) cb(NULL, NORN_SESSION_CLOSED, ud);
+        return;
+    }
+    relay_do_send_create(client, slot, ep->ip, ep->port);
+}
+
 int norn_relay_connect_async(norn_client_t *client,
                              const unsigned char *target_pubkey,
                              const unsigned char *relay_pubkey,
@@ -1401,10 +1461,6 @@ int norn_relay_connect_async(norn_client_t *client,
                              void *user_data) {
     if (!client || !target_pubkey || !relay_pubkey || !callback) return -1;
     if (!client->initialized) return -1;
-
-    const norn_endpoint_t *relay_ep = norn_endpoint_cache_lookup(
-        &client->endpoint_cache, relay_pubkey);
-    if (!relay_ep || relay_ep->ip == 0) return -1;
 
     int slot = -1;
     for (int i = 0; i < 8; i++) {
@@ -1415,26 +1471,26 @@ int norn_relay_connect_async(norn_client_t *client,
     uint8_t session_id[NORN_RELAY_SESSION_ID_LEN];
     randombytes_buf(session_id, sizeof(session_id));
 
-    norn_relay_create_t req;
-    req.msg_type = NORN_MSG_RELAY_CREATE;
-    memcpy(req.target_pubkey, target_pubkey, 32);
-    memcpy(req.session_id, session_id, NORN_RELAY_SESSION_ID_LEN);
-    bf_sign(req.signature, (const unsigned char *)&req,
-            offsetof(norn_relay_create_t, signature), client->self_sec);
-
-    uint8_t buf[NORN_RELAY_CREATE_LEN];
-    if (norn_encode_relay_create(&req, buf) != 0) return -1;
-    if (net_send(&client->net, buf, sizeof(buf), relay_ep->ip, relay_ep->port) < 0) return -1;
-
     memcpy(client->relay_pending[slot].session_id, session_id, NORN_RELAY_SESSION_ID_LEN);
     memcpy(client->relay_pending[slot].relay_pubkey, relay_pubkey, 32);
-    client->relay_pending[slot].relay_ip = relay_ep->ip;
-    client->relay_pending[slot].relay_port = relay_ep->port;
     memcpy(client->relay_pending[slot].peer_pubkey, target_pubkey, 32);
     client->relay_pending[slot].callback = callback;
     client->relay_pending[slot].user_data = user_data;
     client->relay_pending[slot].suite = norn_suite_sodium();
-    client->relay_pending[slot].active = 1;
+    /* Mark active=0 until RelayCreate is actually sent (set in relay_do_send_create). */
+    client->relay_pending[slot].active = 0;
+
+    /* Try endpoint cache first; resolve via DHT on miss (BUG-006). */
+    const norn_endpoint_t *relay_ep = norn_endpoint_cache_lookup(
+        &client->endpoint_cache, relay_pubkey);
+    if (relay_ep && relay_ep->ip != 0)
+        return relay_do_send_create(client, slot, relay_ep->ip, relay_ep->port);
+
+    /* Pack (client, slot) into a single void* for the resolve callback. */
+    uintptr_t packed = ((uintptr_t)client << 8) | (uintptr_t)(slot & 0xFF);
+    int ret = norn_resolve_endpoint_async(client, relay_pubkey, norn_suite_sodium(),
+                                          on_relay_ep_resolved, (void *)packed);
+    if (ret != 0) return -1;
     return 0;
 }
 

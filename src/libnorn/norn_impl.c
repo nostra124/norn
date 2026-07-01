@@ -16,9 +16,11 @@
 #include <sodium.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 /* Forward declarations for private types */
 struct dial_context;
@@ -295,12 +297,61 @@ int norn_load_dht_nodes(norn_client_t *client, const char *path) {
 
 int norn_save_peer_cache(norn_client_t *client, const char *path) {
     if (!client || !path || !client->initialized) return -1;
-    return -1; /* TODO: implement norn_endpoint_cache persistence */
+
+    /* Ensure parent directory exists. */
+    char dir[512];
+    snprintf(dir, sizeof(dir), "%s", path);
+    char *slash = strrchr(dir, '/');
+    if (slash && slash != dir) {
+        *slash = '\0';
+        mkdir(dir, 0700);
+        *slash = '/';
+    }
+
+    FILE *f = fopen(path, "w");
+    if (!f) return -1;
+
+    norn_endpoint_cache_t *cache = &client->endpoint_cache;
+    int written = 0;
+    for (int i = 0; i < NORN_ENDPOINT_CACHE_SIZE; i++) {
+        norn_cached_endpoint_t *e = &cache->entries[i];
+        if (!e->valid) continue;
+        char hex[65];
+        sodium_bin2hex(hex, sizeof(hex), e->pubkey, 32);
+        fprintf(f, "%s %u %u\n", hex,
+                (unsigned)ntohl(e->endpoint.ip),
+                (unsigned)ntohs(e->endpoint.port));
+        written++;
+    }
+    fclose(f);
+    return written;
 }
 
 int norn_load_peer_cache(norn_client_t *client, const char *path) {
     if (!client || !path || !client->initialized) return -1;
-    return -1; /* TODO: implement norn_endpoint_cache persistence */
+
+    FILE *f = fopen(path, "r");
+    if (!f) return -1;
+
+    char hex[65];
+    unsigned ip_host, port_host;
+    int loaded = 0;
+    while (fscanf(f, "%64s %u %u\n", hex, &ip_host, &port_host) == 3) {
+        unsigned char pubkey[32];
+        if (sodium_hex2bin(pubkey, sizeof(pubkey), hex, 64, NULL, NULL, NULL) != 0)
+            continue;
+        norn_endpoint_t ep;
+        memset(&ep, 0, sizeof(ep));
+        memcpy(ep.pubkey, pubkey, 32);
+        ep.ip = htonl(ip_host);
+        ep.port = htons((uint16_t)port_host);
+        ep.caps = NORN_EP_CAP_DIRECT;
+        norn_endpoint_cache_store(&client->endpoint_cache, pubkey, &ep,
+                                   NORN_ENDPOINT_TTL_DEFAULT);
+        loaded++;
+    }
+    fclose(f);
+    return loaded;
 }
 
 int norn_tick(norn_client_t *client) {

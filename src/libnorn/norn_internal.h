@@ -70,6 +70,10 @@ struct norn_client {
     /* Relay service (FEAT-017) */
     norn_relay_t relay;               /* Relay forwarding state */
 
+    /* BEP-44 announce sequence counter: incremented per norn_announce_endpoint_async
+     * call so re-announces always have a strictly increasing seq (BUG-004). */
+    uint64_t announce_seq;
+
     /* Bonjour/mDNS service announcement and discovery (FEAT-036) */
     norn_bonjour_t *bonjour;
     

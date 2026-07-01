@@ -432,33 +432,18 @@ int norn_natpmp_add_mapping(uint32_t gateway_ip,
                              int protocol,
                              uint32_t lease_duration,
                              norn_upnp_result_t *result) {
-    if (!result) return -1;
-    (void)gateway_ip;  /* natpmp_map_udp auto-discovers the gateway */
-    (void)protocol;    /* only UDP supported by natpmp_map_udp */
-    (void)external_port; /* router assigns the external port */
-
-    uint16_t ext_port = 0;
-    uint32_t ext_ip = 0;
-    if (natpmp_map_udp(internal_port, lease_duration, &ext_port, &ext_ip) != 0)
-        return -1;
-
-    result->external_ip = ext_ip;
-    result->external_port = htons(ext_port);
-    result->internal_port = htons(internal_port);
-    result->lease_duration = lease_duration;
-    result->success = 1;
-    return 0;
+    /* NAT-PMP requires platform natpmp_map_udp() — not yet implemented (BUG-007). */
+    (void)gateway_ip; (void)internal_port; (void)external_port;
+    (void)protocol; (void)lease_duration; (void)result;
+    return -1;
 }
 
 int norn_natpmp_remove_mapping(uint32_t gateway_ip,
                                 uint16_t external_port,
                                 int protocol) {
-    (void)gateway_ip;
-    (void)protocol;
-    /* NAT-PMP removes a mapping by requesting it with lifetime = 0. */
-    uint16_t dummy_port;
-    uint32_t dummy_ip;
-    return natpmp_map_udp(external_port, 0, &dummy_port, &dummy_ip);
+    /* NAT-PMP requires platform natpmp_map_udp() — not yet implemented (BUG-007). */
+    (void)gateway_ip; (void)external_port; (void)protocol;
+    return -1;
 }
 
 int norn_auto_port_mapping(uint16_t internal_port,
@@ -467,21 +452,9 @@ int norn_auto_port_mapping(uint16_t internal_port,
     if (!protocol || !result) return -1;
     result->success = 0;
 
-    /* Try NAT-PMP first (simpler, faster, works on most modern routers) */
-    {
-        uint16_t ext_port;
-        uint32_t ext_ip;
-        if (natpmp_map_udp(internal_port, 3600, &ext_port, &ext_ip) == 0) {
-            result->external_ip = ext_ip;
-            result->external_port = htons(ext_port);
-            result->internal_port = htons(internal_port);
-            result->lease_duration = 3600;
-            result->success = 1;
-            return 0;
-        }
-    }
+    /* NAT-PMP not yet implemented (BUG-007); fall through to UPnP. */
 
-    /* Try UPnP as fallback */
+    /* Try UPnP */
     {
         char device_url[256];
         if (norn_upnp_discover(5000, device_url) == 0) {

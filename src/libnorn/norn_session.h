@@ -116,6 +116,14 @@ typedef void (*norn_resolve_callback_t)(const norn_endpoint_t *endpoint,
                                         void *user_data);
 
 /**
+ * @brief Callback for endpoint announce completion (BUG-005)
+ *
+ * @param status 0 on success, -1 on error
+ * @param user_data User-provided pointer from norn_announce_endpoint_async
+ */
+typedef void (*norn_announce_callback_t)(int status, void *user_data);
+
+/**
  * @brief Callback for stream events
  *
  * @param stream Stream handle
@@ -603,7 +611,7 @@ int norn_announce_endpoint_async(norn_client_t *client,
                                  const norn_endpoint_t *endpoint,
                                  const unsigned char *secret,
                                  const norn_crypto_suite_t *suite,
-                                 void *callback,
+                                 norn_announce_callback_t callback,
                                  void *user_data);
 
 /**

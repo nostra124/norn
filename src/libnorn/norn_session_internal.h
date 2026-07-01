@@ -15,6 +15,9 @@
 #include "channel.h"
 #include "streammux.h"
 
+/* Wire message type for session teardown (BUG-003). */
+#define NORN_MSG_SESSION_CLOSE  0x05
+
 /* Internal handshake states (for async state machine) */
 typedef enum {
     HS_NONE,              /* No handshake in progress */
@@ -76,6 +79,7 @@ struct norn_session {
     unsigned char last_msg[256];      /* Last sent message (for retransmit) */
     size_t last_msg_len;
     uint32_t last_send_time;          /* Time of last send (ms) */
+    uint32_t connect_start_ms;        /* Monotonic ms when CONNECTING began (BUG-002) */
     int retry_count;
     
     /* Callbacks */
