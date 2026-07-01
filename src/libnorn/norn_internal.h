@@ -83,6 +83,19 @@ struct norn_client {
     } holepunch_pending[8];
     int holepunch_pending_count;
 
+    /* Relay connect pending requests (FEAT-022) */
+    struct {
+        uint8_t session_id[NORN_RELAY_SESSION_ID_LEN];
+        uint8_t relay_pubkey[32];
+        uint32_t relay_ip;
+        uint16_t relay_port;
+        uint8_t peer_pubkey[32];
+        norn_session_callback_t callback;
+        void *user_data;
+        const norn_crypto_suite_t *suite;
+        int active;
+    } relay_pending[8];
+
     /* Application-protocol service registry (FEAT-033): inbound stream/datagram
      * handlers keyed by service id, applied to every session. */
     struct {

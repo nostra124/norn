@@ -134,6 +134,7 @@ typedef struct {
     int session_count;
     int session_cap;
     int enabled;
+    void *net; /* net_t* back-pointer for net_send; void* avoids circular include */
 } norn_relay_t;
 
 /**

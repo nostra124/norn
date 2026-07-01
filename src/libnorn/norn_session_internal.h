@@ -11,6 +11,7 @@
 #define NORN_SESSION_INTERNAL_H
 
 #include "norn_session.h"
+#include "norn_relay.h"
 #include "channel.h"
 #include "streammux.h"
 
@@ -58,6 +59,13 @@ struct norn_session {
                                          listener, not closed on free */
     uint32_t peer_ip;                 /* Network byte order */
     uint16_t peer_port;               /* Network byte order */
+
+    /* Relay transport (FEAT-022): when relay_enabled, outbound packets are
+     * wrapped in RelayForward and sent to relay_ip:relay_port. */
+    int relay_enabled;
+    uint8_t relay_session_id[NORN_RELAY_SESSION_ID_LEN];
+    uint32_t relay_ip;
+    uint16_t relay_port;
     
     /* State machine */
     norn_session_state_t state;

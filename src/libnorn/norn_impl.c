@@ -120,6 +120,7 @@ norn_client_t *norn_new(const unsigned char *self_pub,
     norn_endpoint_cache_init(&client->endpoint_cache);
     norn_rendezvous_init(&client->rv);
     norn_relay_init(&client->relay);
+    client->relay.net = &client->net;
     return client;
 }
 
@@ -628,13 +629,39 @@ static void dispatch_response(norn_client_t *client,
                               const uint8_t *data, size_t len,
                               uint32_t from_ip, uint16_t from_port) {
     if (len < 1) return;
-    
+
+    /* RelayForward must be unwrapped before session dispatch so that relay
+     * sessions (which store relay_ip/port as peer) receive the inner payload
+     * rather than the wrapper. */
+    if (data[0] == NORN_MSG_RELAY_FORWARD) {
+        norn_relay_forward_t fwd;
+        if (norn_decode_relay_forward(&fwd, data, len) == 0) {
+            /* Acting as relay: forward to the other endpoint. */
+            if (client->relay.enabled) {
+                norn_relay_handle_forward(&client->relay, &fwd, from_ip, htons(from_port));
+            }
+            /* Acting as relay session endpoint: find session by relay_session_id
+             * and feed inner payload to the session state machine. */
+            for (int i = 0; i < client->session_count; i++) {
+                norn_session_t *s = client->sessions[i];
+                if (s->relay_enabled &&
+                    memcmp(s->relay_session_id, fwd.session_id,
+                           NORN_RELAY_SESSION_ID_LEN) == 0) {
+                    norn_session_process_packet(s, fwd.payload, fwd.payload_len,
+                                               from_ip, htons(from_port));
+                    break;
+                }
+            }
+        }
+        return;
+    }
+
     /* Try the session layer first: this matches packets from known session
      * peers (established encrypted traffic) and new INIT packets ("DHCH").
      * Returns 0 if handled, -1 to fall through to DHT/binary-protocol. */
     if (norn_session_dispatch_udp(client, data, len, from_ip, htons(from_port)) == 0)
         return;
-    
+
     /* Route binary protocol messages */
     if (data[0] >= 0x10 && data[0] <= 0x2F) {
         /* NAT traversal messages (0x10-0x1F) */
@@ -703,31 +730,103 @@ static void dispatch_response(norn_client_t *client,
             return;
         }
         
-        /* Relay messages (0x20-0x2F) */
+        /* Relay messages (0x20-0x2F) — RelayForward (0x21) handled above. */
         if (data[0] >= NORN_MSG_RELAY_CREATE && data[0] <= NORN_MSG_RELAY_CLOSE) {
             if (data[0] == NORN_MSG_RELAY_CREATE && len >= NORN_RELAY_CREATE_LEN) {
                 norn_relay_create_t req;
                 if (norn_decode_relay_create(&req, data, len) == 0) {
-                    uint8_t session_id[NORN_RELAY_SESSION_ID_LEN];
-                    int result = norn_relay_handle_create(&client->relay, &req, from_ip, from_port, session_id);
-                    if (result == 0) {
-                        /* TODO: Forward create request to target */
-                        (void)session_id;
+                    /* Are we the intended target? Send RelayAccept back. */
+                    if (memcmp(req.target_pubkey, client->self_pub, 32) == 0) {
+                        norn_relay_accept_t acc;
+                        acc.msg_type = NORN_MSG_RELAY_ACCEPT;
+                        memcpy(acc.session_id, req.session_id, NORN_RELAY_SESSION_ID_LEN);
+                        memset(acc.initiator_pubkey, 0, 32);
+                        bf_sign(acc.signature, (const unsigned char *)&acc,
+                                offsetof(norn_relay_accept_t, signature), client->self_sec);
+                        uint8_t acc_buf[NORN_RELAY_ACCEPT_LEN];
+                        if (norn_encode_relay_accept(&acc, acc_buf) == 0)
+                            net_send(&client->net, acc_buf, sizeof(acc_buf),
+                                     from_ip, htons(from_port));
+                    } else if (client->relay.enabled) {
+                        /* Acting as relay: store session and forward to target. */
+                        uint8_t session_id[NORN_RELAY_SESSION_ID_LEN];
+                        if (norn_relay_handle_create(&client->relay, &req, from_ip,
+                                                      htons(from_port), session_id) == 0) {
+                            const norn_endpoint_t *tgt = norn_endpoint_cache_lookup(
+                                &client->endpoint_cache, req.target_pubkey);
+                            if (tgt && tgt->ip != 0) {
+                                uint8_t fwd[NORN_RELAY_CREATE_LEN];
+                                norn_relay_create_t fwd_req = req;
+                                if (norn_encode_relay_create(&fwd_req, fwd) == 0)
+                                    net_send(&client->net, fwd, sizeof(fwd),
+                                             tgt->ip, tgt->port);
+                            }
+                        }
                     }
-                }
-            } else if (data[0] == NORN_MSG_RELAY_FORWARD) {
-                norn_relay_forward_t msg;
-                if (norn_decode_relay_forward(&msg, data, len) == 0) {
-                    norn_relay_handle_forward(&client->relay, &msg, from_ip, from_port);
                 }
             } else if (data[0] == NORN_MSG_RELAY_ACCEPT && len >= NORN_RELAY_ACCEPT_LEN) {
                 norn_relay_accept_t accept;
                 if (norn_decode_relay_accept(&accept, data, len) == 0) {
-                    /* TODO: Handle relay accept */
-                    (void)accept;
+                    /* Acting as relay: mark session active and forward to initiator. */
+                    norn_relay_session_t *rs = norn_relay_find_session(
+                        &client->relay, accept.session_id);
+                    if (rs) {
+                        rs->active = 1;
+                        rs->target_ip = from_ip;
+                        rs->target_port = htons(from_port);
+                        uint8_t fwd[NORN_RELAY_ACCEPT_LEN];
+                        if (norn_encode_relay_accept(&accept, fwd) == 0)
+                            net_send(&client->net, fwd, sizeof(fwd),
+                                     rs->initiator_ip, rs->initiator_port);
+                    }
+                    /* Acting as initiator: relay accept received — start handshake. */
+                    for (int i = 0; i < 8; i++) {
+                        if (!client->relay_pending[i].active) continue;
+                        if (memcmp(client->relay_pending[i].session_id,
+                                   accept.session_id, NORN_RELAY_SESSION_ID_LEN) != 0) continue;
+                        norn_session_t *s = norn_session_new(
+                            client, client->relay_pending[i].suite);
+                        if (!s) { client->relay_pending[i].active = 0; break; }
+                        s->is_initiator = 1;
+                        norn_session_set_identity(s, client->self_pub, client->self_sec);
+                        norn_session_set_signer(s, client->signer, client->signer_ud);
+                        memcpy(s->peer_pubkey, client->relay_pending[i].peer_pubkey, 32);
+                        s->relay_enabled = 1;
+                        memcpy(s->relay_session_id, accept.session_id,
+                               NORN_RELAY_SESSION_ID_LEN);
+                        s->relay_ip = client->relay_pending[i].relay_ip;
+                        s->relay_port = client->relay_pending[i].relay_port;
+                        s->fd = -1;
+                        if (channel_gen_ephemeral(&s->channel) != 0 ||
+                            norn_client_add_session(client, s) != 0) {
+                            free(s->streams); free(s);
+                            client->relay_pending[i].active = 0;
+                            break;
+                        }
+                        s->callback = client->relay_pending[i].callback;
+                        s->user_data = client->relay_pending[i].user_data;
+                        client->relay_pending[i].active = 0;
+                        norn_session_send_pending(s);
+                        break;
+                    }
                 }
             } else if (data[0] == NORN_MSG_RELAY_CLOSE) {
-                /* TODO: Handle relay close */
+                if (len >= 1 + NORN_RELAY_SESSION_ID_LEN) {
+                    const uint8_t *sid = data + 1;
+                    norn_relay_close_session(&client->relay, sid);
+                    /* Also close any relay session on the initiator side. */
+                    for (int i = 0; i < client->session_count; i++) {
+                        norn_session_t *s = client->sessions[i];
+                        if (s->relay_enabled &&
+                            memcmp(s->relay_session_id, sid,
+                                   NORN_RELAY_SESSION_ID_LEN) == 0) {
+                            s->state = NORN_SESSION_CLOSED;
+                            if (s->callback)
+                                s->callback(s, NORN_SESSION_CLOSED, s->user_data);
+                            break;
+                        }
+                    }
+                }
             }
             return;
         }

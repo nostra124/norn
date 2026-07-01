@@ -5,6 +5,7 @@
  */
 
 #include "norn_relay.h"
+#include "net.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -17,7 +18,8 @@ int norn_relay_init(norn_relay_t *relay) {
     
     relay->session_count = 0;
     relay->enabled = 0;
-    
+    relay->net = NULL;
+
     return 0;
 }
 
@@ -199,22 +201,20 @@ int norn_relay_handle_forward(norn_relay_t *relay,
                                const norn_relay_forward_t *msg,
                                uint32_t from_ip,
                                uint16_t from_port) {
-    if (!relay || !msg) return -1;
-    
+    if (!relay || !msg || !relay->net) return -1;
+
     norn_relay_session_t *session = norn_relay_find_session(relay, msg->session_id);
-    if (!session) return -1;
-    if (!session->active) return -1;
-    
-    /* Determine direction */
-    int from_initiator = (from_ip == session->initiator_ip && 
+    if (!session || !session->active) return -1;
+
+    int from_initiator = (from_ip == session->initiator_ip &&
                           from_port == session->initiator_port);
-    
-    /* TODO: Forward to the other party */
-    /* This will be implemented when integrating with the network layer */
-    
-    (void)from_initiator;
-    
-    return 0;
+    uint32_t dest_ip   = from_initiator ? session->target_ip   : session->initiator_ip;
+    uint16_t dest_port = from_initiator ? session->target_port : session->initiator_port;
+
+    uint8_t out[1 + NORN_RELAY_SESSION_ID_LEN + 2 + NORN_RELAY_MAX_PAYLOAD];
+    size_t out_len = 0;
+    if (norn_encode_relay_forward(msg, out, &out_len) != 0) return -1;
+    return net_send((net_t *)relay->net, out, out_len, dest_ip, dest_port) >= 0 ? 0 : -1;
 }
 
 int norn_relay_close_session(norn_relay_t *relay, const uint8_t *session_id) {

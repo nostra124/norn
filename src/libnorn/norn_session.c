@@ -17,6 +17,8 @@
 #include "mainline.h"
 #include "norn_upnp.h"
 #include "bep44.h"
+#include "crypto.h"
+#include "net.h"
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -33,9 +35,23 @@
 /* Send one datagram to the session's peer. An outbound dial has its own socket
  * connect()ed to the peer, so a plain send() suffices (and Linux rejects sendto
  * with an address on a connected socket). An inbound session shares the client's
- * unconnected listen socket, so it must address the peer explicitly. */
+ * unconnected listen socket, so it must address the peer explicitly. Relay
+ * sessions (relay_enabled) wrap the payload in RelayForward and send via the
+ * shared DHT socket to the relay node. */
 static ssize_t session_dgram_send(norn_session_t *s, const unsigned char *buf,
                                   size_t len) {
+    if (s->relay_enabled) {
+        if (len > NORN_RELAY_MAX_PAYLOAD) return -1;
+        norn_relay_forward_t fwd;
+        fwd.msg_type = NORN_MSG_RELAY_FORWARD;
+        memcpy(fwd.session_id, s->relay_session_id, NORN_RELAY_SESSION_ID_LEN);
+        fwd.payload_len = (uint16_t)len;
+        memcpy(fwd.payload, buf, len);
+        uint8_t out[1 + NORN_RELAY_SESSION_ID_LEN + 2 + NORN_RELAY_MAX_PAYLOAD];
+        size_t out_len = 0;
+        if (norn_encode_relay_forward(&fwd, out, &out_len) != 0) return -1;
+        return net_send(&s->client->net, out, out_len, s->relay_ip, s->relay_port);
+    }
     if (!s->shared_fd) return send(s->fd, buf, len, 0);
     struct sockaddr_in a;
     memset(&a, 0, sizeof(a));
@@ -1383,43 +1399,51 @@ int norn_relay_connect_async(norn_client_t *client,
                              const unsigned char *relay_pubkey,
                              norn_session_callback_t callback,
                              void *user_data) {
-    if (!client || !target_pubkey || !relay_pubkey) return -1;
-    if (!callback) return -1;
-    
-    /* TODO FEAT-017 Phase 4: Implement relay connection
-     * 
-     * Algorithm:
-     * 1. Create onion-routed circuit through relay
-     * 2. Each hop adds layer of encryption
-     * 3. Relay forwards without seeing payload
-     * 4. End-to-end encryption between initiator and target
-     * 
-     * Wire protocol (see FEAT-017-NAT.md):
-     * - RelayCreate (msg_type = 0x20)
-     * - RelayExtend (msg_type = 0x21)
-     */
-    
-    (void)callback;
-    (void)user_data;
-    return -1;
+    if (!client || !target_pubkey || !relay_pubkey || !callback) return -1;
+    if (!client->initialized) return -1;
+
+    const norn_endpoint_t *relay_ep = norn_endpoint_cache_lookup(
+        &client->endpoint_cache, relay_pubkey);
+    if (!relay_ep || relay_ep->ip == 0) return -1;
+
+    int slot = -1;
+    for (int i = 0; i < 8; i++) {
+        if (!client->relay_pending[i].active) { slot = i; break; }
+    }
+    if (slot < 0) return -1;
+
+    uint8_t session_id[NORN_RELAY_SESSION_ID_LEN];
+    randombytes_buf(session_id, sizeof(session_id));
+
+    norn_relay_create_t req;
+    req.msg_type = NORN_MSG_RELAY_CREATE;
+    memcpy(req.target_pubkey, target_pubkey, 32);
+    memcpy(req.session_id, session_id, NORN_RELAY_SESSION_ID_LEN);
+    bf_sign(req.signature, (const unsigned char *)&req,
+            offsetof(norn_relay_create_t, signature), client->self_sec);
+
+    uint8_t buf[NORN_RELAY_CREATE_LEN];
+    if (norn_encode_relay_create(&req, buf) != 0) return -1;
+    if (net_send(&client->net, buf, sizeof(buf), relay_ep->ip, relay_ep->port) < 0) return -1;
+
+    memcpy(client->relay_pending[slot].session_id, session_id, NORN_RELAY_SESSION_ID_LEN);
+    memcpy(client->relay_pending[slot].relay_pubkey, relay_pubkey, 32);
+    client->relay_pending[slot].relay_ip = relay_ep->ip;
+    client->relay_pending[slot].relay_port = relay_ep->port;
+    memcpy(client->relay_pending[slot].peer_pubkey, target_pubkey, 32);
+    client->relay_pending[slot].callback = callback;
+    client->relay_pending[slot].user_data = user_data;
+    client->relay_pending[slot].suite = norn_suite_sodium();
+    client->relay_pending[slot].active = 1;
+    return 0;
 }
 
 int norn_relay_enable(norn_client_t *client,
                       void *callback,
                       void *user_data) {
-    if (!client) return -1;
-    if (!client->initialized) return -1;
-    
-    /* TODO FEAT-017 Phase 4: Implement relay service
-     * 
-     * When acting as relay:
-     * 1. Listen for RelayCreate messages
-     * 2. Create circuit ID
-     * 3. Forward traffic between circuit endpoints
-     * 4. Cannot see encrypted payload
-     */
-    
-    (void)callback;
-    (void)user_data;
-    return -1;
+    if (!client || !client->initialized) return -1;
+    client->relay.enabled = 1;
+    client->rendezvous_callback = callback;
+    client->rendezvous_user_data = user_data;
+    return 0;
 }
