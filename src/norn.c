@@ -1205,13 +1205,15 @@ static int do_set(int argc, char **argv) {
  * get/set handlers, which expect the verb at argv[1]; present them a shifted
  * view that drops the "bep44" token. `argv[sub_idx]` is the sub-verb. */
 static void bep44_help(FILE *out, const char *prog) {
-    fprintf(out, "Usage: %s bep44 <get|set|put> [ARGS...]\n", prog);
+    fprintf(out, "Usage: %s bep44 <get|set|put|list> [ARGS...]\n", prog);
     fprintf(out, "\nSubcommands (mutable — signed, named):\n"
             "  set <name> <value>     Publish a named mutable record (keyed by your pubkey)\n"
             "  get <node-id> <name>   Retrieve a named mutable record (by publisher node-id)\n"
             "\nSubcommands (immutable — content-addressed):\n"
             "  put <value>            Publish an immutable record; prints the content hash\n"
-            "  get <hash>             Retrieve an immutable record by its 40-hex SHA1 hash\n");
+            "  get <hash>             Retrieve an immutable record by its 40-hex SHA1 hash\n"
+            "\nSubcommands (enumeration):\n"
+            "  list                   List DHT records this node is holding (TSV)\n");
 }
 
 static int do_bep44(int argc, char **argv, int sub_idx) {
@@ -1239,10 +1241,20 @@ static int do_bep44(int argc, char **argv, int sub_idx) {
         rc = do_put_immutable(n, view);
     } else if (strcmp(sub, "set") == 0) {
         rc = do_set(n, view);
+    } else if (strcmp(sub, "list") == 0) {
+        /* `norn bep44 list` — enumerate the DHT records this node is holding. */
+        unsigned char buf[4096];
+        size_t vlen = 0;
+        if (ipc_round_trip("bep44-list", buf, &vlen, sizeof(buf)) != 0) {
+            fprintf(stderr, "nornd is not running\n");
+            rc = 1;
+        } else {
+            print_tsv_pretty(buf, vlen);
+            rc = 0;
+        }
     } else if (strcmp(sub, "get") == 0) {
         /* Disambiguate by positional arg count: `get <node-id> <name>` (two
          * args) is mutable; `get <hash>` (one arg) is immutable. */
-        /* Count non-option args after the sub. */
         int pos = 0;
         for (int i = sub_idx + 1; i < argc; i++)
             if (argv[i][0] != '-') pos++;
@@ -1252,7 +1264,7 @@ static int do_bep44(int argc, char **argv, int sub_idx) {
             rc = do_get_immutable(n, view);/* immutable: <hash> */
     } else {
         fprintf(stderr, "ERROR: Unknown bep44 subcommand: %s\n", sub);
-        fprintf(stderr, "Usage: %s bep44 <get|set|put> ...\n", prog_name);
+        fprintf(stderr, "Usage: %s bep44 <get|set|put|list> ...\n", prog_name);
         rc = 1;
     }
     free(view);

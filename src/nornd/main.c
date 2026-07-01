@@ -570,6 +570,34 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
         }
         #undef APPEND_ROW
         resp.vlen = off;
+    } else if (strcmp(req.op, "bep44-list") == 0) {
+        /* `norn bep44 list`: enumerate the DHT records this node is holding on
+         * behalf of the network, as TSV (Target, Type, Size, Seq, Stored). */
+        resp.ok = 1;
+        resp.has_val = 1;
+        size_t off = 0;
+        int wn = snprintf((char *)resp.val + off, sizeof(resp.val) - off,
+            "Target\tType\tSize\tSeq\tStored\n");
+        if (wn > 0) off += (size_t)wn;
+        /* mutable then immutable */
+        for (int kind = 0; kind < 2; kind++) {
+            norn_dht_item_t items[64];
+            int n = norn_dht_list(kind, items, 64);
+            if (n < 0) n = 0;
+            for (int i = 0; i < n && off + 1 < sizeof(resp.val); i++) {
+                char tgt[41];
+                for (int b = 0; b < 20; b++)
+                    snprintf(tgt + b * 2, 3, "%02x", items[i].target[b]);
+                wn = snprintf((char *)resp.val + off, sizeof(resp.val) - off,
+                    "%s\t%s\t%zu\t%u\t%ld\n", tgt,
+                    items[i].immutable ? "immutable" : "mutable",
+                    items[i].vlen, items[i].seq, items[i].stored);
+                if (wn < 0) break;
+                if ((size_t)wn >= sizeof(resp.val) - off) break;
+                off += (size_t)wn;
+            }
+        }
+        resp.vlen = off;
     } else {
         nornd_dispatch(ctx->be, &req, &resp);
     }

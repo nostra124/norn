@@ -11,6 +11,7 @@
 #include "bep44.h"
 #include "crypto.h"
 #include "net.h"
+#include "dhtstore.h"
 #include <sodium.h>
 #include <string.h>
 #include <stdlib.h>
@@ -499,6 +500,23 @@ int norn_routing_pubkey(const norn_client_t *client, const unsigned char *node_i
         }
     }
     return 0;
+}
+
+int norn_dht_list(int want_immutable, norn_dht_item_t *out, int max) {
+    if (!out || max <= 0) return -1;
+    /* dhtstore_list returns dht_item_info_t with the same field layout as
+     * norn_dht_item_t; copy field-by-field to keep the public type opaque. */
+    dht_item_info_t info[128];
+    int n = dhtstore_list(want_immutable, info, max < 128 ? max : 128);
+    if (n < 0) n = 0;
+    for (int i = 0; i < n; i++) {
+        memcpy(out[i].target, info[i].target, 20);
+        out[i].immutable = info[i].immutable;
+        out[i].vlen = info[i].vlen;
+        out[i].seq = info[i].seq;
+        out[i].stored = info[i].stored;
+    }
+    return n;
 }
 
 int norn_encode_mutable(const norn_mutable_t *rec,

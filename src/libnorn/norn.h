@@ -603,6 +603,33 @@ int norn_routing_lookup(const norn_client_t *client, const unsigned char *node_i
 int norn_routing_pubkey(const norn_client_t *client, const unsigned char *node_id,
                         unsigned char *pubkey_out);
 
+/**
+ * @brief Info about a DHT record this node is storing on behalf of the network
+ *
+ * The DHT is distributed: each node holds the records whose target hash falls
+ * close to the node's own id. norn_dht_list() enumerates those locally-held
+ * records so `norn bep44 list` can show what this node is storing.
+ */
+typedef struct {
+    unsigned char target[20];  /**< DHT key (SHA1) the record is stored under */
+    int           immutable;   /**< 1 = immutable (content-addressed), 0 = mutable */
+    size_t        vlen;        /**< Value length in bytes */
+    uint32_t      seq;         /**< Sequence number (mutable only; 0 for immutable) */
+    long          stored;      /**< Unix timestamp when the record was stored */
+} norn_dht_item_t;
+
+/**
+ * @brief Enumerate the DHT records this node is holding
+ *
+ * @param want_immutable 1 to list immutable items, 0 for mutable items
+ * @param out   Output array (caller-owned)
+ * @param max   Max entries `out` can hold
+ * @return Number of entries written (0..max), or -1 on error (NULL out)
+ *
+ * @note NULL-safe: returns -1 if out is NULL
+ */
+int norn_dht_list(int want_immutable, norn_dht_item_t *out, int max);
+
 /* === Event loop integration === */
 
 /**
