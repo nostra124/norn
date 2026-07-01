@@ -160,9 +160,7 @@ static void usage(FILE *out) {
     static const char *cmds[][2] = {
         {"node",       "Manage the local nornd daemon"},
         {"peer",       "Interact with remote peers"},
-        {"bep44",      "DHT mutable records (signed, named)"},
-        {"put",        "DHT immutable record (content-addressed)"},
-        {"get",        "DHT immutable record (by content hash)"},
+        {"bep44",      "DHT records (mutable + immutable)"},
         {"cluster",    "Cluster KV store"},
         {"version",    "Print version"},
     };
@@ -1207,10 +1205,13 @@ static int do_set(int argc, char **argv) {
  * get/set handlers, which expect the verb at argv[1]; present them a shifted
  * view that drops the "bep44" token. `argv[sub_idx]` is the sub-verb. */
 static void bep44_help(FILE *out, const char *prog) {
-    fprintf(out, "Usage: %s bep44 <get|set> [ARGS...]\n", prog);
-    fprintf(out, "\nSubcommands:\n"
+    fprintf(out, "Usage: %s bep44 <get|set|put> [ARGS...]\n", prog);
+    fprintf(out, "\nSubcommands (mutable — signed, named):\n"
+            "  set <name> <value>     Publish a named mutable record (keyed by your pubkey)\n"
             "  get <node-id> <name>   Retrieve a named mutable record (by publisher node-id)\n"
-            "  set <name> <value>     Publish a named mutable record (keyed by your pubkey)\n");
+            "\nSubcommands (immutable — content-addressed):\n"
+            "  put <value>            Publish an immutable record; prints the content hash\n"
+            "  get <hash>             Retrieve an immutable record by its 40-hex SHA1 hash\n");
 }
 
 static int do_bep44(int argc, char **argv, int sub_idx) {
@@ -1234,13 +1235,24 @@ static int do_bep44(int argc, char **argv, int sub_idx) {
     view[n] = NULL;
 
     int rc;
-    if (strcmp(sub, "get") == 0) {
-        rc = do_get(n, view);
+    if (strcmp(sub, "put") == 0) {
+        rc = do_put_immutable(n, view);
     } else if (strcmp(sub, "set") == 0) {
         rc = do_set(n, view);
+    } else if (strcmp(sub, "get") == 0) {
+        /* Disambiguate by positional arg count: `get <node-id> <name>` (two
+         * args) is mutable; `get <hash>` (one arg) is immutable. */
+        /* Count non-option args after the sub. */
+        int pos = 0;
+        for (int i = sub_idx + 1; i < argc; i++)
+            if (argv[i][0] != '-') pos++;
+        if (pos >= 2)
+            rc = do_get(n, view);          /* mutable: <node-id> <name> */
+        else
+            rc = do_get_immutable(n, view);/* immutable: <hash> */
     } else {
         fprintf(stderr, "ERROR: Unknown bep44 subcommand: %s\n", sub);
-        fprintf(stderr, "Usage: %s bep44 <get|set> ...\n", prog_name);
+        fprintf(stderr, "Usage: %s bep44 <get|set|put> ...\n", prog_name);
         rc = 1;
     }
     free(view);
@@ -1400,12 +1412,12 @@ int main(int argc, char **argv) {
     } else if (strcmp(cmd, "keygen") == 0) {
         return do_keygen(argc, argv);
     } else if (strcmp(cmd, "bep44") == 0) {
-        /* Namespaced direct-DHT verbs: norn bep44 <get|set> ... (mutable) */
+        /* BEP-44 DHT records: norn bep44 <get|set|put> ...
+         *   set <name> <value>   — mutable, signed, salted by name
+         *   get <node-id> <name> — mutable (by publisher node-id + name)
+         *   put <value>          — immutable, content-addressed
+         *   get <hash>           — immutable (by content hash) */
         return do_bep44(argc, argv, optind + 1);
-    } else if (strcmp(cmd, "get") == 0) {
-        return do_get_immutable(argc, argv); /* immutable: norn get <hash> */
-    } else if (strcmp(cmd, "put") == 0) {
-        return do_put_immutable(argc, argv); /* immutable: norn put <value> */
     } else if (strcmp(cmd, "cluster") == 0) {
         if (optind + 1 >= argc) {
             fprintf(stdout, "Usage: %s cluster <subcommand> [ARGS...]\n", prog_name);

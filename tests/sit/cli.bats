@@ -106,20 +106,20 @@ setup() {
     [ -f "$WORK_DIR/env-key.pem" ]
 }
 
-@test "norn get (immutable) fails without hash" {
-    run "$NORN_BIN" get
+@test "norn bep44 get (immutable) fails without hash" {
+    run "$NORN_BIN" bep44 get
     [ "$status" -eq 1 ]
     [[ "$output" == *"hash"* ]] || [[ "$output" == *"missing"* ]]
 }
 
-@test "norn get (immutable) fails with invalid hex hash" {
-    run "$NORN_BIN" get invalid-hex-hash
+@test "norn bep44 get (immutable) fails with invalid hex hash" {
+    run "$NORN_BIN" bep44 get invalid-hex-hash
     [ "$status" -eq 1 ]
     [[ "$output" == *"hex"* ]] || [[ "$output" == *"invalid"* ]]
 }
 
-@test "norn get (immutable) fails with wrong-length hash" {
-    run "$NORN_BIN" get abc123
+@test "norn bep44 get (immutable) fails with wrong-length hash" {
+    run "$NORN_BIN" bep44 get abc123
     [ "$status" -eq 1 ]
     [[ "$output" == *"40"* ]] || [[ "$output" == *"length"* ]]
 }
@@ -130,8 +130,8 @@ setup() {
     [[ "$output" == *"name"* ]] || [[ "$output" == *"value"* ]] || [[ "$output" == *"Usage"* ]]
 }
 
-@test "norn put fails without value" {
-    run "$NORN_BIN" put
+@test "norn bep44 put fails without value" {
+    run "$NORN_BIN" bep44 put
     [ "$status" -eq 1 ]
     [[ "$output" == *"value"* ]] || [[ "$output" == *"missing"* ]] || [[ "$output" == *"Usage"* ]]
 }
