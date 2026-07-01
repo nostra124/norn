@@ -127,215 +127,215 @@ dist_launchd_DATA = contrib/launchd/io.norn.nornd.plist contrib/launchd/io.norn.
 
 check_PROGRAMS = test_norn test_bep44 test_dhtstore test_bencode test_crypto test_log test_kademlia test_recstore test_norn_async test_mainline test_channel test_channel_edges test_replaycache test_stream test_stream_edges test_stream_recovery test_stream_cc test_stream_random test_streammux test_streammux_random test_forward test_raft test_kvstore test_cluster test_overlay test_overlay_net test_transport test_transport_udp test_transport_tcp test_idexch test_attr test_net test_suite test_norn_kad test_norn_idexch test_norn_session test_session_loopback test_session_accept test_rendezvous test_holepunch test_relay test_nornd_ipc test_nornd_identity test_nornd_dispatch test_nornd_client test_localstore test_nornd_served_proto test_nornd_peers test_nornd_store test_nornd_served test_nornd_agent test_nornd_served_dial test_nornd_peer_fetch
 
-test_norn_SOURCES = tests/test_norn.c
+test_norn_SOURCES = tests/unit/test_norn.c
 test_norn_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_norn_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_bep44_SOURCES = tests/test_bep44.c
+test_bep44_SOURCES = tests/unit/test_bep44.c
 test_bep44_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_bep44_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_dhtstore_SOURCES = tests/test_dhtstore.c
+test_dhtstore_SOURCES = tests/unit/test_dhtstore.c
 test_dhtstore_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_dhtstore_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_bencode_SOURCES = tests/test_bencode.c
+test_bencode_SOURCES = tests/unit/test_bencode.c
 test_bencode_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_bencode_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_crypto_SOURCES = tests/test_crypto.c
+test_crypto_SOURCES = tests/unit/test_crypto.c
 test_crypto_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_crypto_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_log_SOURCES = tests/test_log.c
+test_log_SOURCES = tests/unit/test_log.c
 test_log_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_log_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_kademlia_SOURCES = tests/test_kademlia.c
+test_kademlia_SOURCES = tests/unit/test_kademlia.c
 test_kademlia_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_kademlia_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_recstore_SOURCES = tests/test_recstore.c
+test_recstore_SOURCES = tests/unit/test_recstore.c
 test_recstore_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_recstore_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_norn_async_SOURCES = tests/test_norn_async.c
+test_norn_async_SOURCES = tests/unit/test_norn_async.c
 test_norn_async_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_norn_async_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_mainline_SOURCES = tests/test_mainline.c
+test_mainline_SOURCES = tests/unit/test_mainline.c
 test_mainline_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_mainline_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_channel_SOURCES = tests/test_channel.c
+test_channel_SOURCES = tests/unit/test_channel.c
 test_channel_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_channel_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_channel_edges_SOURCES = tests/test_channel_edges.c
+test_channel_edges_SOURCES = tests/unit/test_channel_edges.c
 test_channel_edges_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_channel_edges_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_replaycache_SOURCES = tests/test_replaycache.c
+test_replaycache_SOURCES = tests/unit/test_replaycache.c
 test_replaycache_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_replaycache_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_stream_SOURCES = tests/test_stream.c
+test_stream_SOURCES = tests/unit/test_stream.c
 test_stream_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_stream_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_stream_edges_SOURCES = tests/test_stream_edges.c
+test_stream_edges_SOURCES = tests/unit/test_stream_edges.c
 test_stream_edges_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_stream_edges_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_stream_recovery_SOURCES = tests/test_stream_recovery.c
+test_stream_recovery_SOURCES = tests/unit/test_stream_recovery.c
 test_stream_recovery_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_stream_recovery_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_stream_cc_SOURCES = tests/test_stream_cc.c
+test_stream_cc_SOURCES = tests/unit/test_stream_cc.c
 test_stream_cc_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_stream_cc_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_stream_random_SOURCES = tests/test_stream_random.c
+test_stream_random_SOURCES = tests/unit/test_stream_random.c
 test_stream_random_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_stream_random_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_streammux_SOURCES = tests/test_streammux.c
+test_streammux_SOURCES = tests/unit/test_streammux.c
 test_streammux_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_streammux_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_streammux_random_SOURCES = tests/test_streammux_random.c
+test_streammux_random_SOURCES = tests/unit/test_streammux_random.c
 test_streammux_random_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_streammux_random_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_forward_SOURCES = tests/test_forward.c
+test_forward_SOURCES = tests/unit/test_forward.c
 test_forward_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_forward_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_raft_SOURCES = tests/test_raft.c
+test_raft_SOURCES = tests/unit/test_raft.c
 test_raft_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_raft_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_kvstore_SOURCES = tests/test_kvstore.c
+test_kvstore_SOURCES = tests/unit/test_kvstore.c
 test_kvstore_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_kvstore_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_cluster_SOURCES = tests/test_cluster.c
+test_cluster_SOURCES = tests/unit/test_cluster.c
 test_cluster_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_cluster_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_overlay_SOURCES = tests/test_overlay.c
+test_overlay_SOURCES = tests/unit/test_overlay.c
 test_overlay_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_overlay_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_overlay_net_SOURCES = tests/test_overlay_net.c
+test_overlay_net_SOURCES = tests/unit/test_overlay_net.c
 test_overlay_net_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_overlay_net_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_transport_SOURCES = tests/test_transport.c
+test_transport_SOURCES = tests/unit/test_transport.c
 test_transport_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_transport_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_transport_udp_SOURCES = tests/test_transport_udp.c
+test_transport_udp_SOURCES = tests/unit/test_transport_udp.c
 test_transport_udp_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_transport_udp_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_transport_tcp_SOURCES = tests/test_transport_tcp.c
+test_transport_tcp_SOURCES = tests/unit/test_transport_tcp.c
 test_transport_tcp_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_transport_tcp_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_idexch_SOURCES = tests/test_idexch.c
+test_idexch_SOURCES = tests/unit/test_idexch.c
 test_idexch_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_idexch_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_attr_SOURCES = tests/test_attr.c
+test_attr_SOURCES = tests/unit/test_attr.c
 test_attr_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_attr_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_net_SOURCES = tests/test_net.c
+test_net_SOURCES = tests/unit/test_net.c
 test_net_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_net_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_suite_SOURCES = tests/test_suite.c
+test_suite_SOURCES = tests/unit/test_suite.c
 test_suite_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_suite_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_norn_kad_SOURCES = tests/test_norn_kad.c
+test_norn_kad_SOURCES = tests/unit/test_norn_kad.c
 test_norn_kad_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_norn_kad_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_norn_idexch_SOURCES = tests/test_norn_idexch.c
+test_norn_idexch_SOURCES = tests/unit/test_norn_idexch.c
 test_norn_idexch_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_norn_idexch_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_norn_session_SOURCES = tests/test_norn_session.c
+test_norn_session_SOURCES = tests/unit/test_norn_session.c
 test_norn_session_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_norn_session_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_session_loopback_SOURCES = tests/test_session_loopback.c
+test_session_loopback_SOURCES = tests/unit/test_session_loopback.c
 test_session_loopback_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_session_loopback_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_session_accept_SOURCES = tests/test_session_accept.c
+test_session_accept_SOURCES = tests/unit/test_session_accept.c
 test_session_accept_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_session_accept_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_rendezvous_SOURCES = tests/test_rendezvous.c
+test_rendezvous_SOURCES = tests/unit/test_rendezvous.c
 test_rendezvous_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_rendezvous_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_holepunch_SOURCES = tests/test_holepunch.c
+test_holepunch_SOURCES = tests/unit/test_holepunch.c
 test_holepunch_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_holepunch_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_relay_SOURCES = tests/test_relay.c
+test_relay_SOURCES = tests/unit/test_relay.c
 test_relay_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn
 test_relay_LDADD = libnorn.la $(SODIUM_LIBS)
 
-test_nornd_ipc_SOURCES = tests/test_nornd_ipc.c
+test_nornd_ipc_SOURCES = tests/unit/test_nornd_ipc.c
 test_nornd_ipc_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 test_nornd_ipc_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
-test_nornd_identity_SOURCES = tests/test_nornd_identity.c
+test_nornd_identity_SOURCES = tests/unit/test_nornd_identity.c
 test_nornd_identity_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 test_nornd_identity_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
-test_nornd_dispatch_SOURCES = tests/test_nornd_dispatch.c
+test_nornd_dispatch_SOURCES = tests/unit/test_nornd_dispatch.c
 test_nornd_dispatch_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 test_nornd_dispatch_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
-test_nornd_client_SOURCES = tests/test_nornd_client.c
+test_nornd_client_SOURCES = tests/unit/test_nornd_client.c
 test_nornd_client_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 test_nornd_client_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
-test_nornd_served_proto_SOURCES = tests/test_nornd_served_proto.c
+test_nornd_served_proto_SOURCES = tests/unit/test_nornd_served_proto.c
 test_nornd_served_proto_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 test_nornd_served_proto_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
-test_nornd_peers_SOURCES = tests/test_nornd_peers.c
+test_nornd_peers_SOURCES = tests/unit/test_nornd_peers.c
 test_nornd_peers_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 test_nornd_peers_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
-test_nornd_peer_fetch_SOURCES = tests/test_nornd_peer_fetch.c
+test_nornd_peer_fetch_SOURCES = tests/unit/test_nornd_peer_fetch.c
 test_nornd_peer_fetch_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 test_nornd_peer_fetch_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
-test_nornd_store_SOURCES = tests/test_nornd_store.c
+test_nornd_store_SOURCES = tests/unit/test_nornd_store.c
 test_nornd_store_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 test_nornd_store_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
-test_localstore_SOURCES = tests/test_localstore.c
+test_localstore_SOURCES = tests/unit/test_localstore.c
 test_localstore_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 test_localstore_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
-test_nornd_served_SOURCES = tests/test_nornd_served.c
+test_nornd_served_SOURCES = tests/unit/test_nornd_served.c
 test_nornd_served_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 test_nornd_served_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
-test_nornd_agent_SOURCES = tests/test_nornd_agent.c
+test_nornd_agent_SOURCES = tests/unit/test_nornd_agent.c
 test_nornd_agent_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 test_nornd_agent_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
-test_nornd_served_dial_SOURCES = tests/test_nornd_served_dial.c
+test_nornd_served_dial_SOURCES = tests/unit/test_nornd_served_dial.c
 test_nornd_served_dial_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 test_nornd_served_dial_LDADD = libnornd.la libnorn.la $(SODIUM_LIBS)
 
