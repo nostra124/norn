@@ -25,6 +25,7 @@
 #include "norn_cluster.h"
 #include "norn_raft.h"
 #include "peers.h"
+#include "publog.h"
 #include "served.h"
 #include "served_conn.h"
 #include "store.h"
@@ -167,6 +168,7 @@ typedef struct {
     nornd_serve_conn_t conns[MAX_SERVE];
     int n;
     localstore_t lstore;   /* `norn node set` keys: local, non-replicated */
+    publog_t publog;       /* `norn bep44 set/put` publish log */
 } serve_host_t;
 
 /* served-KV backend: read GET/LIST from the local store (node-set keys). */
@@ -383,6 +385,7 @@ typedef struct {
     time_t start_time;
     uint16_t listen_port;   /* the DHT UDP port we listen on (for the self row) */
     localstore_t *lstore;    /* `norn node set` keys (the served local store) */
+    publog_t *publog;        /* `norn bep44 set/put` publish log */
 } serve_ctx_t;
 
 /* Read, decode, dispatch and reply to one ready client. Returns 0 to keep the
@@ -417,6 +420,25 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
             resp.has_err = 1;
             strcpy(resp.err, "store full or key too large");
         } else {
+            resp.ok = 1;
+        }
+    } else if (strcmp(req.op, "publog-add") == 0) {
+        /* `norn bep44 set/put` logs the publish here so `bep44 list` can show
+         * our own records. req.key = 20-byte target; req.val packs:
+         * [immutable:1][vlen:4][seq:4][name...]. */
+        if (req.klen != 20 || !req.has_val || !ctx->publog || req.vlen < 9) {
+            resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "bad publog request");
+        } else {
+            int immutable = req.val[0] ? 1 : 0;
+            uint32_t vlen, seq;
+            memcpy(&vlen, req.val + 1, 4);
+            memcpy(&seq, req.val + 5, 4);
+            const char *name = (const char *)req.val + 9;
+            size_t namelen = req.vlen - 9;
+            char namebuf[128] = {0};
+            if (namelen && namelen < sizeof(namebuf)) memcpy(namebuf, name, namelen);
+            publog_add(ctx->publog, req.key, immutable,
+                       namelen ? namebuf : NULL, (size_t)vlen, seq);
             resp.ok = 1;
         }
     } else if (strcmp(req.op, "node-public") == 0) {
@@ -571,15 +593,34 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
         #undef APPEND_ROW
         resp.vlen = off;
     } else if (strcmp(req.op, "bep44-list") == 0) {
-        /* `norn bep44 list`: enumerate the DHT records this node is holding on
-         * behalf of the network, as TSV (Target, Type, Size, Seq, Stored). */
+        /* `norn bep44 list`: two sections — records this node PUBLISHED (from
+         * the publog) and records this node is HOLDING for the DHT (from the
+         * dhtstore). TSV: Target, Type, Size, Seq, Stored, Name, Source. */
         resp.ok = 1;
         resp.has_val = 1;
         size_t off = 0;
         int wn = snprintf((char *)resp.val + off, sizeof(resp.val) - off,
-            "Target\tType\tSize\tSeq\tStored\n");
+            "Target\tType\tSize\tSeq\tStored\tName\tSource\n");
         if (wn > 0) off += (size_t)wn;
-        /* mutable then immutable */
+        /* Section 1: records this node published (publog). */
+        if (ctx->publog) {
+            int np = publog_count(ctx->publog);
+            for (int i = 0; i < np && off + 1 < sizeof(resp.val); i++) {
+                const publog_entry_t *e = publog_get(ctx->publog, i);
+                if (!e) break;
+                char tgt[41];
+                for (int b = 0; b < 20; b++) snprintf(tgt + b * 2, 3, "%02x", e->target[b]);
+                wn = snprintf((char *)resp.val + off, sizeof(resp.val) - off,
+                    "%s\t%s\t%zu\t%u\t%ld\t%s\tpublished\n", tgt,
+                    e->immutable ? "immutable" : "mutable",
+                    e->vlen, e->seq, (long)e->published,
+                    e->name[0] ? e->name : "-");
+                if (wn < 0) break;
+                if ((size_t)wn >= sizeof(resp.val) - off) break;
+                off += (size_t)wn;
+            }
+        }
+        /* Section 2: records this node is holding for the DHT (dhtstore). */
         for (int kind = 0; kind < 2; kind++) {
             norn_dht_item_t items[64];
             int n = norn_dht_list(kind, items, 64);
@@ -589,7 +630,7 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
                 for (int b = 0; b < 20; b++)
                     snprintf(tgt + b * 2, 3, "%02x", items[i].target[b]);
                 wn = snprintf((char *)resp.val + off, sizeof(resp.val) - off,
-                    "%s\t%s\t%zu\t%u\t%ld\n", tgt,
+                    "%s\t%s\t%zu\t%u\t%ld\t-\theld\n", tgt,
                     items[i].immutable ? "immutable" : "mutable",
                     items[i].vlen, items[i].seq, items[i].stored);
                 if (wn < 0) break;
@@ -780,7 +821,7 @@ int main(int argc, char **argv) {
     norn_cluster_kv_watch(cl, (const unsigned char *)"", 0, on_kv_change,
                           &watches);
 
-    serve_ctx_t srv = {&be, &watches, &kp, client, time(NULL), listen_port, NULL};
+    serve_ctx_t srv = {&be, &watches, &kp, client, time(NULL), listen_port, NULL, NULL};
 
     /* Node-served KV (FEAT-033): host GET/LIST from the cluster KV and CAT from a
      * file-backed object store under <data-dir>/objects, served to peers that
@@ -805,6 +846,8 @@ int main(int argc, char **argv) {
          * independent of the optional file-backed object store. */
         localstore_init(&serve.lstore);
         srv.lstore = &serve.lstore;
+        publog_init(&serve.publog);
+        srv.publog = &serve.publog;
         snprintf(objdir, sizeof(objdir), "%s/objects", base);
         if (nornd_store_init(&serve_store, objdir) == 0) {
             serve.be.ctx = &serve;

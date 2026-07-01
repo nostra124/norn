@@ -51,7 +51,7 @@ libnorn_la_LIBADD = $(SODIUM_LIBS) $(AVAHI_LIBS)
 # (not part of the library). Convenience lib so the daemon and its tests share
 # the same object code.
 noinst_LTLIBRARIES = libnornd.la
-libnornd_la_SOURCES = src/nornd/ipc.c src/nornd/identity.c src/nornd/dispatch.c src/nornd/client.c src/nornd/cli_cluster.c src/nornd/cli_peer.c src/nornd/served_proto.c src/nornd/store.c src/nornd/served.c src/nornd/served_conn.c src/nornd/localstore.c src/nornd/agent.c src/nornd/peers.c src/nornd/transport.c
+libnornd_la_SOURCES = src/nornd/ipc.c src/nornd/identity.c src/nornd/dispatch.c src/nornd/client.c src/nornd/cli_cluster.c src/nornd/cli_peer.c src/nornd/served_proto.c src/nornd/store.c src/nornd/served.c src/nornd/served_conn.c src/nornd/localstore.c src/nornd/publog.c src/nornd/agent.c src/nornd/peers.c src/nornd/transport.c
 libnornd_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 
 # Internal headers: not installed, but must ship in the tarball (they're
@@ -59,7 +59,7 @@ libnornd_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_s
 noinst_HEADERS = src/nornd/ipc.h src/nornd/identity.h src/nornd/dispatch.h \
                  src/nornd/client.h src/nornd/cli_cluster.h \
                  src/nornd/cli_peer.h \
-                src/nornd/localstore.h src/nornd/served_proto.h src/nornd/store.h \
+                src/nornd/localstore.h src/nornd/publog.h src/nornd/served_proto.h src/nornd/store.h \
                 src/nornd/served.h src/nornd/served_conn.h src/nornd/agent.h \
                  src/nornd/peers.h src/nornd/transport.h \
                  src/libnorn/norn_internal.h src/libnorn/norn_session_internal.h \

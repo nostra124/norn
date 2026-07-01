@@ -543,6 +543,40 @@ static int ipc_round_trip_key(const char *op, const unsigned char *key, size_t k
     return 0;
 }
 
+/* Notify nornd of a successful bep44 publish so `bep44 list` can show it.
+ * Packs [immutable:1][vlen:4][seq:4][name...] into the value. Best-effort:
+ * failure is non-fatal (the record is already published to the DHT). */
+static void publog_notify(const unsigned char *target, int immutable,
+                          size_t vlen, uint32_t seq, const char *name) {
+    unsigned char val[200];
+    if (sizeof(val) < 9 + (name ? strlen(name) : 0)) return;
+    val[0] = immutable ? 1 : 0;
+    memcpy(val + 1, &vlen, 4);
+    memcpy(val + 5, &seq, 4);
+    size_t nl = name ? strlen(name) : 0;
+    if (nl) memcpy(val + 9, name, nl);
+    size_t vlen_total = 9 + nl;
+    char pbuf[512];
+    const char *path = nornd_socket_path(pbuf, sizeof(pbuf));
+    int fd = ipc_connect(path);
+    if (fd < 0) return;
+    nornd_ipc_req_t req;
+    memset(&req, 0, sizeof(req));
+    strcpy(req.op, "publog-add");
+    memcpy(req.key, target, 20);
+    req.klen = 20;
+    memcpy(req.val, val, vlen_total);
+    req.vlen = vlen_total;
+    req.has_val = 1;
+    unsigned char wire[NORND_IPC_MAX_BODY + 4];
+    int wlen = nornd_ipc_encode_req(&req, wire, sizeof(wire));
+    if (wlen > 0) {
+        ssize_t w = write(fd, wire, (size_t)wlen);
+        (void)w;
+    }
+    close(fd);
+}
+
 static int do_node_secret(int argc, char **argv) {
     static struct option long_opts[] = {
         {"help", no_argument, 0, 'h'},
@@ -996,6 +1030,7 @@ static int do_put_immutable(int argc, char **argv) {
     /* The immutable target = SHA1(bencode(value)); compute it for display. */
     unsigned char target[20];
     bep44_immutable_target((const unsigned char *)value, value_len, target);
+    publog_notify(target, 1, value_len, 0, NULL);
     printf("%s", col_magenta());
     for (int i = 0; i < 20; i++) printf("%02x", target[i]);
     printf("%s\n", col_reset());
@@ -1187,6 +1222,11 @@ static int do_set(int argc, char **argv) {
     }
     /* Give the announce time to reach the storing nodes. */
     dht_pump(client, timeout_ms, NULL);
+
+    /* Compute the target so we can log the publish + show it. */
+    unsigned char target[20];
+    bep44_target_salted(pubkey, (const unsigned char *)name, strlen(name), target);
+    publog_notify(target, 0, value_len, seq, name);
 
     /* recfile output: key=<hex>\nseq=<n>\nname=<name>\n */
     char rec[160];
