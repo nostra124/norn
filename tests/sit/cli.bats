@@ -154,17 +154,6 @@ setup() {
     [ "$status" -ne 0 ]
 }
 
-@test "norn --log-level debug accepts debug" {
-    run "$NORN_BIN" --log-level debug version
-    [ "$status" -eq 0 ]
-}
-
-@test "norn --log-level invalid rejects invalid level" {
-    run "$NORN_BIN" --log-level invalid version
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"Invalid"* ]] || [[ "$output" == *"invalid"* ]]
-}
-
 @test "norn --port accepts valid port" {
     run "$NORN_BIN" --port 6881 version
     [ "$status" -eq 0 ]

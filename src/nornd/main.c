@@ -412,6 +412,47 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
         memcpy(resp.val, "pong", 4);
         resp.vlen = 4;
         resp.has_val = 1;
+    } else if (strcmp(req.op, "node-keygen") == 0) {
+        /* `norn keygen` / `norn node keygen`: generate an Ed25519 keypair and
+         * save to the path in req.val (or the default identity path). Returns
+         * the 32-byte public key. */
+        keypair_t newkp;
+        if (crypto_keypair_new(&newkp) != 0) {
+            resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "keypair generation failed");
+        } else {
+            /* Determine the path. */
+            char path[600];
+            if (req.has_val && req.vlen > 0 && req.vlen < sizeof(path)) {
+                memcpy(path, req.val, req.vlen);
+                path[req.vlen] = '\0';
+            } else {
+                const char *home = getenv("HOME");
+                if (!home) home = "/tmp";
+                snprintf(path, sizeof(path), "%s/.config/norn/key.pem", home);
+            }
+            /* Create parent dirs. */
+            char dir[600];
+            strncpy(dir, path, sizeof(dir) - 1);
+            dir[sizeof(dir) - 1] = '\0';
+            char *last = strrchr(dir, '/');
+            if (last) { *last = '\0'; mkdir(dir[0] ? dir : "/", 0700); }
+            if (access(path, F_OK) == 0) {
+                resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "key file already exists");
+            } else {
+                FILE *f = fopen(path, "wb");
+                if (!f) {
+                    resp.ok = 0; resp.has_err = 1;
+                    snprintf(resp.err, sizeof(resp.err), "cannot create key file");
+                } else {
+                    fwrite(&newkp, sizeof(newkp), 1, f);
+                    fclose(f);
+                    chmod(path, 0600);
+                    resp.ok = 1; resp.has_val = 1;
+                    memcpy(resp.val, newkp.public_key, 32);
+                    resp.vlen = 32;
+                }
+            }
+        }
     } else if (strcmp(req.op, "node-set") == 0) {
         /* `norn node set <name> <value>`: store a local (non-replicated) key in
          * the served store. req.key = name, req.val = value. */
@@ -671,6 +712,109 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
         }
         #undef APPEND_ROW
         resp.vlen = off;
+    } else if (strcmp(req.op, "bep44-get") == 0) {
+        /* `norn bep44 get <node-id> <name>`: resolve the publisher's pubkey
+         * from the node-id, compute the salted target, then check the publog
+         * + dhtstore for a local hit (instant — works for own records and
+         * records this node is holding). req.key = 20-byte node-id;
+         * req.val = name string. */
+        if (req.klen != 20 || !req.has_val || req.vlen == 0) {
+            resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "missing node-id or name");
+        } else {
+            /* Resolve pubkey: own node-id or routing table. */
+            unsigned char pk[32];
+            int got_pk = 0;
+            unsigned char self_id[20];
+            if (norn_get_id(ctx->client, self_id) == 0 &&
+                memcmp(req.key, self_id, 20) == 0) {
+                memcpy(pk, ctx->kp->public_key, 32);
+                got_pk = 1;
+            } else {
+                if (norn_routing_pubkey(ctx->client, req.key, pk) == 1)
+                    got_pk = 1;
+            }
+            if (!got_pk) {
+                resp.ok = 0; resp.has_err = 1;
+                strcpy(resp.err, "pubkey unknown (not a norn peer)");
+            } else {
+                /* Compute the salted target. */
+                unsigned char target[20];
+                bep44_target_salted(pk, req.val, req.vlen, target);
+                /* Check the publog (own published records). */
+                int found = 0;
+                if (ctx->publog) {
+                    int np = publog_count(ctx->publog);
+                    for (int i = 0; i < np && !found; i++) {
+                        const publog_entry_t *e = publog_get(ctx->publog, i);
+                        if (!e || e->immutable) continue;
+                        if (memcmp(e->target, target, 20) == 0) {
+                            resp.ok = 1;
+                            resp.has_val = 1;
+                            size_t vl = e->vlen;
+                            if (vl > sizeof(resp.val)) vl = sizeof(resp.val);
+                            memcpy(resp.val, e->value, vl);
+                            resp.vlen = vl;
+                            found = 1;
+                        }
+                    }
+                }
+                /* Check the dhtstore (held records). */
+                if (!found) {
+                    unsigned char vbuf[1024];
+                    int vgot = norn_dht_get_value(target, vbuf, sizeof(vbuf));
+                    if (vgot > 0) {
+                        resp.ok = 1;
+                        resp.has_val = 1;
+                        memcpy(resp.val, vbuf, (size_t)vgot);
+                        resp.vlen = (size_t)vgot;
+                        found = 1;
+                    }
+                }
+                if (!found) {
+                    resp.ok = 0;
+                    resp.has_err = 1;
+                    strcpy(resp.err, "not found locally (DHT lookup not yet supported via IPC)");
+                }
+            }
+        }
+    } else if (strcmp(req.op, "bep44-get-immutable") == 0) {
+        /* `norn bep44 get <hash>` (immutable): fetch a content-addressed record
+         * by its 40-hex SHA1 key. Checks the dhtstore first (held records),
+         * then the publog (own published). req.key = 20-byte hash. */
+        if (req.klen != 20) {
+            resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "key must be 20 bytes");
+        } else {
+            int found = 0;
+            /* Check dhtstore. */
+            unsigned char vbuf[1024];
+            int vgot = norn_dht_get_value(req.key, vbuf, sizeof(vbuf));
+            if (vgot > 0) {
+                resp.ok = 1; resp.has_val = 1;
+                memcpy(resp.val, vbuf, (size_t)vgot);
+                resp.vlen = (size_t)vgot;
+                found = 1;
+            }
+            /* Check publog. */
+            if (!found && ctx->publog) {
+                int np = publog_count(ctx->publog);
+                for (int i = 0; i < np && !found; i++) {
+                    const publog_entry_t *e = publog_get(ctx->publog, i);
+                    if (!e || !e->immutable) continue;
+                    if (memcmp(e->target, req.key, 20) == 0) {
+                        resp.ok = 1; resp.has_val = 1;
+                        size_t vl = e->vlen;
+                        if (vl > sizeof(resp.val)) vl = sizeof(resp.val);
+                        memcpy(resp.val, e->value, vl);
+                        resp.vlen = vl;
+                        found = 1;
+                    }
+                }
+            }
+            if (!found) {
+                resp.ok = 0; resp.has_err = 1;
+                strcpy(resp.err, "not found locally");
+            }
+        }
     } else if (strcmp(req.op, "bep44-del") == 0) {
         /* `norn bep44 del <target>`: delete a held DHT record by its 20-byte
          * target hash. req.key = target. */

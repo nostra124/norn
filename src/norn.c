@@ -14,10 +14,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include "config.h"
-#include "libnorn/norn.h"
-#include "libnorn/bep44.h"
-#include "libnorn/crypto.h"
-#include "libnorn/log.h"
 #include "nornd/cli_cluster.h"
 #include "nornd/cli_peer.h"
 #include "nornd/ipc.h"
@@ -31,7 +27,13 @@ static const char *prog_name = "norn";
 static char *key_file = NULL;
 static int port = DEFAULT_PORT;
 static int timeout_ms = DEFAULT_TIMEOUT;
-static int log_level = LOG_INFO;
+
+/* Forward declarations for IPC helpers used before definition. */
+static int ipc_round_trip_kv_bin(const char *op,
+                                 const unsigned char *key, size_t klen,
+                                 const unsigned char *value, size_t vlen,
+                                 unsigned char *resp_val, size_t *resp_vlen,
+                                 size_t resp_cap);
 
 /* stdout is a terminal (colorize+align); when piped, emit plain recfile/tsv. */
 static int stdout_is_tty(void) {
@@ -151,8 +153,6 @@ static void usage(FILE *out) {
     fprintf(out, "  --key <path>       Ed25519 keypair (default: ~/.config/norn/key.pem)\n");
     fprintf(out, "  --port <port>      DHT UDP port (default: 6881)\n");
     fprintf(out, "  --timeout <ms>     Query timeout (default: 5000)\n");
-    fprintf(out, "  --log-level <lvl>  Log level: debug, info, warn, error\n");
-
     fprintf(out, "  --help             Show this help\n");
     fputc('\n', out);
 
@@ -170,98 +170,6 @@ static void usage(FILE *out) {
     fputc('\n', out);
 }
 
-static char *get_default_key_path(void) {
-    const char *home = getenv("HOME");
-    if (!home) {
-        fprintf(stderr, "ERROR: HOME environment variable not set\n");
-        return NULL;
-    }
-    
-    char *path = malloc(strlen(home) + strlen("/.config/norn/key.pem") + 1);
-    if (!path) {
-        fprintf(stderr, "ERROR: Out of memory\n");
-        return NULL;
-    }
-    
-    sprintf(path, "%s/.config/norn/key.pem", home);
-    return path;
-}
-
-static int create_key_dir(const char *key_path) {
-    char *dir = strdup(key_path);
-    if (!dir) return -1;
-
-    char *last_slash = strrchr(dir, '/');
-    if (!last_slash) {
-        free(dir);
-        return 0;
-    }
-    *last_slash = '\0';
-
-    /* Create each path component (mkdir -p), so a default path like
-     * ~/.config/norn works even when the ~/.config parent doesn't exist yet. */
-    for (char *p = dir + 1; *p; p++) {
-        if (*p != '/')
-            continue;
-        *p = '\0';
-        if (mkdir(dir, 0700) != 0 && errno != EEXIST) {
-            fprintf(stderr, "ERROR: Failed to create directory %s: %s\n", dir, strerror(errno));
-            free(dir);
-            return -1;
-        }
-        *p = '/';
-    }
-    if (mkdir(dir, 0700) != 0 && errno != EEXIST) {
-        fprintf(stderr, "ERROR: Failed to create directory %s: %s\n", dir, strerror(errno));
-        free(dir);
-        return -1;
-    }
-
-    free(dir);
-    return 0;
-}
-
-static int load_keypair(unsigned char pubkey[32], unsigned char secret[64]) {
-    /* Only a path from get_default_key_path() is heap-owned here; `key_file`
-     * and a NORN_KEY value from getenv() are borrowed and must not be freed. */
-    const char *path = key_file;
-    int owned = 0;
-    if (!path) {
-        path = getenv("NORN_KEY");
-    }
-    if (!path) {
-        path = get_default_key_path();
-        if (!path) return -1;
-        owned = 1;
-    }
-
-    FILE *f = fopen(path, "r");
-    if (!f) {
-        fprintf(stderr, "ERROR: Failed to open key file %s: %s\n", path, strerror(errno));
-        fprintf(stderr, "HINT: Run 'norn keygen' to create a keypair\n");
-        if (owned) free((char*)path);
-        return -1;
-    }
-
-    keypair_t kp;
-    memset(&kp, 0, sizeof(kp));
-
-    if (fread(&kp, sizeof(kp), 1, f) != 1) {
-        fprintf(stderr, "ERROR: Failed to read key file %s\n", path);
-        fclose(f);
-        if (owned) free((char*)path);
-        return -1;
-    }
-
-    fclose(f);
-
-    memcpy(pubkey, kp.public_key, 32);
-    memcpy(secret, kp.secret_key, 64);
-
-    if (owned) free((char*)path);
-    return 0;
-}
-
 static int do_version(void) {
     printf("norn %s\n", NORN_VERSION);
     return 0;
@@ -273,13 +181,12 @@ static int do_keygen(int argc, char **argv) {
         {"help", no_argument, 0, 'h'},
         {0, 0, 0, 0}
     };
-    
+
     int opt;
-    char *key_path = NULL;
-    int owned = 0; /* 1 only when key_path is heap-owned (get_default_key_path) */
+    const char *key_path = NULL;
 
     optind = 2;
-    
+
     while ((opt = getopt_long(argc, argv, "+k:h", long_options, NULL)) != -1) {
         switch (opt) {
             case 'k':
@@ -293,60 +200,27 @@ static int do_keygen(int argc, char **argv) {
                 return 1;
         }
     }
-    
-    if (!key_path) {
-        /* Honor a global `--key` given before the subcommand (the top-level
-         * getopt consumed it into key_file). */
-        key_path = key_file;
-    }
-    if (!key_path) {
-        key_path = getenv("NORN_KEY");
-    }
-    if (!key_path) {
-        key_path = get_default_key_path();
-        if (!key_path) return 1;
-        owned = 1;
-    }
 
-    if (access(key_path, F_OK) == 0) {
-        fprintf(stderr, "ERROR: Key file already exists: %s\n", key_path);
-        fprintf(stderr, "HINT: Remove the file or use --key to specify a different path\n");
-        if (owned) free(key_path);
+    if (!key_path) key_path = key_file;
+    if (!key_path) key_path = getenv("NORN_KEY");
+
+    /* Send to nornd; nornd generates the keypair, saves it, returns the
+     * 32-byte public key. If key_path is given, pass it as the value. */
+    unsigned char pubkey[32];
+    size_t pklen = 0;
+    if (ipc_round_trip_kv_bin("node-keygen", NULL, 0,
+                              (const unsigned char *)key_path,
+                              key_path ? strlen(key_path) : 0,
+                              pubkey, &pklen, sizeof(pubkey)) != 0) {
         return 1;
     }
-    
-    if (create_key_dir(key_path) != 0) {
-        if (owned) free(key_path);
+    if (pklen != 32) {
+        fprintf(stderr, "norn keygen: unexpected response length\n");
         return 1;
     }
-    
-    keypair_t kp;
-    crypto_keypair_new(&kp);
-    
-    FILE *f = fopen(key_path, "wb");
-    if (!f) {
-        fprintf(stderr, "ERROR: Failed to create key file %s: %s\n", key_path, strerror(errno));
-        if (owned) free(key_path);
-        return 1;
-    }
-    
-    if (fwrite(&kp, sizeof(kp), 1, f) != 1) {
-        fprintf(stderr, "ERROR: Failed to write key file %s\n", key_path);
-        fclose(f);
-        if (owned) free(key_path);
-        return 1;
-    }
-    
-    fclose(f);
-    chmod(key_path, 0600);
-    
     printf("%s", col_green());
-    for (int i = 0; i < 32; i++) {
-        printf("%02x", kp.public_key[i]);
-    }
+    for (int i = 0; i < 32; i++) printf("%02x", pubkey[i]);
     printf("%s\n", col_reset());
-    
-    if (owned) free(key_path);
     return 0;
 }
 
@@ -862,69 +736,21 @@ static int do_node_log(int argc, char **argv) {
     return 1;
 }
 
-/* Drive the DHT event loop for up to `budget_ms`, returning early once `*done`
- * (if given) becomes non-zero. Polls the socket so we wake on incoming packets
- * but still tick on the timeout slice to drive retransmits and query timeouts. */
-static void dht_pump(norn_client_t *client, int budget_ms, const volatile int *done) {
-    int fd = norn_get_fd(client);
-    const int slice = 100;
-    for (int spent = 0; spent < budget_ms; spent += slice) {
-        if (done && *done)
-            return;
-        struct pollfd pfd = { .fd = fd, .events = POLLIN, .revents = 0 };
-        poll(&pfd, 1, slice);
-        norn_tick(client);
-    }
-}
-
-/* Capture the first value delivered by a get_mutable/get_immutable query. */
-struct dht_get_ctx {
-    int found;
-    unsigned char value[1024];
-    size_t len;
-};
-
-static void on_dht_value(void *ud, const unsigned char *value, size_t value_len) {
-    struct dht_get_ctx *c = ud;
-    if (c->found)
-        return; /* keep the first result */
-    if (value_len > sizeof(c->value))
-        value_len = sizeof(c->value);
-    memcpy(c->value, value, value_len);
-    c->len = value_len;
-    c->found = 1;
-}
-
-/* `norn bep44 get <node-id> <name>` — retrieve a salted mutable record.
- * Resolve the publisher's Ed25519 pubkey from the 40-hex DHT node-id (via the
- * running nornd's routing table, which learned it from the norn "pk"
- * extension), then fetch the record named <name> under that pubkey. */
+/* `norn bep44 get <node-id> <name>` — retrieve a named mutable record.
+ * Pure IPC: sends node-id + name to nornd, which resolves the pubkey,
+ * checks the publog + dhtstore locally, and returns the value. */
 static int do_get(int argc, char **argv) {
     static struct option long_options[] = {
-        {"key", required_argument, 0, 'k'},
-        {"timeout", required_argument, 0, 't'},
         {"help", no_argument, 0, 'h'},
         {0, 0, 0, 0}
     };
 
     int opt;
-
     optind = 2;
-
-    while ((opt = getopt_long(argc, argv, "+k:t:h", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "+h", long_options, NULL)) != -1) {
         switch (opt) {
-            case 'k':
-                key_file = optarg;
-                break;
-            case 't':
-                timeout_ms = atoi(optarg);
-                if (timeout_ms <= 0) {
-                    fprintf(stderr, "ERROR: Invalid timeout: %s\n", optarg);
-                    return 1;
-                }
-                break;
             case 'h':
-                fprintf(stdout, "Usage: %s bep44 get [OPTIONS] <node-id> <name>\n", prog_name);
+                fprintf(stdout, "Usage: %s bep44 get <node-id> <name>\n", prog_name);
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Retrieve a named mutable record from the DHT (BEP-44).\n");
                 fprintf(stdout, "The publisher's pubkey is resolved from the 40-hex\n");
@@ -933,11 +759,7 @@ static int do_get(int argc, char **argv) {
                 fprintf(stdout, "Arguments:\n");
                 fprintf(stdout, "  <node-id>       40-hex DHT node id of the publisher\n");
                 fprintf(stdout, "  <name>          Record name (the salt)\n");
-                fprintf(stdout, "\n");
-                fprintf(stdout, "Options:\n");
-                fprintf(stdout, "  --key <path>      Key file path\n");
-                fprintf(stdout, "  --timeout <ms>    Query timeout (default: %d)\n", DEFAULT_TIMEOUT);
-                fprintf(stdout, "  --help            Show this help\n");
+                fprintf(stdout, "  --help          Show this help\n");
                 return 0;
             default:
                 return 1;
@@ -964,64 +786,18 @@ static int do_get(int argc, char **argv) {
         return 1;
     }
 
-    /* Resolve the publisher's pubkey from the node-id via nornd. */
-    unsigned char peer_pk[32];
-    size_t pklen = 0;
-    if (ipc_round_trip_key("peer-public", node_id, 20, peer_pk, &pklen, sizeof(peer_pk)) != 0) {
-        fprintf(stderr, "norn: could not resolve pubkey for node %s\n", nodeid_str);
-        return 1;
-    }
-    if (pklen != 32) {
-        fprintf(stderr, "norn: unexpected pubkey response length\n");
-        return 1;
-    }
-
-    unsigned char self_pub[32], self_sec[64];
-    if (load_keypair(self_pub, self_sec) != 0) {
-        return 1;
-    }
-
-    norn_config_t cfg;
-    memset(&cfg, 0, sizeof(cfg));
-    cfg.version = NORN_VERSION;
-
-    norn_client_t *client = norn_new(self_pub, self_sec, &cfg);
-    if (!client) {
-        fprintf(stderr, "ERROR: Failed to create DHT client\n");
-        return 1;
-    }
-
-    if (norn_bootstrap(client) != 0) {
-        fprintf(stderr, "ERROR: DHT bootstrap failed (no network?)\n");
-        norn_free(client);
-        return 1;
-    }
-    /* Let the routing table populate before querying. */
-    dht_pump(client, 500, NULL);
-
-    struct dht_get_ctx ctx;
-    memset(&ctx, 0, sizeof(ctx));
-    if (norn_get_mutable_salt(client, peer_pk,
+    /* Send node-id + name to nornd; nornd resolves pubkey, checks publog +
+     * dhtstore, returns the value. */
+    unsigned char val[4096];
+    size_t vlen = 0;
+    if (ipc_round_trip_kv_bin("bep44-get", node_id, 20,
                               (const unsigned char *)name, strlen(name),
-                              on_dht_value, &ctx) != 0) {
-        fprintf(stderr, "ERROR: Failed to start DHT get\n");
-        norn_free(client);
+                              val, &vlen, sizeof(val)) != 0) {
         return 1;
     }
-    dht_pump(client, timeout_ms, &ctx.found);
-
-    int rc;
-    if (ctx.found) {
-        fwrite(ctx.value, 1, ctx.len, stdout);
-        fputc('\n', stdout);
-        rc = 0;
-    } else {
-        fprintf(stderr, "norn: no value found for %s/%s\n", nodeid_str, name);
-        rc = 1;
-    }
-
-    norn_free(client);
-    return rc;
+    fwrite(val, 1, vlen, stdout);
+    fputc('\n', stdout);
+    return 0;
 }
 
 /* `norn put <value>` — publish an immutable BEP-44 record (content-addressed:
@@ -1087,32 +863,22 @@ static int do_put_immutable(int argc, char **argv) {
     return 0;
 }
 
-/* `norn get <hash>` — retrieve an immutable BEP-44 record by its 40-hex SHA1
- * content hash. The value is self-verifying (hash matches the content). */
+/* `norn bep44 get <hash>` (immutable) — retrieve a content-addressed record
+ * by its 40-hex SHA1 key. Pure IPC via bep44-get-immutable. */
 static int do_get_immutable(int argc, char **argv) {
     static struct option long_options[] = {
-        {"key", required_argument, 0, 'k'},
-        {"timeout", required_argument, 0, 't'},
         {"help", no_argument, 0, 'h'},
         {0, 0, 0, 0}
     };
     int opt;
     optind = 2;
-    while ((opt = getopt_long(argc, argv, "+k:t:h", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "+h", long_options, NULL)) != -1) {
         switch (opt) {
-            case 'k': key_file = optarg; break;
-            case 't':
-                timeout_ms = atoi(optarg);
-                if (timeout_ms <= 0) { fprintf(stderr, "ERROR: Invalid timeout: %s\n", optarg); return 1; }
-                break;
             case 'h':
-                printf("Usage: %s get [OPTIONS] <hash>\n", prog_name);
+                printf("Usage: %s bep44 get <hash>\n", prog_name);
                 printf("\n");
                 printf("Retrieve an immutable record from the DHT (BEP-44) by its\n");
                 printf("40-hex SHA1 content hash.\n");
-                printf("\nOptions:\n");
-                printf("  --key <path>      Key file path\n");
-                printf("  --timeout <ms>    Query timeout (default: %d)\n", DEFAULT_TIMEOUT);
                 printf("  --help            Show this help\n");
                 return 0;
             default: return 1;
@@ -1120,7 +886,7 @@ static int do_get_immutable(int argc, char **argv) {
     }
     if (optind >= argc) {
         fprintf(stderr, "ERROR: missing <hash>\n");
-        fprintf(stderr, "Usage: %s get <hash>\n", prog_name);
+        fprintf(stderr, "Usage: %s bep44 get <hash>\n", prog_name);
         return 1;
     }
     const char *hash_str = argv[optind];
@@ -1134,41 +900,15 @@ static int do_get_immutable(int argc, char **argv) {
         return 1;
     }
 
-    unsigned char self_pub[32], self_sec[64];
-    if (load_keypair(self_pub, self_sec) != 0) return 1;
-
-    norn_config_t cfg;
-    memset(&cfg, 0, sizeof(cfg));
-    cfg.version = NORN_VERSION;
-    norn_client_t *client = norn_new(self_pub, self_sec, &cfg);
-    if (!client) { fprintf(stderr, "ERROR: Failed to create DHT client\n"); return 1; }
-    if (norn_bootstrap(client) != 0) {
-        fprintf(stderr, "ERROR: DHT bootstrap failed (no network?)\n");
-        norn_free(client);
+    /* Ask nornd for the value; nornd checks dhtstore + publog. */
+    unsigned char val[4096];
+    size_t vlen = 0;
+    if (ipc_round_trip_key("bep44-get-immutable", key, 20, val, &vlen, sizeof(val)) != 0) {
         return 1;
     }
-    dht_pump(client, 500, NULL);
-
-    struct dht_get_ctx ctx;
-    memset(&ctx, 0, sizeof(ctx));
-    if (norn_get_immutable(client, key, on_dht_value, &ctx) != 0) {
-        fprintf(stderr, "ERROR: Failed to start DHT get\n");
-        norn_free(client);
-        return 1;
-    }
-    dht_pump(client, timeout_ms, &ctx.found);
-
-    int rc;
-    if (ctx.found) {
-        fwrite(ctx.value, 1, ctx.len, stdout);
-        fputc('\n', stdout);
-        rc = 0;
-    } else {
-        fprintf(stderr, "norn: no value found for %s\n", hash_str);
-        rc = 1;
-    }
-    norn_free(client);
-    return rc;
+    fwrite(val, 1, vlen, stdout);
+    fputc('\n', stdout);
+    return 0;
 }
 
 /* `norn bep44 set <name> <value>` — publish a salted mutable record.
@@ -1427,14 +1167,13 @@ int main(int argc, char **argv) {
         {"key", required_argument, 0, 'k'},
         {"port", required_argument, 0, 'p'},
         {"timeout", required_argument, 0, 't'},
-        {"log-level", required_argument, 0, 'l'},
         {"help", no_argument, 0, 'h'},
         {0, 0, 0, 0}
     };
     
     int opt;
     
-    while ((opt = getopt_long(argc, argv, "+k:p:t:l:h", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "+k:p:t:h", long_options, NULL)) != -1) {
         switch (opt) {
             case 'k':
                 key_file = optarg;
@@ -1450,21 +1189,6 @@ int main(int argc, char **argv) {
                 timeout_ms = atoi(optarg);
                 if (timeout_ms <= 0) {
                     fprintf(stderr, "ERROR: Invalid timeout: %s\n", optarg);
-                    return 1;
-                }
-                break;
-            case 'l':
-                if (strcmp(optarg, "debug") == 0) {
-                    log_level = LOG_DEBUG;
-                } else if (strcmp(optarg, "info") == 0) {
-                    log_level = LOG_INFO;
-                } else if (strcmp(optarg, "warn") == 0) {
-                    log_level = LOG_WARN;
-                } else if (strcmp(optarg, "error") == 0) {
-                    log_level = LOG_ERROR;
-                } else {
-                    fprintf(stderr, "ERROR: Invalid log level: %s\n", optarg);
-                    fprintf(stderr, "Valid levels: debug, info, warn, error\n");
                     return 1;
                 }
                 break;

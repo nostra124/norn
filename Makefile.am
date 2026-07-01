@@ -52,6 +52,7 @@ libnorn_la_LIBADD = $(SODIUM_LIBS) $(AVAHI_LIBS)
 # the same object code.
 noinst_LTLIBRARIES = libnornd.la
 libnornd_la_SOURCES = src/nornd/ipc.c src/nornd/identity.c src/nornd/dispatch.c src/nornd/client.c src/nornd/cli_cluster.c src/nornd/cli_peer.c src/nornd/served_proto.c src/nornd/store.c src/nornd/served.c src/nornd/served_conn.c src/nornd/localstore.c src/nornd/publog.c src/nornd/pubqueue.c src/nornd/dht_persist.c src/nornd/agent.c src/nornd/peers.c src/nornd/transport.c
+libnornd_la_LIBADD = libnorn.la
 libnornd_la_CFLAGS = $(SODIUM_CFLAGS) -Wall -Wextra -Werror -std=gnu99 -I$(top_srcdir)/src/libnorn -I$(top_srcdir)/src/nornd
 
 # Internal headers: not installed, but must ship in the tarball (they're
