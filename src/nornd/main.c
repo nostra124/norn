@@ -16,12 +16,14 @@
 
 #include "config.h"
 #include "agent.h"
+#include "bep44.h"
 #include "crypto.h"
 #include "dispatch.h"
 #include "identity.h"
 #include "ipc.h"
 #include "localstore.h"
 #include "dht_persist.h"
+#include "pubqueue.h"
 #include "norn.h"
 #include "norn_cluster.h"
 #include "norn_raft.h"
@@ -170,6 +172,7 @@ typedef struct {
     int n;
     localstore_t lstore;   /* `norn node set` keys: local, non-replicated */
     publog_t publog;       /* `norn bep44 set/put` publish log */
+    pubqueue_t pubqueue;   /* queued DHT publishes (drained async) */
 } serve_host_t;
 
 /* served-KV backend: read GET/LIST from the local store (node-set keys). */
@@ -387,6 +390,7 @@ typedef struct {
     uint16_t listen_port;   /* the DHT UDP port we listen on (for the self row) */
     localstore_t *lstore;    /* `norn node set` keys (the served local store) */
     publog_t *publog;        /* `norn bep44 set/put` publish log */
+    pubqueue_t *pubqueue;    /* queued DHT publishes (drained async by the main loop) */
 } serve_ctx_t;
 
 /* Read, decode, dispatch and reply to one ready client. Returns 0 to keep the
@@ -422,6 +426,54 @@ static int serve_client(int fd, serve_ctx_t *ctx) {
             strcpy(resp.err, "store full or key too large");
         } else {
             resp.ok = 1;
+        }
+    } else if (strcmp(req.op, "bep44-set") == 0) {
+        /* `norn bep44 set <name> <value>`: enqueue an async mutable publish.
+         * req.key = name, req.val = value. Signs with the node's keypair,
+         * computes the target, stores in publog + pubqueue, returns the key. */
+        if (req.klen == 0 || !req.has_val || !ctx->pubqueue || !ctx->kp) {
+            resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "missing name or value");
+        } else {
+            char name[128] = {0};
+            size_t nl = req.klen < sizeof(name) - 1 ? req.klen : sizeof(name) - 1;
+            memcpy(name, req.key, nl);
+            uint32_t seq = (uint32_t)time(NULL);
+            if (pubqueue_add_mutable(ctx->pubqueue, ctx->kp->public_key,
+                                     ctx->kp->secret_key, req.val, req.vlen,
+                                     seq, name) != 0) {
+                resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "publish queue full");
+            } else {
+                /* Compute the target for the response + publog. */
+                unsigned char target[20];
+                bep44_target_salted(ctx->kp->public_key,
+                                    (const unsigned char *)name, nl, target);
+                /* Log to publog (with value). */
+                publog_add(ctx->publog, target, 0, name, req.val, req.vlen, seq);
+                /* Return the 20-byte key. */
+                resp.ok = 1;
+                resp.has_val = 1;
+                memcpy(resp.val, target, 20);
+                resp.vlen = 20;
+            }
+        }
+    } else if (strcmp(req.op, "bep44-put") == 0) {
+        /* `norn bep44 put <value>`: enqueue an async immutable publish.
+         * req.val = value. Computes the target, stores in publog + pubqueue,
+         * returns the key. */
+        if (!req.has_val || !ctx->pubqueue) {
+            resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "missing value");
+        } else {
+            if (pubqueue_add_immutable(ctx->pubqueue, req.val, req.vlen) != 0) {
+                resp.ok = 0; resp.has_err = 1; strcpy(resp.err, "publish queue full");
+            } else {
+                unsigned char target[20];
+                bep44_immutable_target(req.val, req.vlen, target);
+                publog_add(ctx->publog, target, 1, NULL, req.val, req.vlen, 0);
+                resp.ok = 1;
+                resp.has_val = 1;
+                memcpy(resp.val, target, 20);
+                resp.vlen = 20;
+            }
         }
     } else if (strcmp(req.op, "publog-add") == 0) {
         /* `norn bep44 set/put` logs the publish here so `bep44 list` can show
@@ -863,7 +915,7 @@ int main(int argc, char **argv) {
     norn_cluster_kv_watch(cl, (const unsigned char *)"", 0, on_kv_change,
                           &watches);
 
-    serve_ctx_t srv = {&be, &watches, &kp, client, time(NULL), listen_port, NULL, NULL};
+    serve_ctx_t srv = {&be, &watches, &kp, client, time(NULL), listen_port, NULL, NULL, NULL};
 
     /* Node-served KV (FEAT-033): host GET/LIST from the cluster KV and CAT from a
      * file-backed object store under <data-dir>/objects, served to peers that
@@ -890,6 +942,8 @@ int main(int argc, char **argv) {
         srv.lstore = &serve.lstore;
         publog_init(&serve.publog);
         srv.publog = &serve.publog;
+        pubqueue_init(&serve.pubqueue);
+        srv.pubqueue = &serve.pubqueue;
         snprintf(objdir, sizeof(objdir), "%s/objects", base);
         if (nornd_store_init(&serve_store, objdir) == 0) {
             serve.be.ctx = &serve;
@@ -962,6 +1016,25 @@ int main(int argc, char **argv) {
         nornd_transport_poll(xport); /* drain peer frames into the cluster */
         serve_host_pump(&serve);     /* drive node-served KV streams (FEAT-033) */
         norn_cluster_tick(cl, now_ms());
+
+        /* Drain the async publish queue: send DHT put queries for each pending
+         * entry. norn_put_mutable_salt / norn_put_immutable are non-blocking
+         * (they just send the query); the DHT handles propagation. */
+        {
+            int nq = pubqueue_count(&serve.pubqueue);
+            for (int i = 0; i < nq; i++) {
+                const pubqueue_entry_t *e = pubqueue_get(&serve.pubqueue, i);
+                if (!e) break;
+                if (e->immutable)
+                    norn_put_immutable(client, e->value, e->vlen);
+                else
+                    norn_put_mutable_salt(client, e->pubkey, e->secret,
+                                          e->value, e->vlen, e->seq,
+                                          (const unsigned char *)e->name,
+                                          strlen(e->name));
+                pubqueue_done(&serve.pubqueue, i);
+            }
+        }
 
         /* Periodically persist the DHT routing table so we re-join faster
          * after a restart. Every 300s (matching MAINLINE_BOOTSTRAP_INTERVAL). */

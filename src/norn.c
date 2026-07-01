@@ -543,43 +543,68 @@ static int ipc_round_trip_key(const char *op, const unsigned char *key, size_t k
     return 0;
 }
 
-/* Notify nornd of a successful bep44 publish so `bep44 list` can show it.
- * Packs [immutable:1][vlen:4][seq:4][name_len:1][name...][value...] into the
- * IPC value. Best-effort: failure is non-fatal. */
-static void publog_notify(const unsigned char *target, int immutable,
-                          size_t vlen, uint32_t seq, const char *name,
-                          const unsigned char *value) {
-    size_t nl = name ? strlen(name) : 0;
-    if (nl > 127) nl = 127;
-    if (vlen > 1000) vlen = 1000;
-    size_t need = 10 + nl + vlen;
-    if (need > NORND_IPC_MAX_VAL) return;
-    unsigned char val[NORND_IPC_MAX_VAL];
-    val[0] = immutable ? 1 : 0;
-    memcpy(val + 1, &vlen, 4);
-    memcpy(val + 5, &seq, 4);
-    val[9] = (unsigned char)nl;
-    if (nl) memcpy(val + 10, name, nl);
-    if (value && vlen) memcpy(val + 10 + nl, value, vlen);
+/* ipc_round_trip with a binary key + binary value, returning a binary response.
+ * Used by bep44-set/put: sends name+value, receives the 20-byte DHT key. */
+static int ipc_round_trip_kv_bin(const char *op,
+                                 const unsigned char *key, size_t klen,
+                                 const unsigned char *value, size_t vlen,
+                                 unsigned char *resp_val, size_t *resp_vlen,
+                                 size_t resp_cap) {
     char pbuf[512];
     const char *path = nornd_socket_path(pbuf, sizeof(pbuf));
     int fd = ipc_connect(path);
-    if (fd < 0) return;
+    if (fd < 0) {
+        fprintf(stderr, "norn: cannot reach nornd at %s. Is nornd running?\n", path);
+        return -1;
+    }
     nornd_ipc_req_t req;
     memset(&req, 0, sizeof(req));
-    strcpy(req.op, "publog-add");
-    memcpy(req.key, target, 20);
-    req.klen = 20;
-    memcpy(req.val, val, need);
-    req.vlen = need;
-    req.has_val = 1;
+    strcpy(req.op, op);
+    if (key && klen) {
+        if (klen > sizeof(req.key)) klen = sizeof(req.key);
+        memcpy(req.key, key, klen);
+        req.klen = klen;
+    }
+    if (value && vlen) {
+        if (vlen > sizeof(req.val)) vlen = sizeof(req.val);
+        memcpy(req.val, value, vlen);
+        req.vlen = vlen;
+        req.has_val = 1;
+    }
     unsigned char wire[NORND_IPC_MAX_BODY + 4];
     int wlen = nornd_ipc_encode_req(&req, wire, sizeof(wire));
-    if (wlen > 0) {
-        ssize_t w = write(fd, wire, (size_t)wlen);
-        (void)w;
+    if (wlen < 0 || write(fd, wire, (size_t)wlen) != wlen) {
+        close(fd);
+        return -1;
+    }
+    unsigned char frame[NORND_IPC_MAX_BODY + 4];
+    size_t got = 0;
+    while (got < 4) {
+        ssize_t n = read(fd, frame + got, 4 - got);
+        if (n <= 0) { close(fd); return -1; }
+        got += (size_t)n;
+    }
+    int64_t body = nornd_ipc_frame_len(frame, 4);
+    if (body < 0 || (size_t)body + 4 > sizeof(frame)) { close(fd); return -1; }
+    while (got < (size_t)body + 4) {
+        ssize_t n = read(fd, frame + got, (size_t)body + 4 - got);
+        if (n <= 0) { close(fd); return -1; }
+        got += (size_t)n;
     }
     close(fd);
+    nornd_ipc_resp_t resp;
+    size_t consumed = 0;
+    if (nornd_ipc_decode_resp(frame, got, &resp, &consumed) != 0) return -1;
+    if (!resp.ok) {
+        if (resp.has_err && resp.err[0])
+            fprintf(stderr, "norn: %s\n", resp.err);
+        return -1;
+    }
+    size_t n = resp.vlen;
+    if (n > resp_cap) n = resp_cap;
+    memcpy(resp_val, resp.val, n);
+    *resp_vlen = n;
+    return 0;
 }
 
 static int do_node_secret(int argc, char **argv) {
@@ -1043,37 +1068,22 @@ static int do_put_immutable(int argc, char **argv) {
         return 1;
     }
 
-    unsigned char self_pub[32], self_sec[64];
-    if (load_keypair(self_pub, self_sec) != 0) return 1;
-
-    norn_config_t cfg;
-    memset(&cfg, 0, sizeof(cfg));
-    cfg.version = NORN_VERSION;
-    norn_client_t *client = norn_new(self_pub, self_sec, &cfg);
-    if (!client) { fprintf(stderr, "ERROR: Failed to create DHT client\n"); return 1; }
-    if (norn_bootstrap(client) != 0) {
-        fprintf(stderr, "ERROR: DHT bootstrap failed (no network?)\n");
-        norn_free(client);
+    /* Send to nornd via IPC; nornd enqueues an async DHT publish, logs to
+     * publog, and returns the 20-byte key. No blocking. */
+    unsigned char key[20];
+    size_t klen = 0;
+    if (ipc_round_trip_kv_bin("bep44-put", NULL, 0,
+                              (const unsigned char *)value, value_len,
+                              key, &klen, sizeof(key)) != 0) {
         return 1;
     }
-    dht_pump(client, 500, NULL);
-
-    if (norn_put_immutable(client, (const unsigned char *)value, value_len) != 0) {
-        fprintf(stderr, "ERROR: DHT put failed\n");
-        norn_free(client);
+    if (klen != 20) {
+        fprintf(stderr, "norn bep44 put: unexpected response length\n");
         return 1;
     }
-    dht_pump(client, 1000, NULL);
-
-    /* The immutable target = SHA1(bencode(value)); compute it for display. */
-    unsigned char target[20];
-    bep44_immutable_target((const unsigned char *)value, value_len, target);
-    publog_notify(target, 1, value_len, 0, NULL, (const unsigned char *)value);
     printf("%s", col_magenta());
-    for (int i = 0; i < 20; i++) printf("%02x", target[i]);
+    for (int i = 0; i < 20; i++) printf("%02x", key[i]);
     printf("%s\n", col_reset());
-
-    norn_free(client);
     return 0;
 }
 
@@ -1173,8 +1183,6 @@ static int do_set(int argc, char **argv) {
     };
 
     int opt;
-    int seq_given = 0;
-    uint32_t seq = 0;
 
     optind = 2;
 
@@ -1182,10 +1190,6 @@ static int do_set(int argc, char **argv) {
         switch (opt) {
             case 'k':
                 key_file = optarg;
-                break;
-            case 's':
-                seq = (uint32_t)strtoul(optarg, NULL, 10);
-                seq_given = 1;
                 break;
             case 'h':
                 fprintf(stdout, "Usage: %s bep44 set [OPTIONS] <name> <value>\n", prog_name);
@@ -1201,7 +1205,6 @@ static int do_set(int argc, char **argv) {
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Options:\n");
                 fprintf(stdout, "  --key <path>    Key file path\n");
-                fprintf(stdout, "  --seq <n>       Sequence number (default: current unix time)\n");
                 fprintf(stdout, "  --help          Show this help\n");
                 return 0;
             default:
@@ -1223,56 +1226,23 @@ static int do_set(int argc, char **argv) {
         return 1;
     }
 
-    /* BEP-44 mutable records carry a monotonically increasing seq. Default to
-     * the current unix time so repeated sets from the same key advance. */
-    if (!seq_given)
-        seq = (uint32_t)time(NULL);
-
-    unsigned char pubkey[32], secret[64];
-    if (load_keypair(pubkey, secret) != 0) {
+    /* Send to nornd via IPC; nornd signs with the node keypair, enqueues an
+     * async DHT publish, logs to publog, and returns the 20-byte key. No
+     * blocking — the daemon's event loop publishes during norn_tick. */
+    unsigned char key[20];
+    size_t klen = 0;
+    if (ipc_round_trip_kv_bin("bep44-set", (const unsigned char *)name, strlen(name),
+                              (const unsigned char *)value, value_len,
+                              key, &klen, sizeof(key)) != 0) {
         return 1;
     }
-
-    norn_config_t cfg;
-    memset(&cfg, 0, sizeof(cfg));
-    cfg.version = NORN_VERSION;
-
-    norn_client_t *client = norn_new(pubkey, secret, &cfg);
-    if (!client) {
-        fprintf(stderr, "ERROR: Failed to create DHT client\n");
+    if (klen != 20) {
+        fprintf(stderr, "norn bep44 set: unexpected response length\n");
         return 1;
     }
-
-    if (norn_bootstrap(client) != 0) {
-        fprintf(stderr, "ERROR: DHT bootstrap failed (no network?)\n");
-        norn_free(client);
-        return 1;
-    }
-    /* Populate the routing table before publishing. */
-    dht_pump(client, 500, NULL);
-
-    if (norn_put_mutable_salt(client, pubkey, secret,
-                              (const unsigned char *)value, value_len, seq,
-                              (const unsigned char *)name, strlen(name)) != 0) {
-        fprintf(stderr, "ERROR: DHT put failed\n");
-        norn_free(client);
-        return 1;
-    }
-    /* Give the announce time to reach the storing nodes. */
-    dht_pump(client, 1000, NULL);
-
-    /* Compute the target so we can log the publish + show it. */
-    unsigned char target[20];
-    bep44_target_salted(pubkey, (const unsigned char *)name, strlen(name), target);
-    publog_notify(target, 0, value_len, seq, name, (const unsigned char *)value);
-
-    /* Print the DHT key (the SHA1 hash the record is stored under), like
-     * `bep44 put` prints the immutable key. */
     printf("%s", col_magenta());
-    for (int i = 0; i < 20; i++) printf("%02x", target[i]);
+    for (int i = 0; i < 20; i++) printf("%02x", key[i]);
     printf("%s\n", col_reset());
-
-    norn_free(client);
     return 0;
 }
 
