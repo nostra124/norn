@@ -337,10 +337,35 @@ int norn_bootstrap(norn_client_t *client);
  * }
  * @endcode
  */
-int norn_put_mutable(norn_client_t *client,
-                     const unsigned char *pubkey, const unsigned char *secret,
-                     const unsigned char *value, size_t value_len,
-                     uint32_t seq);
+ int norn_put_mutable(norn_client_t *client,
+                      const unsigned char *pubkey, const unsigned char *secret,
+                      const unsigned char *value, size_t value_len,
+                      uint32_t seq);
+
+/**
+ * @brief Store a salted mutable signed record in the DHT (BEP-44)
+ *
+ * As norn_put_mutable(), but the target is salted: target = SHA1("k" ‖ pubkey
+ * ‖ salt). This lets one keypair publish many distinct named records (the salt
+ * is the name), rather than exactly one per key.
+ *
+ * @param client  Client handle
+ * @param pubkey  Ed25519 public key (32 bytes, caller-owned)
+ * @param secret  Ed25519 secret key (64 bytes, caller-owned)
+ * @param value   Value bytes (max 1000)
+ * @param value_len Value length
+ * @param seq     Monotonically increasing sequence number
+ * @param salt    Salt bytes (the record "name"); may be NULL (unsalted)
+ * @param saltlen Salt length
+ * @return 0 on success (query sent), -1 on error
+ *
+ * @note BEP-44: Implements salted mutable items
+ * @note NULL-safe: Returns -1 if client, pubkey, secret, or value is NULL
+ */
+int norn_put_mutable_salt(norn_client_t *client,
+                          const unsigned char *pubkey, const unsigned char *secret,
+                          const unsigned char *value, size_t value_len,
+                          uint32_t seq, const unsigned char *salt, size_t saltlen);
 
 /**
  * @brief Retrieve a mutable signed record from the DHT (BEP-44)
@@ -379,9 +404,31 @@ int norn_put_mutable(norn_client_t *client,
  * }
  * @endcode
  */
-int norn_get_mutable(norn_client_t *client,
-                     const unsigned char *pubkey,
-                     norn_get_callback_t callback, void *user_data);
+ int norn_get_mutable(norn_client_t *client,
+                      const unsigned char *pubkey,
+                      norn_get_callback_t callback, void *user_data);
+
+/**
+ * @brief Retrieve a salted mutable signed record from the DHT (BEP-44)
+ *
+ * As norn_get_mutable(), but the target is salted: target = SHA1("k" ‖ pubkey
+ * ‖ salt). Use this to fetch a record previously stored with
+ * norn_put_mutable_salt() under the same pubkey + salt.
+ *
+ * @param client  Client handle
+ * @param pubkey  Ed25519 public key (32 bytes) — the record's owner
+ * @param salt    Salt bytes (the record "name"); may be NULL (unsalted)
+ * @param saltlen Salt length
+ * @param callback Function to call when value is found
+ * @param user_data User data passed to callback
+ * @return 0 on success (query sent), -1 on error
+ *
+ * @note BEP-44: Implements salted mutable items
+ */
+int norn_get_mutable_salt(norn_client_t *client,
+                          const unsigned char *pubkey,
+                          const unsigned char *salt, size_t saltlen,
+                          norn_get_callback_t callback, void *user_data);
 
 /**
  * @brief Store an immutable value in the DHT (BEP-44)

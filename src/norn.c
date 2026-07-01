@@ -721,16 +721,18 @@ static int do_get(int argc, char **argv) {
     static struct option long_options[] = {
         {"key", required_argument, 0, 'k'},
         {"timeout", required_argument, 0, 't'},
+        {"name", required_argument, 0, 'n'},
         {"json", no_argument, 0, 'j'},
         {"help", no_argument, 0, 'h'},
         {0, 0, 0, 0}
     };
-    
+
     int opt;
-    
+    const char *name = NULL;
+
     optind = 2;
-    
-    while ((opt = getopt_long(argc, argv, "+k:t:jh", long_options, NULL)) != -1) {
+
+    while ((opt = getopt_long(argc, argv, "+k:t:n:jh", long_options, NULL)) != -1) {
         switch (opt) {
             case 'k':
                 key_file = optarg;
@@ -742,20 +744,24 @@ static int do_get(int argc, char **argv) {
                     return 1;
                 }
                 break;
+            case 'n':
+                name = optarg;
+                break;
             case 'j':
                 /* JSON output - would format output as JSON */
                 break;
             case 'h':
                 fprintf(stdout, "Usage: %s get [OPTIONS] <key>\n", prog_name);
                 fprintf(stdout, "\n");
-                fprintf(stdout, "Retrieve record from DHT\n");
+                fprintf(stdout, "Retrieve a record from the DHT\n");
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Arguments:\n");
-                fprintf(stdout, "  <key>           64-character hex public key\n");
+                fprintf(stdout, "  <key>           64-char hex public key (mutable)\n");
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Options:\n");
                 fprintf(stdout, "  --key <path>      Key file path\n");
                 fprintf(stdout, "  --timeout <ms>    Query timeout (default: %d)\n", DEFAULT_TIMEOUT);
+                fprintf(stdout, "  --name <name>     Salt/name: fetch a named (salted) record\n");
                 fprintf(stdout, "  --json            Output as JSON\n");
                 fprintf(stdout, "  --help            Show this help\n");
                 return 0;
@@ -812,7 +818,14 @@ static int do_get(int argc, char **argv) {
 
     struct dht_get_ctx ctx;
     memset(&ctx, 0, sizeof(ctx));
-    if (norn_get_mutable(client, target, on_dht_value, &ctx) != 0) {
+    int gerr;
+    if (name)
+        gerr = norn_get_mutable_salt(client, target,
+                                     (const unsigned char *)name, strlen(name),
+                                     on_dht_value, &ctx);
+    else
+        gerr = norn_get_mutable(client, target, on_dht_value, &ctx);
+    if (gerr != 0) {
         fprintf(stderr, "ERROR: Failed to start DHT get\n");
         norn_free(client);
         return 1;
@@ -837,6 +850,7 @@ static int do_set(int argc, char **argv) {
     static struct option long_options[] = {
         {"key", required_argument, 0, 'k'},
         {"seq", required_argument, 0, 's'},
+        {"name", required_argument, 0, 'n'},
         {"help", no_argument, 0, 'h'},
         {0, 0, 0, 0}
     };
@@ -844,10 +858,11 @@ static int do_set(int argc, char **argv) {
     int opt;
     int seq_given = 0;
     uint32_t seq = 0;
+    const char *name = NULL;
 
     optind = 2;
 
-    while ((opt = getopt_long(argc, argv, "+k:s:h", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "+k:s:n:h", long_options, NULL)) != -1) {
         switch (opt) {
             case 'k':
                 key_file = optarg;
@@ -856,12 +871,16 @@ static int do_set(int argc, char **argv) {
                 seq = (uint32_t)strtoul(optarg, NULL, 10);
                 seq_given = 1;
                 break;
+            case 'n':
+                name = optarg;
+                break;
             case 'h':
                 fprintf(stdout, "Usage: %s set [OPTIONS] <value>\n", prog_name);
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Publish a signed mutable record to the DHT (BEP-44).\n");
-                fprintf(stdout, "The record is addressed by your public key; retrieve it\n");
-                fprintf(stdout, "with `%s bep44 get <your-public-key>`.\n", prog_name);
+                fprintf(stdout, "The record is addressed by your public key (and the\n");
+                fprintf(stdout, "salt name if --name is given); retrieve it with\n");
+                fprintf(stdout, "`%s bep44 get <your-public-key> [--name <name>]`.\n", prog_name);
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Arguments:\n");
                 fprintf(stdout, "  <value>         Value to store (max %d bytes)\n", MAX_VALUE_SIZE);
@@ -869,6 +888,8 @@ static int do_set(int argc, char **argv) {
                 fprintf(stdout, "Options:\n");
                 fprintf(stdout, "  --key <path>    Key file path\n");
                 fprintf(stdout, "  --seq <n>       Sequence number (default: current unix time)\n");
+                fprintf(stdout, "  --name <name>   Salt/name: publish a distinct named record\n");
+                fprintf(stdout, "                  (one keypair, many records)\n");
                 fprintf(stdout, "  --help          Show this help\n");
                 return 0;
             default:
@@ -917,8 +938,10 @@ static int do_set(int argc, char **argv) {
     /* Populate the routing table before publishing. */
     dht_pump(client, 2000, NULL);
 
-    if (norn_put_mutable(client, pubkey, secret,
-                         (const unsigned char *)value, value_len, seq) != 0) {
+    if (norn_put_mutable_salt(client, pubkey, secret,
+                              (const unsigned char *)value, value_len, seq,
+                              (const unsigned char *)name,
+                              name ? strlen(name) : 0) != 0) {
         fprintf(stderr, "ERROR: DHT put failed\n");
         norn_free(client);
         return 1;
@@ -926,13 +949,15 @@ static int do_set(int argc, char **argv) {
     /* Give the announce time to reach the storing nodes. */
     dht_pump(client, timeout_ms, NULL);
 
-    /* recfile output: key=<hex>\nseq=<n>\n */
-    char rec[128];
+    /* recfile output: key=<hex>\n[seq=<n>\n][name=<name>\n] */
+    char rec[160];
     int rn = 0;
     rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "key=");
     for (int i = 0; i < 32; i++)
         rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "%02x", pubkey[i]);
     rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "\nseq=%u\n", seq);
+    if (name)
+        rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "name=%s\n", name);
     print_recfile_pretty((const unsigned char *)rec, (size_t)rn);
 
     norn_free(client);
@@ -945,8 +970,8 @@ static int do_set(int argc, char **argv) {
 static void bep44_help(FILE *out, const char *prog) {
     fprintf(out, "Usage: %s bep44 <get|set> [ARGS...]\n", prog);
     fprintf(out, "\nSubcommands:\n"
-            "  get <pubkey>       Retrieve a signed record from the DHT\n"
-            "  set <value>        Publish a signed record (keyed by your pubkey)\n");
+            "  get <pubkey> [--name <name>]  Retrieve a mutable record (salted if --name)\n"
+            "  set <value>  [--name <name>]  Publish a mutable record (salted if --name)\n");
 }
 
 static int do_bep44(int argc, char **argv, int sub_idx) {

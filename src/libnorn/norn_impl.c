@@ -347,46 +347,67 @@ int norn_put_mutable(norn_client_t *client,
                      const unsigned char *pubkey, const unsigned char *secret,
                      const unsigned char *value, size_t value_len,
                      uint32_t seq) {
+    return norn_put_mutable_salt(client, pubkey, secret, value, value_len, seq,
+                                 NULL, 0);
+}
+
+int norn_put_mutable_salt(norn_client_t *client,
+                          const unsigned char *pubkey, const unsigned char *secret,
+                          const unsigned char *value, size_t value_len,
+                          uint32_t seq, const unsigned char *salt, size_t saltlen) {
     if (!client || !client->initialized || !pubkey || !secret || !value) return -1;
     if (value_len > 1000) return -1;
-    
-    /* Compute target */
+
+    /* Compute target: salted if a salt is given, else the unsalted form. */
     unsigned char target[20];
-    bep44_target_for_pubkey(target, pubkey);
-    
+    if (salt && saltlen)
+        bep44_target_salted(pubkey, salt, saltlen, target);
+    else
+        bep44_target_for_pubkey(target, pubkey);
+
     /* Sign value */
     unsigned char sig[64];
     unsigned char signbuf[2048];
     int signlen = bep44_signbuf(seq, value, value_len, signbuf, sizeof(signbuf));
     if (signlen < 0) return -1;
-    
+
     if (crypto_sign_detached(sig, NULL, signbuf, signlen, secret) != 0) return -1;
-    
+
     /* Issue async put */
     return mainline_lookup_mutable(&client->ml, target, 1, pubkey, seq,
-                                    value, value_len, sig, NULL, 0, 0,
+                                    value, value_len, sig, salt, saltlen, 0,
                                     NULL, NULL, 0, 0, NULL);
 }
 
 int norn_get_mutable(norn_client_t *client,
                      const unsigned char *pubkey,
                      norn_get_callback_t callback, void *user_data) {
+    return norn_get_mutable_salt(client, pubkey, NULL, 0, callback, user_data);
+}
+
+int norn_get_mutable_salt(norn_client_t *client,
+                          const unsigned char *pubkey,
+                          const unsigned char *salt, size_t saltlen,
+                          norn_get_callback_t callback, void *user_data) {
     if (!client || !client->initialized || !pubkey || !callback) return -1;
-    
+
     /* Create transaction */
     norn_transaction_t *txn = norn_transaction_new(&client->txn, TXN_GET_MUTABLE, pubkey);
     if (!txn) return -1;
-    
+
     txn->get_callback = callback;
     txn->user_data = user_data;
-    
-    /* Compute target */
+
+    /* Compute target: salted if a salt is given, else the unsalted form. */
     unsigned char target[20];
-    bep44_target_for_pubkey(target, pubkey);
-    
+    if (salt && saltlen)
+        bep44_target_salted(pubkey, salt, saltlen, target);
+    else
+        bep44_target_for_pubkey(target, pubkey);
+
     /* Issue async get */
     return mainline_lookup_mutable(&client->ml, target, 0, NULL, 0,
-                                    NULL, 0, NULL, NULL, 0, 0,
+                                    NULL, 0, NULL, salt, saltlen, 0,
                                     NULL, NULL, 0, 0, NULL);
 }
 
