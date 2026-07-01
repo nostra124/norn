@@ -183,3 +183,79 @@ setup() {
     run "$NORN_BIN" --timeout 5000 version
     [ "$status" -eq 0 ]
 }
+
+@test "norn peer --help shows subcommands" {
+    run "$NORN_BIN" peer --help
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"connect"* ]]
+    [[ "$output" == *"get"* ]]
+    [[ "$output" == *"cat"* ]]
+    [[ "$output" == *"list"* ]]
+    [[ "$output" == *"public"* ]]
+}
+
+@test "norn peer with no subcommand shows error" {
+    run "$NORN_BIN" peer
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage"* ]]
+}
+
+@test "norn peer connect without spec shows usage" {
+    run "$NORN_BIN" peer connect
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage"* ]]
+}
+
+@test "norn peer connect with invalid spec fails" {
+    run "$NORN_BIN" peer connect dead
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"norn:"* ]]
+}
+
+@test "norn peer get without args shows usage" {
+    run "$NORN_BIN" peer get
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage"* ]]
+}
+
+@test "norn peer get with invalid spec fails" {
+    run "$NORN_BIN" peer get dead key
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"norn:"* ]]
+}
+
+@test "norn peer cat without args shows usage" {
+    run "$NORN_BIN" peer cat
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage"* ]]
+}
+
+@test "norn peer cat with invalid spec fails" {
+    run "$NORN_BIN" peer cat dead hash
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"norn:"* ]]
+}
+
+@test "norn peer list returns valid TSV" {
+    run "$NORN_BIN" peer list
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Node-Id"* ]]
+}
+
+@test "norn peer public without node-id shows usage" {
+    run "$NORN_BIN" peer public
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage"* ]]
+}
+
+@test "norn peer public with invalid node-id shows error" {
+    run "$NORN_BIN" peer public dead
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"40 hex"* ]]
+}
+
+@test "norn peer with unknown subcommand shows error" {
+    run "$NORN_BIN" peer nonexistent
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Unknown"* ]]
+}

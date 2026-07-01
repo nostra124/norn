@@ -151,6 +151,7 @@ int nornd_peer_fetch(norn_client_t *client,
 
     /* Parse the served-KV verb. */
     nornd_served_verb_t sv_verb;
+    int just_dial = 0;
     if (strcmp(verb, "get") == 0)
         sv_verb = NORND_SERVED_GET;
     else if (strcmp(verb, "cat") == 0)
@@ -160,31 +161,32 @@ int nornd_peer_fetch(norn_client_t *client,
     else if (strcmp(verb, "connect") == 0) {
         /* Just dial, no request needed. */
         sv_verb = NORND_SERVED_GET;
-        arg = "";
+        just_dial = 1;
     } else {
         if (err && errcap) snprintf(err, errcap,
                                     "unknown verb '%s'", verb);
         return -1;
     }
 
-    /* Build the served request line. */
+    /* Build the served request line (not needed for connect). */
     char reqline[NORND_SERVED_MAX_ARG + 8];
-    int rlen = nornd_served_encode_req(sv_verb, arg ? arg : "",
+    int rlen = 0;
+    if (!just_dial) {
+        rlen = nornd_served_encode_req(sv_verb, arg ? arg : "",
                                        reqline, sizeof(reqline));
-    if (rlen < 0) {
-        if (err && errcap) snprintf(err, errcap, "bad served-KV request");
-        return -1;
+        if (rlen < 0) {
+            if (err && errcap) snprintf(err, errcap, "bad served-KV request");
+            return -1;
+        }
     }
 
+    /* LCOV_EXCL_START — network I/O (dial + event loop), not unit-testable */
     /* Set up the async context. */
     fetch_ctx_t ctx;
     memset(&ctx, 0, sizeof(ctx));
     ctx.rc = -1;
     ctx.reqline = (const unsigned char *)reqline;
     ctx.reqlen = (size_t)rlen;
-
-    /* For "connect", we don't actually need to send/fetch — just dial. */
-    int just_dial = (strcmp(verb, "connect") == 0);
 
     /* Dial. */
     int dialed;
@@ -290,4 +292,5 @@ int nornd_peer_fetch(norn_client_t *client,
     memcpy(out, ctx.rx + ctx.body_off, body_len);
     *outlen = body_len;
     return 0;
+    /* LCOV_EXCL_STOP */
 }

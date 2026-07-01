@@ -1,7 +1,7 @@
 # Coverage-tracked sources for norn
 # 100% line AND branch coverage required before commit
 # Add LCOV_EXCL_LINE / LCOV_EXCL_BR_LINE for genuinely untestable paths
-# Paths are relative to src/libnorn/
+# Paths are relative to the project root
 # 
 # Note: Network I/O modules (norn.c, norn_impl.c, net.c) are excluded from
 # unit test coverage - they require SIT/PIT with real network infrastructure.
@@ -40,3 +40,4 @@ src/nornd/served.c
 src/nornd/agent.c
 
 src/nornd/peers.c
+src/nornd/peer_fetch.c
