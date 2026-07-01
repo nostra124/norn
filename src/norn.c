@@ -1158,9 +1158,9 @@ static int do_set(int argc, char **argv) {
                 fprintf(stdout, "Usage: %s bep44 set [OPTIONS] <name> <value>\n", prog_name);
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Publish a signed mutable record to the DHT (BEP-44).\n");
-                fprintf(stdout, "The record is named by <name> (the BEP-44 salt) and\n");
-                fprintf(stdout, "addressed by your public key; retrieve it with\n");
-                fprintf(stdout, "`%s bep44 get <your-node-id> <name>`.\n", prog_name);
+                fprintf(stdout, "The record is named by <name> (the BEP-44 salt); prints\n");
+                fprintf(stdout, "the DHT key (SHA1 hash) it is stored under. Retrieve it\n");
+                fprintf(stdout, "with `norn bep44 get <your-node-id> <name>`.\n");
                 fprintf(stdout, "\n");
                 fprintf(stdout, "Arguments:\n");
                 fprintf(stdout, "  <name>          Record name (the salt; one keypair, many records)\n");
@@ -1233,14 +1233,11 @@ static int do_set(int argc, char **argv) {
     bep44_target_salted(pubkey, (const unsigned char *)name, strlen(name), target);
     publog_notify(target, 0, value_len, seq, name, (const unsigned char *)value);
 
-    /* recfile output: key=<hex>\nseq=<n>\nname=<name>\n */
-    char rec[160];
-    int rn = 0;
-    rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "key=");
-    for (int i = 0; i < 32; i++)
-        rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "%02x", pubkey[i]);
-    rn += snprintf(rec + rn, sizeof(rec) - (size_t)rn, "\nseq=%u\nname=%s\n", seq, name);
-    print_recfile_pretty((const unsigned char *)rec, (size_t)rn);
+    /* Print the DHT key (the SHA1 hash the record is stored under), like
+     * `bep44 put` prints the immutable key. */
+    printf("%s", col_magenta());
+    for (int i = 0; i < 20; i++) printf("%02x", target[i]);
+    printf("%s\n", col_reset());
 
     norn_free(client);
     return 0;
